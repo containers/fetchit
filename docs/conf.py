@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# WordCount documentation build configuration file, created by
+# Harpoon documentation build configuration file, created by
 # sphinx-quickstart on Fri Jun  8 14:27:52 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -19,7 +19,6 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../source'))
 
 
 # -- General configuration ------------------------------------------------
@@ -46,7 +45,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'WordCount'
+project = 'Harpoon'
 copyright = '2018, Harsha'
 author = 'Harsha'
 
@@ -112,7 +111,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'WordCountdoc'
+htmlhelp_basename = 'Harpoondoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -139,7 +138,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'WordCount.tex', 'WordCount Documentation',
+    (master_doc, 'Harpoon.tex', 'Harpoon Documentation',
      'Harsha', 'manual'),
 ]
 
@@ -149,7 +148,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'wordcount', 'WordCount Documentation',
+    (master_doc, 'harpoon', 'Harpoon Documentation',
      [author], 1)
 ]
 
@@ -160,8 +159,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'WordCount', 'WordCount Documentation',
-     author, 'WordCount', 'One line description of project.',
+    (master_doc, 'Harpoon', 'Harpoon Documentation',
+     author, 'Harpoon', 'GitOps engine for Podman',
      'Miscellaneous'),
 ]
 
