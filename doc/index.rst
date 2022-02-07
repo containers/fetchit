@@ -4,14 +4,13 @@
    table of contents
 
 
-word-count
-==========
+Harpoon
+=======
+Harpoon was designed to allow for the hands off management of containers running on system running podman.
 
 .. toctree::
    :maxdepth: 2
 
    purpose.rst
-   dependencies.rst
-   usage.rst
-   credit.rst
-   exercises.rst
+   engine.rst
+   client.rst
