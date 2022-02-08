@@ -1,4 +1,0 @@
-# This is a fix so that Matplotlib can create plots
-# non-interactively on a cluster.
-
-backend: Agg
