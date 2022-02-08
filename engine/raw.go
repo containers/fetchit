@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/bindings/images"
@@ -16,6 +17,7 @@ import (
 type Raw struct {
 	Image string
 	Name  string
+	Env   map[string]string
 }
 
 func rawPodman(path string) error {
@@ -46,8 +48,11 @@ func rawPodman(path string) error {
 
 	}
 
+	fmt.Printf("env: %v\n", raw.Env)
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
+	s.Env = map[string]string{"color": "blue"}
+	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
