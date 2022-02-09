@@ -18,6 +18,7 @@ type Raw struct {
 	Image string
 	Name  string
 	Env   map[string]string
+	Ports []types.PortMapping
 }
 
 func rawPodman(path string) error {
