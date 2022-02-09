@@ -30,7 +30,7 @@ func rawPodman(path string) error {
 	var raw Raw
 	json.Unmarshal([]byte(rawJson), &raw)
 	// Create a new Podman client
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
+	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -48,10 +48,10 @@ func rawPodman(path string) error {
 
 	}
 
-	fmt.Printf("env: %v\n", raw.Env)
+	fmt.Printf("env: %v\n", raw)
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
-	s.Env = map[string]string{"color": "blue"}
+	s.Env = map[string]string(raw.Env)
 	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
