@@ -15,10 +15,10 @@ import (
 )
 
 type Raw struct {
-	Image string
-	Name  string
-	Env   map[string]string
-	Ports []types.PortMapping
+	Image        string
+	Name         string
+	Env          map[string]string
+	PortMappings []types.PortMapping
 }
 
 func rawPodman(path string) error {
@@ -28,7 +28,7 @@ func rawPodman(path string) error {
 		return err
 	}
 
-	raw := Raw{Ports: []types.PortMapping{}}
+	var raw Raw
 	json.Unmarshal([]byte(rawJson), &raw)
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
@@ -53,7 +53,7 @@ func rawPodman(path string) error {
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
-	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
+	s.PortMappings = []types.PortMapping(raw.PortMappings)
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
