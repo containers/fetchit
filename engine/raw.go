@@ -53,7 +53,7 @@ func rawPodman(path string) error {
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
-	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
+	s.PortMappings = []types.PortMapping(raw.Ports)
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
