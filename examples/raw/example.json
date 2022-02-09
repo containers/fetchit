@@ -1,5 +1,5 @@
 {"Image":"docker.io/mmumshad/simple-webapp-color:latest",
 "Name": "colors",
 "Env": {"color": "blue", "tree": "trunk"},
-"Ports": ["554-223-2311", "332-232-2123"]
+"Ports": [{"ContainerPort: 8080", "HostPort: 8080"}]
 }
