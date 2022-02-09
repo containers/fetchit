@@ -1,3 +1,4 @@
 {"Image":"docker.io/mmumshad/simple-webapp-color:latest",
-"Name":"colors"
+"Name": "colors"
+"Env": {"color": "blue"}
 }
