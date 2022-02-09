@@ -28,7 +28,7 @@ func rawPodman(path string) error {
 		return err
 	}
 
-	var raw Raw
+	raw := Raw{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
@@ -53,7 +53,7 @@ func rawPodman(path string) error {
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
-	s.PortMappings = []types.PortMapping(raw.Ports)
+	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
