@@ -3,8 +3,8 @@
 "Env": {"color": "blue", "tree": "trunk"},
 "Ports": [ 
     {
-    "ContainerPort": 8080, 
-    "HostPort": 8080
+    "HostPort": 8080, 
+    "ContainerPort": 8080
 }
 ]
 }
