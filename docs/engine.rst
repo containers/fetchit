@@ -6,14 +6,11 @@ The Harpoon engine does the heavy lifting of the container management process. T
 
 .. image:: media/Harpoon.png
 
-The engine references a file to ensure the repository and how to deploy the container.
 
-.. code:: bash
-   Method: raw
-   Git: https://github.com/cooktheryan/harpoon-examples
-   Branch: main
-   Directory: ./harpoon-examples
-   Subdirectory: ./examples/raw
+
+Configuration
+=============
+The engine references a file to ensure the repository and how to deploy the container.
 
 
 
