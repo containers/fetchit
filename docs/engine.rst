@@ -9,10 +9,12 @@ The Harpoon engine does the heavy lifting of the container management process. T
 The engine references a file to ensure the repository and how to deploy the container.
 
 .. code:: bash
-   method: compose
-   git: https://github.com/cooktheryan/harpoon-examples
-   branch: main
-   path: compose/
+   Method: raw
+   Git: https://github.com/cooktheryan/harpoon-examples
+   Branch: main
+   Directory: ./harpoon-examples
+   Subdirectory: ./examples/raw
+
 
 
 Method
@@ -34,8 +36,13 @@ Branch
 A specific branch should be fined within the repository for the engine to follow.
 
 
-Path
-----
-Path references the location in which the method file is located within the repository.
+Directory
+---------
+Directory references the location that the repository will be cloned to on the system
+
+
+Subdirectory
+------------
+This is the specific subdirectory containing the json file(s) to be deployed and managed by the engine.
 
 
