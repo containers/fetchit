@@ -22,7 +22,7 @@ Method
 * raw - Deploys a container based on a json definition.
 * compose - Base on podman `compose <https://github.com/containers/podman-compose>`_
 * kubernetes pod - Allows the deployment of containers based on the `pod <https://developers.redhat.com/blog/2019/01/15/podman-managing-containers-pods#podman_pods__what_you_need_to_know>`_
-* systemd - Allows for a systemd file to be created on the system `systemd <https://github.com/containers/podman/blob/main/docs/source/markdown/podman-generate-systemd.1.md`_
+* systemd - Allows for a systemd file to be created on the system `systemd <https://github.com/containers/podman/blob/main/docs/source/markdown/podman-generate-systemd.1.md>`_
 
 Git
 ---
