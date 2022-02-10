@@ -14,16 +14,29 @@ import (
 	"github.com/containers/podman/v4/pkg/specgen"
 )
 
+/* below is an example.json file:
+{"Image":"docker.io/mmumshad/simple-webapp-color:latest",
+"Name": "colors",
+"Env": {"color": "blue", "tree": "trunk"},
+"Ports": [{
+    "HostIP":        "",
+    "ContainerPort": 8080,
+    "HostPort":      8080,
+    "Range":         0,
+    "Protocol":      ""}]
+}
+*/
+
 type Raw struct {
-	Image string
-	Name  string
-	Env   map[string]string
-	Ports []types.PortMapping
+	Image string              `json:"Image"`
+	Name  string              `json:"Name"`
+	Env   map[string]string   `json:"Env"`
+	Ports []types.PortMapping `json:"Ports"`
 }
 
-func rawPodman(path string) error {
+func RawPodman(path string) error {
 	fmt.Printf("Creating podman container from %s\n", path)
-	rawJson, err := ioutil.ReadFile(path + "/example.json")
+	rawJson, err := ioutil.ReadFile("./example.json")
 	if err != nil {
 		return err
 	}
@@ -51,13 +64,6 @@ func rawPodman(path string) error {
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
 	}
-	raw.Ports = append(raw.Ports, types.PortMapping{
-		HostIP:        "",
-		ContainerPort: 8080,
-		HostPort:      8080,
-		Range:         0,
-		Protocol:      "",
-	})
 
 	fmt.Printf("env: %v\n", raw)
 	fmt.Printf("ports: %v\n", raw.Ports)
