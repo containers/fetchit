@@ -26,6 +26,7 @@ For regular user accounts run the following to enable the socket.
 Within */run* a process will be started for the user to interact with the podman socket. Using your UID you can idenitfy the socket.
 
 .. code-block:: bash
+   
    export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
 
 Root
