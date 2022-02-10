@@ -49,8 +49,15 @@ func rawPodman(path string) error {
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
 	}
-
+	raw.Ports = append(raw.Ports, types.PortMapping{
+		HostIP:        "",
+		ContainerPort: 8080,
+		HostPort:      8080,
+		Range:         0,
+		Protocol:      "",
+	})
 	fmt.Printf("env: %v\n", raw)
+	fmt.Printf("ports: %v\n", raw.Ports)
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)

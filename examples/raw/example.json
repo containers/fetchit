@@ -2,8 +2,11 @@
 "Name": "colors",
 "Env": {"color": "blue", "tree": "trunk"},
 "Ports": 
-    {
-    "HostPort": 8080, 
-    "ContainerPort": 8080
+{
+    "HostIP":        "",
+    "ContainerPort": 8080,
+    "HostPort":      8080,
+    "Range":         0,
+    "Protocol":      ""
 }
 }
