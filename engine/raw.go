@@ -21,12 +21,6 @@ type Raw struct {
 	Ports []types.PortMapping
 }
 
-type PortMapping struct {
-	HostPort      int
-	ContainerPort int
-	Protocol      string
-}
-
 func rawPodman(path string) error {
 	fmt.Printf("Creating podman container from %s\n", path)
 	rawJson, err := ioutil.ReadFile(path + "/example.json")
@@ -56,6 +50,13 @@ func rawPodman(path string) error {
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
 	}
+	raw.Ports = append(raw.Ports, types.PortMapping{
+		HostIP:        "",
+		ContainerPort: 8080,
+		HostPort:      8080,
+		Range:         0,
+		Protocol:      "",
+	})
 
 	fmt.Printf("env: %v\n", raw)
 	fmt.Printf("ports: %v\n", raw.Ports)
