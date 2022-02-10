@@ -20,6 +20,7 @@ User
 For regular user accounts run the following to enable the socket.
 
 .. code-block:: bash
+
    systemctl --user enable --now podman.socket
 
 Within */run* a process will be started for the user to interact with the podman socket. Using your UID you can idenitfy the socket.
@@ -32,4 +33,5 @@ Root
 For the root user enable the socket by running the following.
 
 .. code-block:: bash
+
    systemctl enable --now podman.socket

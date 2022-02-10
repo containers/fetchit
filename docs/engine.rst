@@ -13,6 +13,7 @@ Configuration
 The engine references a file to ensure the repository and how to deploy the container.
 
 .. code-block:: json
+
    {
    "Url":"http://github.com/redhat-et/harpoon",
    "Directory": "./wiggles",
