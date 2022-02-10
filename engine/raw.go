@@ -34,18 +34,15 @@ type Raw struct {
 	Ports []types.PortMapping `json:"Ports"`
 }
 
-func RawPodman(path string) error {
+func rawPodman(path string) error {
 	fmt.Printf("Creating podman container from %s\n", path)
-	rawJson, err := ioutil.ReadFile("./example.json")
+	rawJson, err := ioutil.ReadFile(path + "/example.json")
 	if err != nil {
 		return err
 	}
 
 	raw := Raw{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
-	fmt.Printf("raw %+v\n", raw)
-	fmt.Printf("rawjson %+v\n", rawJson)
-	fmt.Printf("%+v\n", raw.Ports)
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
 	if err != nil {
@@ -64,9 +61,7 @@ func RawPodman(path string) error {
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
 	}
-
-	fmt.Printf("env: %v\n", raw)
-	fmt.Printf("ports: %v\n", raw.Ports)
+	// Create a new container
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
