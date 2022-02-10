@@ -18,7 +18,13 @@ type Raw struct {
 	Image string
 	Name  string
 	Env   map[string]string
-	Ports types.PortMapping
+	Ports []types.PortMapping
+}
+
+type PortMapping struct {
+	HostPort      int
+	ContainerPort int
+	Protocol      string
 }
 
 func rawPodman(path string) error {
@@ -29,7 +35,7 @@ func rawPodman(path string) error {
 	}
 
 	var raw Raw
-	raw.Ports = types.PortMapping{}
+	raw.Ports = []types.PortMapping{}
 	json.Unmarshal([]byte(rawJson), &raw)
 	fmt.Printf("%+v\n", raw.Ports)
 	// Create a new Podman client
@@ -50,13 +56,7 @@ func rawPodman(path string) error {
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
 	}
-	raw.Ports = append(raw.Ports, types.PortMapping{
-		HostIP:        "",
-		ContainerPort: 8080,
-		HostPort:      8080,
-		Range:         0,
-		Protocol:      "",
-	})
+
 	fmt.Printf("env: %v\n", raw)
 	fmt.Printf("ports: %v\n", raw.Ports)
 	s := specgen.NewSpecGenerator(raw.Image, false)
