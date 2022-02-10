@@ -14,23 +14,40 @@ import (
 	"github.com/containers/podman/v4/pkg/specgen"
 )
 
+/* below is an example.json file:
+{"Image":"docker.io/mmumshad/simple-webapp-color:latest",
+"Name": "colors",
+"Env": {"color": "blue", "tree": "trunk"},
+"Ports": [{
+    "HostIP":        "",
+    "ContainerPort": 8080,
+    "HostPort":      8080,
+    "Range":         0,
+    "Protocol":      ""}]
+}
+*/
+
 type Raw struct {
-	Image string
-	Name  string
-	Env   map[string]string
+	Image string              `json:"Image"`
+	Name  string              `json:"Name"`
+	Env   map[string]string   `json:"Env"`
+	Ports []types.PortMapping `json:"Ports"`
 }
 
-func rawPodman(path string) error {
+func RawPodman(path string) error {
 	fmt.Printf("Creating podman container from %s\n", path)
-	rawJson, err := ioutil.ReadFile(path + "/example.json")
+	rawJson, err := ioutil.ReadFile("./example.json")
 	if err != nil {
 		return err
 	}
 
-	var raw Raw
+	raw := Raw{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
+	fmt.Printf("raw %+v\n", raw)
+	fmt.Printf("rawjson %+v\n", rawJson)
+	fmt.Printf("%+v\n", raw.Ports)
 	// Create a new Podman client
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
+	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -48,11 +65,12 @@ func rawPodman(path string) error {
 
 	}
 
-	fmt.Printf("env: %v\n", raw.Env)
+	fmt.Printf("env: %v\n", raw)
+	fmt.Printf("ports: %v\n", raw.Ports)
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
-	s.Env = map[string]string{"color": "blue"}
-	s.PortMappings = []types.PortMapping{{HostPort: 8080, ContainerPort: 8080}}
+	s.Env = map[string]string(raw.Env)
+	s.PortMappings = []types.PortMapping(raw.Ports)
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)

@@ -1,6 +1,6 @@
-{"Url":"http://github.com/redhat-et/harpoon",
+{"Url":"http://github.com/cooktheryan/harpoon",
 "Directory": "./wiggles",
 "Subdirectory": "examples/raw",
-"Branch":"main",
+"Branch":"coding",
 "Method":"raw"
 }
