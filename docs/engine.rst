@@ -6,7 +6,7 @@ The Harpoon engine does the heavy lifting of the container management process. T
 
 The engine references a file to ensure the repository and how to deploy the container.
 
-```
+.. code:: bash
 method: compose
 git: https://github.com/cooktheryan/harpoon-examples
 branch: main
@@ -15,10 +15,10 @@ path: compose/
 
 Method
 ------
-
-* compose - Base on podman `compose<https://github.com/containers/podman-compose>`_
-* pod - Allows the deployment of containers based on the `pod<https://developers.redhat.com/blog/2019/01/15/podman-managing-containers-pods#podman_pods__what_you_need_to_know>`_
-* systemd - Allows for a systemd file to be created on the system `systemd<https://github.com/containers/podman/blob/main/docs/source/markdown/podman-generate-systemd.1.md`_
+`Link text <link URL>`_
+* compose - Base on podman `compose <https://github.com/containers/podman-compose>`_
+* pod - Allows the deployment of containers based on the `pod <https://developers.redhat.com/blog/2019/01/15/podman-managing-containers-pods#podman_pods__what_you_need_to_know>`_
+* systemd - Allows for a systemd file to be created on the system `systemd <https://github.com/containers/podman/blob/main/docs/source/markdown/podman-generate-systemd.1.md`_
 
 Git
 ---
