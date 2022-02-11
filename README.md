@@ -10,3 +10,5 @@ On Fedora:
 - libbtrfs
 - btrfs-progs-devel
 - device-mapper-devel
+
+To run podman must be installed.
