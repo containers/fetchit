@@ -11,4 +11,4 @@ On Fedora:
 - btrfs-progs-devel
 - device-mapper-devel
 
-To run podman must be installed.
+To run podman must be installed and the podman socket must be enabled.
