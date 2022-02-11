@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 type Repo struct {
@@ -29,10 +31,26 @@ func main() {
 	if _, err := os.Stat(repo.Directory); os.IsNotExist(err) {
 		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)
 
-		_, err := git.PlainClone(repo.Directory, false, &git.CloneOptions{
+		r, err := git.PlainClone(repo.Directory, false, &git.CloneOptions{
 			URL:        repo.Url,
 			RemoteName: repo.Branch,
 		})
+		ref, err := r.Head()
+
+		// ... retrieving the commit object
+		commit, err := r.CommitObject(ref.Hash())
+
+		// ... retrieve the tree from the commit
+		tree, err := commit.Tree()
+
+		// ... get the files iterator and print the file
+		tree.Files().ForEach(func(f *object.File) error {
+			if strings.Contains(f.Name, repo.Subdirectory) {
+				fmt.Println(f.Name)
+			}
+			return nil
+		})
+
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -54,9 +72,14 @@ func main() {
 		// Pull the latest changes from the origin remote and merge into the current branch
 		err = w.Pull(&git.PullOptions{RemoteName: repo.Branch})
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Nothing to pull.....Requeuing \n")
 		}
 
+		// Print the latest commit that was just pulled
+		ref, err := r.Head()
+		commit, err := r.CommitObject(ref.Hash())
+
+		fmt.Println(commit)
 	} else {
 		fmt.Printf("%s exists but is not a git repository", repo.Directory)
 	}
