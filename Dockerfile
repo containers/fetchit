@@ -10,6 +10,6 @@ FROM docker.io/fedora:35
 
 RUN yum -y update && yum clean all && rm -rf /var/cache/yum
 
-COPY --from=harpoon-builder /opt/app-root/src/github.com/redhat-et/harpoon/engine/engine /usr/local/bin
+COPY --from=harpoon-builder /opt/app-root/src/github.com/redhat-et/harpoon/engine/harpoon /usr/local/bin
 
-CMD ["/usr/local/bin/engine"]
+CMD ["/usr/local/bin/harpoon"]
