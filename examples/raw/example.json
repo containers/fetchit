@@ -3,7 +3,7 @@
     "Env": {"color": "pink", "tree": "trunk"},
     "Ports": [{
         "host_ip":        "",
-        "container_port": 9080,
+        "container_port": 8080,
         "host_port":      8080,
         "range":         0,
         "protocol":      ""}]
