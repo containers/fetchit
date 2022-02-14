@@ -12,6 +12,7 @@ import (
 	"github.com/go-co-op/gocron"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -50,13 +51,23 @@ func process() {
 		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)
 
 		r, err := git.PlainClone(repo.Directory, false, &git.CloneOptions{
-			URL:        repo.Url,
-			RemoteName: repo.Branch,
+			URL:           repo.Url,
+			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Branch)),
+			SingleBranch:  true,
 		})
+		if err != nil {
+			fmt.Printf("Error while cloning the repository: %s\n", err)
+		}
 		ref, err := r.Head()
+		if err != nil {
+			fmt.Printf("Error when retrieving head: %s\n", err)
+		}
 
 		// ... retrieving the commit object
 		commit, err := r.CommitObject(ref.Hash())
+		if err != nil {
+			fmt.Printf("Error when retrieving commit: %s\n", err)
+		}
 
 		// ... retrieve the tree from the commit
 		tree, err := commit.Tree()
@@ -88,8 +99,28 @@ func process() {
 			log.Fatal(err)
 		}
 
+		ref, err := r.Head()
+		if err != nil {
+			fmt.Printf("Error when retrieving head: %s\n", err)
+		}
+
+		// ... retrieving the commit object
+		prevCommit, err := r.CommitObject(ref.Hash())
+		if err != nil {
+			fmt.Printf("Error when retrieving commit: %s\n", err)
+		}
+
+		// ... retrieve the tree from the commit
+		prevTree, err := prevCommit.Tree()
+		if err != nil {
+			fmt.Printf("Error while generating tree: %s\n", err)
+		}
+
 		// Pull the latest changes from the origin remote and merge into the current branch
-		err = w.Pull(&git.PullOptions{RemoteName: repo.Branch})
+		err = w.Pull(&git.PullOptions{
+			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Branch)),
+			SingleBranch:  true,
+		})
 		if err != nil {
 			fmt.Printf("Nothing to pull.....Requeuing \n")
 		} else {
@@ -99,11 +130,25 @@ func process() {
 				fmt.Printf("An error has occured %s\n", err)
 			}
 			commit, err := r.CommitObject(ref.Hash())
+			if err != nil {
+				fmt.Printf("Error when retrieving commit: %s\n", err)
+			}
 
-			fmt.Println(commit)
-			if repo.Method == "raw" {
-				path := repo.Directory + "/" + repo.Subdirectory
-				rawPodman(path)
+			// ... retrieve the tree from the commit
+			tree, err := commit.Tree()
+			if err != nil {
+				fmt.Printf("Error while generating tree: %s\n", err)
+			}
+
+			changes, err := tree.Diff(prevTree)
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, change := range changes {
+				if strings.Contains(change.To.Name, repo.Subdirectory) {
+					path := repo.Directory + "/" + change.To.Name
+					rawPodman(path)
+				}
 			}
 		}
 	} else {
