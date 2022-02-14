@@ -1,0 +1,29 @@
+name: Harpoon Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to Quay
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+          
+      - uses: actions/checkout@v2
+      
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag quay.io/rcook/harpoon:latest
+    
+      - name: push image
+        run: docker push quay.io/rcook/harpoon:latest
