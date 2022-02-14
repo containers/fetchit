@@ -76,6 +76,6 @@ func rawPodman(path string) error {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println("Container started.")
+	fmt.Println("Container started....Requeuing")
 	return nil
 }
