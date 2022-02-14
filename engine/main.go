@@ -7,6 +7,9 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/go-co-op/gocron"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -18,9 +21,24 @@ type Repo struct {
 	Branch       string
 	Method       string
 	Subdirectory string
+	Schedule     string
 }
 
 func main() {
+	repoJson, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var repo Repo
+	json.Unmarshal([]byte(repoJson), &repo)
+
+	s := gocron.NewScheduler(time.UTC)
+	s.Cron(repo.Schedule).Do(process)
+	s.StartAsync()
+	select {}
+}
+
+func process() {
 	repoJson, err := ioutil.ReadFile("config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +64,8 @@ func main() {
 		// ... get the files iterator and print the file
 		tree.Files().ForEach(func(f *object.File) error {
 			if strings.Contains(f.Name, repo.Subdirectory) {
-				fmt.Println(f.Name)
+				path := repo.Directory + "/" + f.Name
+				rawPodman(path)
 			}
 			return nil
 		})
@@ -72,20 +91,22 @@ func main() {
 		// Pull the latest changes from the origin remote and merge into the current branch
 		err = w.Pull(&git.PullOptions{RemoteName: repo.Branch})
 		if err != nil {
-			log.Fatal("Nothing to pull.....Requeuing \n")
+			fmt.Printf("Nothing to pull.....Requeuing \n")
+		} else {
+			// Print the latest commit that was just pulled
+			ref, err := r.Head()
+			if err != nil {
+				fmt.Printf("An error has occured %s\n", err)
+			}
+			commit, err := r.CommitObject(ref.Hash())
+
+			fmt.Println(commit)
+			if repo.Method == "raw" {
+				path := repo.Directory + "/" + repo.Subdirectory
+				rawPodman(path)
+			}
 		}
-
-		// Print the latest commit that was just pulled
-		ref, err := r.Head()
-		commit, err := r.CommitObject(ref.Hash())
-
-		fmt.Println(commit)
 	} else {
-		fmt.Printf("%s exists but is not a git repository", repo.Directory)
-	}
-	fmt.Printf("Deploying items in %s format\n", repo.Method)
-	if repo.Method == "raw" {
-		path := repo.Directory + "/" + repo.Subdirectory
-		rawPodman(path)
+		fmt.Printf("%s exists but is not a git repository", repo.Url)
 	}
 }

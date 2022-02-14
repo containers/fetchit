@@ -35,8 +35,8 @@ type Raw struct {
 }
 
 func rawPodman(path string) error {
-	fmt.Printf("Creating podman container from %s\n", path+"/example.json")
-	rawJson, err := ioutil.ReadFile(path + "/example.json")
+	fmt.Printf("Creating podman container from %s\n", path)
+	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
