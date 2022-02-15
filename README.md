@@ -36,6 +36,12 @@ Define the parameters in your `config.json` to relate to your git repository.
 "Schedule": "*/1 * * * *"
 }
 ```
+Verify running characters before deploying harpoon.
+```
+podman ps
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+```
+
 
 Launch the harpoon container
 ```
@@ -46,6 +52,7 @@ The container will be started and will run in the background. To view the logs:
 
 ```
 podman logs -f harpoon
+
 git clone http://github.com/redhat-et/harpoon main --recursive
 Creating podman container from ./harpoon/examples/raw/example.json
 Trying to pull docker.io/mmumshad/simple-webapp-color:latest...
@@ -70,4 +77,12 @@ A container named colors already exists. Removing the container before redeploy.
 Container created.
 time="2022-02-15T18:04:14Z" level=info msg="Going to start container \"53d86851aad9fc362cb61493c495ec262217c1759e061724dc1f974c35d93d5b\""
 Container started....Requeuing
+```
+
+Verify the sample application is running
+```
+podman ps
+
+CONTAINER ID  IMAGE                                          COMMAND               CREATED         STATUS             PORTS                   NAMES
+53d86851aad9  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       53 minutes ago  Up 53 minutes ago  0.0.0.0:8080->8080/tcp  colors
 ```
