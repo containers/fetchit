@@ -39,6 +39,7 @@ Define the parameters in your `config.json` to relate to your git repository.
 Verify running characters before deploying harpoon.
 ```
 podman ps
+
 CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ```
 
