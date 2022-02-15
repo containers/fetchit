@@ -44,7 +44,7 @@ func rawPodman(path string) error {
 	raw := Raw{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
 	// Create a new Podman client
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/user/1000/podman/podman.sock")
+	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
