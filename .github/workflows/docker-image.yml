@@ -26,4 +26,4 @@ jobs:
         run: docker build . --file Dockerfile --tag quay.io/rcook/harpoon:latest
     
       - name: push image
-        run: docker push quay.io/rcook/harpoon:latest
+        run: docker push quay.io/harpoon/harpoon:latest
