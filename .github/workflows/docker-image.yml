@@ -13,20 +13,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Login to Quay
-        uses: docker/login-action@v1
-        with:
-          registry: quay.io
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-          
       - uses: actions/checkout@v2
       
       - name: Build the Docker image
         run: docker build . --file Dockerfile --tag quay.io/harpoon/harpoon:latest
     
-      - name: push image
-        run: docker push quay.io/harpoon/harpoon:latest
+      - name: Export image
+        run: docker save quay.io/harpoon/harpoon:latest > harpoon.tar
+
+      - name: Upload image
+        uses: actions/upload-artifact@v1
+        with:
+          name: harpoon.tar
+          path: harpoon.tar
+
 
   raw-validate:
     runs-on: ubuntu-latest
@@ -50,3 +50,25 @@ jobs:
 
       - name: Print the current running container
         run: podman ps -l
+
+  push-to-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Quay
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: pull actifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon.tar
+          path: harpoon.tar
+
+      - name: Load the image
+        run: docker load < harpoon.tar
+
+      - name: push image
+        run: docker push quay.io/harpoon/harpoon:latest
