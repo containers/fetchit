@@ -85,3 +85,26 @@ jobs:
 
       - name: push image
         run: docker push quay.io/harpoon/harpoon:latest
+
+  build-arm-and-push:
+    runs-on: ubuntu-latest
+    needs: [ build, raw-validate ]
+    if: > 
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - name: Login to Quay
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build the Docker image
+        run: buildah bud --arch arm64 . quay.io/harpoon/harpoon:arm
+
+      - name: push image
+        run: docker push quay.io/harpoon/harpoon:arm
