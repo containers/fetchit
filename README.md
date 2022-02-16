@@ -17,7 +17,7 @@ Harpoon requires the podman socket to be running on the host. The socket can be 
 
 To enable the socket for $USER:
 ```
-systemctl --user enable podman.socket
+systemctl --user enable podman.socket --now
 ```
 
 To enable the socker for root:
