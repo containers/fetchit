@@ -1,4 +1,4 @@
-name: Harpoon Build
+name: Harpoon Build and test
 
 on:
   push:
@@ -13,17 +13,75 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v2
+      
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag quay.io/harpoon/harpoon:latest
+    
+      - name: Export image
+        run: docker save -o /tmp/harpoon.tar quay.io/harpoon/harpoon:latest
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp/harpoon.tar
+
+  raw-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo docker load -i /tmp/harpoon.tar
+  
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+        
+      - name: Wait for harpoon to deploy
+        run: sleep 1m
+        
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: verify container is running
+        run: if [[ $(sudo podman ps -l | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: sudo podman ps -l
+
+  push-to-registry:
+    runs-on: ubuntu-latest
+    needs: [ build, raw-validate ]
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
       - name: Login to Quay
         uses: docker/login-action@v1
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
-          
-      - uses: actions/checkout@v2
-      
-      - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag quay.io/harpoon/harpoon:latest
-    
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon
+          path: /tmp
+
+      - name: Load the image
+        run: docker load -i /tmp/harpoon.tar
+
       - name: push image
         run: docker push quay.io/harpoon/harpoon:latest
