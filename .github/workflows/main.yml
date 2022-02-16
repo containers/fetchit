@@ -27,10 +27,10 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: run harpoon
-        run: podman run -d --name harpoon -v examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+        run: sudo podman run -d --name harpoon -v examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
         
       - name: sleep 1m
         run: sleep 1m
         
       - name: podman list
-        run: podman ps
+        run: sudo podman ps
