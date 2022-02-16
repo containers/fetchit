@@ -84,7 +84,7 @@ jobs:
         run: sudo docker load -i /tmp/harpoon.tar
 
       - name: push image
-        run: docker push quay.io/harpoon/harpoon:latest
+        run: sudo docker push quay.io/harpoon/harpoon:latest
 
   build-arm-and-push:
     runs-on: ubuntu-latest
