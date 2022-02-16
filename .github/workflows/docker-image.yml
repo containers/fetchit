@@ -56,7 +56,7 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: verify container is running
-        run: if [[ $(podman ps -l | grep -v CON | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: if [[ $(podman ps -l | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
       - name: Print the current running container
         run: podman ps -l
