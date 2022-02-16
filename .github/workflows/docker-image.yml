@@ -49,7 +49,7 @@ jobs:
         run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
-        run: sleep 1m
+        run: sleep 2m
         
       - name: Logs
         run: sudo podman logs harpoon
