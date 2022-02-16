@@ -81,10 +81,10 @@ jobs:
           path: /tmp
 
       - name: Load the image
-        run: sudo docker load -i /tmp/harpoon.tar
+        run: docker load -i /tmp/harpoon.tar
 
       - name: push image
-        run: sudo docker push quay.io/harpoon/harpoon-amd:latest
+        run: docker push quay.io/harpoon/harpoon-amd:latest
 
   build-arm-and-push:
     runs-on: ubuntu-latest
@@ -115,10 +115,10 @@ jobs:
           path: /tmp
 
       - name: Load the image
-        run: docker load -i /tmp/harpoon.tar
+        run: podman load -i /tmp/harpoon.tar
 
       - name: push image
-        run: docker push quay.io/harpoon/harpoon-arm:latest
+        run: podman push quay.io/harpoon/harpoon-arm:latest
 
       - name: create manifest
         run: podman manifest create quay.io/harpoon/harpoon:latest
