@@ -21,7 +21,7 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Run a one-line script
-        run: loginctl enable-linger $(whoami) && echo "XDG_RUNTIME_DIR=/run/user/$UID" >> $GITHUB_ENV
+        run: podman version && loginctl enable-linger $(whoami) && echo "XDG_RUNTIME_DIR=/run/user/$UID" >> $GITHUB_ENV
         
       - name: systemctl
         run: podman system service --time=0 unix://${XDG_RUNTIME_DIR}/podman/podman.sock &
