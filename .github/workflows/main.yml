@@ -27,7 +27,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: run harpoon
-        run: podman run -d --name harpoon -v examples/config.json:/opt/config.json -v ${XDG_RUNTIME_DIR}/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+        run: podman run -d --name harpoon -v examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
         
       - name: sleep 1m
         run: sleep 1m
