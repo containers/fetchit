@@ -21,4 +21,4 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Run a one-line script
-        run: export XDG_RUNTIME_DIR=/run/user/$(id -u) && systemctl --user enable --now podman.socket
+        run: podman ps && ls /run/user && id
