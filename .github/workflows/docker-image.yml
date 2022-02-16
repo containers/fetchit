@@ -21,12 +21,11 @@ jobs:
       - name: Export image
         run: docker save -o /tmp/harpoon.tar quay.io/harpoon/harpoon:latest
 
-      - name: Upload image
+      - name: Save container as artifact
         uses: actions/upload-artifact@v1
         with:
-          name: harpoon
+          name: harpoon-image
           path: /tmp/harpoon.tar
-
 
   raw-validate:
     runs-on: ubuntu-latest
@@ -37,11 +36,11 @@ jobs:
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
-      - name: pull actifact
+      - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon
-          path: /tmp/harpoon.tar
+          name: harpoon-image
+          path: /tmp
 
       - name: Load the image
         run: docker load -i /tmp/harpoon.tar
@@ -75,11 +74,11 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: pull actifact
+      - name: pull artifact
         uses: actions/download-artifact@v1
         with:
           name: harpoon
-          path: /tmp/harpoon.tar
+          path: /tmp
 
       - name: Load the image
         run: docker load -i /tmp/harpoon.tar
