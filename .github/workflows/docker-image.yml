@@ -43,7 +43,7 @@ jobs:
           path: /tmp
 
       - name: Load the image
-        run: docker load -i /tmp/harpoon.tar
+        run: sudo docker load -i /tmp/harpoon.tar
   
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
@@ -55,10 +55,10 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: verify container is running
-        run: if [[ $(podman ps -l | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: if [[ $(sudo podman ps -l | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
       - name: Print the current running container
-        run: podman ps -l
+        run: sudo podman ps -l
 
   push-to-registry:
     runs-on: ubuntu-latest
