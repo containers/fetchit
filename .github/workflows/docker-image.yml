@@ -19,13 +19,13 @@ jobs:
         run: docker build . --file Dockerfile --tag quay.io/harpoon/harpoon:latest
     
       - name: Export image
-        run: docker save quay.io/harpoon/harpoon:latest > harpoon.tar
+        run: docker save -o /tmp/harpoon.tar quay.io/harpoon/harpoon:latest
 
       - name: Upload image
         uses: actions/upload-artifact@v1
         with:
-          name: harpoon.tar
-          path: harpoon.tar
+          name: harpoon
+          path: /tmp/harpoon.tar
 
 
   raw-validate:
@@ -40,11 +40,11 @@ jobs:
       - name: pull actifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon.tar
-          path: harpoon.tar
+          name: harpoon
+          path: /tmp/harpoon.tar
 
       - name: Load the image
-        run: docker load -i harpoon.tar
+        run: docker load -i /tmp/harpoon.tar
   
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
@@ -78,11 +78,11 @@ jobs:
       - name: pull actifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon.tar
-          path: harpoon.tar
+          name: harpoon
+          path: /tmp/harpoon.tar
 
       - name: Load the image
-        run: docker load -i harpoon.tar
+        run: docker load -i /tmp/harpoon.tar
 
       - name: push image
         run: docker push quay.io/harpoon/harpoon:latest
