@@ -44,9 +44,12 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ```
 
 
-Launch the harpoon container
+Launch the harpoon container using a podman volume.
+
+NOTE: If a podman volume is not the preferred storage solution a directory can be used as well. An example would be `-v ~/harpoon-volume:/opt` instead of `-v harpoon-volume:/opt`.
+
 ```
-podman run -d --name harpoon -v ./config.json:/opt/config.json -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --name harpoon -v harpoon-volume:/opt -v ./config.json:/opt/config.json -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
 
 The container will be started and will run in the background. To view the logs:
