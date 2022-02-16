@@ -101,7 +101,10 @@ jobs:
       
       - name: Checkout code
         uses: actions/checkout@v2
-
+        
+      - name: Install required packages
+        run: sudo apt install build-essential qemu-user qemu-user-static  
+        
       - name: Build the Docker image
         run: buildah bud --arch arm64 . quay.io/harpoon/harpoon-arm:latest
 
