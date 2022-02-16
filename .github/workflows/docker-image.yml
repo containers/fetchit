@@ -77,11 +77,11 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon
+          name: harpoon-image
           path: /tmp
 
       - name: Load the image
-        run: docker load -i /tmp/harpoon.tar
+        run: sudo docker load -i /tmp/harpoon.tar
 
       - name: push image
         run: docker push quay.io/harpoon/harpoon:latest
