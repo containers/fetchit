@@ -1,4 +1,4 @@
-name: Harpoon Build
+name: Harpoon Build and test
 
 on:
   push:
@@ -27,3 +27,26 @@ jobs:
     
       - name: push image
         run: docker push quay.io/harpoon/harpoon:latest
+
+  raw-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+        
+      - name: Wait for harpoon to deploy
+        run: sleep 1m
+        
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: verify container is running
+        run: if [[ $(podman ps -l | grep -v CON | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: podman ps -l
