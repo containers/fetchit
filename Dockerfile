@@ -1,13 +1,30 @@
-FROM quay.io/fedora/fedora:35 AS harpoon-builder
-ENV APP_ROOT=/opt/app-root
-RUN dnf -y install golang gpgme-devel libbtrfs btrfs-progs-devel device-mapper-devel
-RUN mkdir -p $APP_ROOT/src/github.com/redhat-et/engine
-ADD engine/ $APP_ROOT/src/github.com/redhat-et/harpoon/engine
-WORKDIR $APP_ROOT/src/github.com/redhat-et/harpoon/engine 
-RUN go build . 
+# BUILD STAGE
+FROM registry.access.redhat.com/ubi8/go-toolset as builder
 
-FROM docker.io/fedora:35
-RUN yum -y update && yum clean all && rm -rf /var/cache/yum
-COPY --from=harpoon-builder /opt/app-root/src/github.com/redhat-et/harpoon/engine/harpoon /usr/local/bin
+ARG ARCH=amd64
+ARG MAKE_TARGET=cross-build-linux-$ARCH
+
+USER root
+
+LABEL name=harpoon-build
+
+ENV GOPATH=/opt/app-root GOCACHE=/mnt/cache GO111MODULE=on
+
+WORKDIR $GOPATH/src/github.com/redhat-et/harpoon
+
+COPY . .
+
+RUN dnf -y install gpgme-devel device-mapper-devel
+
+RUN GOPATH=/opt/app-root GOCACHE=/mnt/cache make $MAKE_TARGET
+
+RUN mv $GOPATH/src/github.com/redhat-et/harpoon/_output/bin/linux_$ARCH/harpoon /usr/local/bin/
+
+# RUN STAGE
+FROM registry.access.redhat.com/ubi9-beta/ubi:latest
+
+COPY --from=builder /usr/local/bin/harpoon /usr/local/bin/
+
 WORKDIR /opt
+
 CMD ["/usr/local/bin/harpoon"]
