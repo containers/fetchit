@@ -18,7 +18,6 @@ import (
 
 type Repo struct {
 	Url          string
-	Directory    string
 	Branch       string
 	Method       string
 	Subdirectory string
@@ -47,10 +46,12 @@ func process() {
 	var repo Repo
 	json.Unmarshal([]byte(repoJson), &repo)
 
-	if _, err := os.Stat(repo.Directory); os.IsNotExist(err) {
+	directory := repo.Url[strings.LastIndex(repo.Url, "/")+1:]
+
+	if _, err := os.Stat(directory); os.IsNotExist(err) {
 		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)
 
-		r, err := git.PlainClone(repo.Directory, false, &git.CloneOptions{
+		r, err := git.PlainClone(directory, false, &git.CloneOptions{
 			URL:           repo.Url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Branch)),
 			SingleBranch:  true,
@@ -75,7 +76,7 @@ func process() {
 		// ... get the files iterator and print the file
 		tree.Files().ForEach(func(f *object.File) error {
 			if strings.Contains(f.Name, repo.Subdirectory) {
-				path := repo.Directory + "/" + f.Name
+				path := directory + "/" + f.Name
 				rawPodman(path)
 			}
 			return nil
@@ -84,12 +85,12 @@ func process() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else if _, err := os.Stat(repo.Directory + "/.git"); !os.IsNotExist(err) {
+	} else if _, err := os.Stat(directory + "/.git"); !os.IsNotExist(err) {
 		// Pull the latest changes from the remote
 		fmt.Printf("Pulling latest repository changes from %s branch %s\n", repo.Url, repo.Branch)
 
 		// Open the local repository
-		r, err := git.PlainOpen(repo.Directory)
+		r, err := git.PlainOpen(directory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -146,7 +147,7 @@ func process() {
 			}
 			for _, change := range changes {
 				if strings.Contains(change.To.Name, repo.Subdirectory) {
-					path := repo.Directory + "/" + change.To.Name
+					path := directory + "/" + change.To.Name
 					rawPodman(path)
 				}
 			}
