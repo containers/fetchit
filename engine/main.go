@@ -77,7 +77,7 @@ func process() {
 		tree.Files().ForEach(func(f *object.File) error {
 			if strings.Contains(f.Name, repo.Subdirectory) {
 				path := directory + "/" + f.Name
-				rawPodman(path)
+				engineMethod(path, repo.Method)
 			}
 			return nil
 		})
@@ -148,11 +148,20 @@ func process() {
 			for _, change := range changes {
 				if strings.Contains(change.To.Name, repo.Subdirectory) {
 					path := directory + "/" + change.To.Name
-					rawPodman(path)
+					engineMethod(path, repo.Method)
 				}
 			}
 		}
 	} else {
 		fmt.Printf("%s exists but is not a git repository", repo.Url)
+	}
+}
+
+func engineMethod(path string, method string) {
+	if method == "raw" {
+		rawPodman(path)
+	}
+	if method == "kube" {
+		fmt.Printf("TBD")
 	}
 }
