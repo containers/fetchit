@@ -98,7 +98,7 @@ func (repo *Repo) process() {
 		// ... get the files iterator and print the file
 		// .. make sure we're only calling the engine method on json files
 		subDirTree.Files().ForEach(func(f *object.File) error {
-			if strings.HasSuffix(f.Name, ".json") || strings.HasSuffix(f.Name, ".service") {
+			if strings.HasSuffix(f.Name, ".json") || strings.HasSuffix(f.Name, ".service") || strings.HasSuffix(f.Name, ".yaml") || strings.HasSuffix(f.Name, ".yml") {
 				path := directory + "/" + repo.Subdirectory + "/" + f.Name
 				if err := engine.EngineMethod(path, repo.Method); err != nil {
 					log.Fatal(err)

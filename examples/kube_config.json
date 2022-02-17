@@ -1,0 +1,6 @@
+{"Url":"http://github.com/redhat-et/harpoon",
+"Subdirectory": "examples/kube",
+"Branch":"main",
+"Method":"kube",
+"Schedule": "*/1 * * * *"
+}
