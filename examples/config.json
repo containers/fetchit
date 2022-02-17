@@ -1,5 +1,4 @@
 {"Url":"http://github.com/redhat-et/harpoon",
-"Directory": "./wiggles",
 "Subdirectory": "examples/raw",
 "Branch":"main",
 "Method":"raw",

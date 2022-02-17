@@ -16,10 +16,10 @@ The engine references a file to ensure the repository and how to deploy the cont
 
    {
    "Url":"http://github.com/redhat-et/harpoon",
-   "Directory": "./wiggles",
    "Subdirectory": "examples/raw",
-   "Branch":"coding",
-   "Method":"raw"
+   "Branch":"main",
+   "Method":"raw",
+   "Schedule": "*/1 * * * *"
    }
 
 Method
@@ -41,13 +41,11 @@ Branch
 A specific branch should be fined within the repository for the engine to follow.
 
 
-Directory
----------
-Directory references the location that the repository will be cloned to on the system
-
-
 Subdirectory
 ------------
 This is the specific subdirectory containing the json file(s) to be deployed and managed by the engine.
 
 
+Schedule
+--------
+Based on cron spec. Allows for the remediation window to be set at repeating intervals or at specific times of day/week
