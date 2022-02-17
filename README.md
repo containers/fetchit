@@ -29,7 +29,6 @@ Define the parameters in your `config.json` to relate to your git repository.
 ```
 {
 "Url":"http://github.com/redhat-et/harpoon",
-"Directory": "./harpoon",
 "Subdirectory": "examples/raw",
 "Branch":"main",
 "Method":"raw",
