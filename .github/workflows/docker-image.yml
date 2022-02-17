@@ -106,7 +106,9 @@ jobs:
         run: sudo apt install build-essential qemu-user qemu-user-static  
         
       - name: Build the Docker image
-        run: buildah bud --arch arm64 . quay.io/harpoon/harpoon-arm:latest
+        run: |
+          buildah bud --arch arm64 . quay.io/harpoon/harpoon-arm:latest
+          buildah push quay.io/harpoon/harpoon-arm:latest
 
       - name: pull artifact
         uses: actions/download-artifact@v1
@@ -116,9 +118,6 @@ jobs:
 
       - name: Load the image
         run: podman load -i /tmp/harpoon.tar
-
-      - name: push image
-        run: podman push quay.io/harpoon/harpoon-arm:latest
 
       - name: create manifest
         run: podman manifest create quay.io/harpoon/harpoon:latest
