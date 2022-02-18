@@ -120,6 +120,6 @@ jobs:
 
       - name: add arm image
         run: |
-          podman manifest add quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-amd:latest --arch amd64
+          podman manifest add quay.io/harpoon/harpoon:latest quay.io/harpoon/harpoon-amd:latest --arch amd64
           podman manifest push quay.io/harpoon/harpoon:latest
         
