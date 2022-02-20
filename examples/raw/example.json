@@ -6,10 +6,5 @@
         "container_port": 8080,
         "host_port":      8080,
         "range":         0,
-        "protocol":      ""}],
-    "Mounts": [{
-        "source": "/~/tmp/",
-        "destination": "/tmp/",
-        "options": "rw,z,rshared",
-        "type": "bind" }]
+        "protocol":      ""}]
 }
