@@ -12,6 +12,7 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 /* below is an example.json file:
@@ -28,10 +29,11 @@ import (
 */
 
 type Raw struct {
-	Image string              `json:"Image"`
-	Name  string              `json:"Name"`
-	Env   map[string]string   `json:"Env"`
-	Ports []types.PortMapping `json:"Ports"`
+	Image  string              `json:"Image"`
+	Name   string              `json:"Name"`
+	Env    map[string]string   `json:"Env"`
+	Ports  []types.PortMapping `json:"Ports"`
+	Mounts []specs.Mount       `json:"Mounts"`
 }
 
 func rawPodman(path string) error {
@@ -65,6 +67,7 @@ func rawPodman(path string) error {
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
+	s.Mounts = []specs.Mount(raw.Mounts)
 	s.PortMappings = []types.PortMapping(raw.Ports)
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
