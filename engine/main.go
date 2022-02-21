@@ -161,6 +161,9 @@ func engineMethod(path string, method string) {
 	if method == "raw" {
 		rawPodman(path)
 	}
+	if method == "systemd" {
+		systemdPodman(path)
+	}
 	if method == "kube" {
 		fmt.Printf("TBD")
 	}
