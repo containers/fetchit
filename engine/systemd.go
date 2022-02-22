@@ -48,7 +48,11 @@ func systemdPodman(path string) error {
 	s := specgen.NewSpecGenerator("quay.io/harpoon/harpoon-amd:latest", false)
 	s.Name = "systemd"
 	s.Privileged = true
-	s.Command = []string{"/bin/sh", "-c", "chroot /host && systemctl start " + systemdFile}
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"chroot", "/host", "sh", "-c", "systemctl restart " + systemdFile}
 	s.Mounts = []specs.Mount{{Source: "/run", Destination: "/run", Type: "bind", Options: []string{"rw"}}, {Source: "/", Destination: "/host", Type: "bind", Options: []string{"ro"}}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
