@@ -5,3 +5,7 @@ venv/
 results/*.png
 results/*.txt
 processed_data/*.dat
+vendor
+_output
+harpoon
+!harpoon/

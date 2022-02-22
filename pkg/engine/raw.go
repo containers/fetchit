@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"context"
@@ -36,7 +36,7 @@ type Raw struct {
 	Mounts []specs.Mount       `json:"Mounts"`
 }
 
-func rawPodman(path string) error {
+func RawPodman(path string) error {
 	fmt.Printf("Creating podman container from %s\n", path)
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
