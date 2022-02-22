@@ -137,7 +137,7 @@ jobs:
         run: |
           podman manifest add --arch arm64 quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-arm:latest
           podman manifest add quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon:latest
+          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon:latest
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
