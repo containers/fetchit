@@ -1,0 +1,6 @@
+{"Url":"http://github.com/cooktheryan/harpoon",
+"Subdirectory": "examples/systemd",
+"Branch":"systemd-method",
+"Method":"raw",
+"Schedule": "*/1 * * * *"
+}
