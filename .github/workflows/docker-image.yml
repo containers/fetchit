@@ -102,7 +102,7 @@ jobs:
 
 
       - name: logs
-        run: sudo podman logs systemd
+        run: sudo podman logs systemd-httpd.service
 
       - name: list files
         run: sudo ls /etc/systemd/system/
