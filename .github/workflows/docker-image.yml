@@ -101,7 +101,7 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: Logs
-        run: sudo podman logs systemd
+        run: sudo systemctl status httpd
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
