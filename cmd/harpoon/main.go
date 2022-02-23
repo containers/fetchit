@@ -77,11 +77,8 @@ func process() {
 
 		// ... get the files iterator and print the file
 		tree.Files().ForEach(func(f *object.File) error {
-			fmt.Printf("%s\n", repo.Subdirectory)
 			if strings.Contains(f.Name, repo.Subdirectory) {
 				path := directory + "/" + f.Name
-				fmt.Printf("%s\n", path)
-				fmt.Printf("%s\n", f.Name)
 				engine.EngineMethod(path, repo.Method)
 			}
 			return nil
