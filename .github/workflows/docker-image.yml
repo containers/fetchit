@@ -100,7 +100,10 @@ jobs:
       - name: Logs
         run: sudo podman logs harpoon
 
-      - name: Logs
+      - name: list files
+        run: sudo ls /etc/systemd/system/
+
+      - name: Check service status 
         run: sudo systemctl status httpd
 
   push-amd-image-to-registry:
