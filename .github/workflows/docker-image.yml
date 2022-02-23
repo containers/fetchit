@@ -89,7 +89,7 @@ jobs:
   
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
