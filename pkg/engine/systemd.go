@@ -43,8 +43,6 @@ func systemdPodman(path string) error {
 		fmt.Println(err)
 	}
 
-	containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
-
 	fmt.Println("Systemd service started....Requeuing")
 	return nil
 }
