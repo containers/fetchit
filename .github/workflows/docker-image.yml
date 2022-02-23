@@ -103,6 +103,9 @@ jobs:
       - name: list files
         run: sudo ls /etc/systemd/system/
 
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
       - name: Check service status 
         run: sudo systemctl status httpd
 
