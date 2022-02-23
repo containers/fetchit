@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/containers/podman/v4/pkg/bindings"
@@ -23,11 +22,10 @@ func systemdPodman(path string) error {
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
 	}
 
 	s := specgen.NewSpecGenerator("quay.io/harpoon/harpoon:latest", false)
-	s.Name = "systemd" + systemdFile
+	s.Name = "systemd" + "-" + systemdFile
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
@@ -39,14 +37,13 @@ func systemdPodman(path string) error {
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
 	}
-	fmt.Printf("command to run %s\n", s.Command)
 	fmt.Println("Container created.")
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
 	}
+
+	containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
 
 	fmt.Println("Systemd service started....Requeuing")
 	return nil
