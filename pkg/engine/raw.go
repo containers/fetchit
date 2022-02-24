@@ -71,6 +71,7 @@ func RawPodman(path string) error {
 	s.Mounts = []specs.Mount(raw.Mounts)
 	s.PortMappings = []types.PortMapping(raw.Ports)
 	s.Volumes = []*specgen.NamedVolume(raw.Volumes)
+	s.RestartPolicy = "always"
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
