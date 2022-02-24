@@ -40,6 +40,7 @@ func ansiblePodman(path string) error {
 	}
 	s.Command = []string{"sh", "-c", "cp " + copyFile, "sh", "-c", "/usr/bin/ansible-playbook " + playbook}
 	s.Mounts = []specs.Mount{{Source: "/home/rcook/.ssh", Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}, {Source: "/home/rcook/ansible.cfg", Destination: "/etc/ansible/ansible.cfg", Type: "bind", Options: []string{"rw"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
