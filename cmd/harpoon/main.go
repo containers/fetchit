@@ -76,10 +76,17 @@ func process() {
 		// ... retrieve the tree from the commit
 		tree, err := commit.Tree()
 
+		// ... get subdirectory tree
+		subDirTree, err := tree.Tree(repo.Subdirectory)
+		if err != nil {
+			fmt.Printf("Error when switching to subdirectory tree: %s\n", err)
+		}
+
 		// ... get the files iterator and print the file
-		tree.Files().ForEach(func(f *object.File) error {
-			if strings.Contains(f.Name, repo.Subdirectory) {
-				path := directory + "/" + f.Name
+		// .. make sure we're only calling the engine method on json files
+		subDirTree.Files().ForEach(func(f *object.File) error {
+			if strings.HasSuffix(f.Name, ".json") || strings.HasSuffix(f.Name, ".service") {
+				path := directory + "/" + repo.Subdirectory + "/" + f.Name
 				engine.EngineMethod(path, repo.Method)
 			}
 			return nil
