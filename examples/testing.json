@@ -1,0 +1,6 @@
+{"Url":"http://github.com/cooktheryan/harpoon",
+"Subdirectory": "examples/ansible",
+"Branch":"ansible",
+"Method":"ansible",
+"Schedule": "*/1 * * * *"
+}

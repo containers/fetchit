@@ -10,6 +10,8 @@ func EngineMethod(path string, method string) {
 		RawPodman(path)
 	case "systemd":
 		systemdPodman(path)
+	case "ansible":
+		ansiblePodman(path)
 	case "kube":
 		fmt.Printf("TBD")
 	}
