@@ -100,18 +100,11 @@ jobs:
       - name: Logs
         run: sudo podman logs harpoon
 
-
-      - name: logs
-        run: sudo podman logs systemd-httpd.service
-
       - name: list files
-        run: sudo ls /etc/systemd/system/
+        run: sudo ls /etc/systemd/system/httpd.service
 
       - name: ensure systemd container is gone
         run: sudo podman ps -a
-
-      - name: Check service status 
-        run: sudo systemctl status httpd
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest

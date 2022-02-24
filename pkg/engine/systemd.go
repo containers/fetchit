@@ -16,7 +16,7 @@ func systemdPodman(path string) error {
 	systemdFile := path[strings.LastIndex(path, "/")+1:]
 
 	systemdLocation := "/etc/systemd/system/"
-	copyFile := ("/opt/" + path + " " + "/host" + systemdLocation)
+	copyFile := ("/opt/" + path + " " + systemdLocation)
 
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
@@ -31,8 +31,8 @@ func systemdPodman(path string) error {
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "cp " + copyFile, "chroot", "/host", "sh", "-c", "systemctl start " + systemdFile}
-	s.Mounts = []specs.Mount{{Source: "/run", Destination: "/run", Type: "bind", Options: []string{"rw"}}, {Source: "/", Destination: "/host", Type: "bind", Options: []string{"rw"}}}
+	s.Command = []string{"sh", "-c", "cp " + copyFile}
+	s.Mounts = []specs.Mount{{Source: systemdLocation, Destination: systemdLocation, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
@@ -42,6 +42,8 @@ func systemdPodman(path string) error {
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		fmt.Println(err)
 	}
+
+	containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
 
 	fmt.Println("Systemd service started....Requeuing")
 	return nil
