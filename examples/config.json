@@ -1,6 +1,6 @@
-{"Url":"http://github.com/redhat-et/harpoon",
-"Subdirectory": "examples/raw",
-"Branch":"main",
-"Method":"raw",
+{"Url":"http://github.com/cooktheryan/harpoon",
+"Subdirectory": "examples/systemd",
+"Branch":"systemd-method",
+"Method":"systemd",
 "Schedule": "*/1 * * * *"
 }

@@ -1,0 +1,6 @@
+{"Url":"http://github.com/redhat-et/harpoon",
+"Subdirectory": "examples/raw",
+"Branch":"main",
+"Method":"raw",
+"Schedule": "*/1 * * * *"
+}

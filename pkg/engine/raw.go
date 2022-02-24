@@ -29,11 +29,12 @@ import (
 */
 
 type Raw struct {
-	Image  string              `json:"Image"`
-	Name   string              `json:"Name"`
-	Env    map[string]string   `json:"Env"`
-	Ports  []types.PortMapping `json:"Ports"`
-	Mounts []specs.Mount       `json:"Mounts"`
+	Image   string                 `json:"Image"`
+	Name    string                 `json:"Name"`
+	Env     map[string]string      `json:"Env"`
+	Ports   []types.PortMapping    `json:"Ports"`
+	Mounts  []specs.Mount          `json:"Mounts"`
+	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
 func RawPodman(path string) error {
@@ -69,6 +70,7 @@ func RawPodman(path string) error {
 	s.Env = map[string]string(raw.Env)
 	s.Mounts = []specs.Mount(raw.Mounts)
 	s.PortMappings = []types.PortMapping(raw.Ports)
+	s.Volumes = []*specgen.NamedVolume(raw.Volumes)
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
