@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,7 +49,7 @@ func process() {
 	var repo Repo
 	json.Unmarshal([]byte(repoJson), &repo)
 
-	directory := repo.Url[strings.LastIndex(repo.Url, "/")+1:]
+	directory := filepath.Base(repo.Url)
 
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
 		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)

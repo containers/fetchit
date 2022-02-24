@@ -3,7 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
-	"strings"
+	"path/filepath"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
@@ -13,7 +13,7 @@ import (
 
 func systemdPodman(path string) error {
 	fmt.Printf("Deploying systemd file(s) %s\n", path)
-	systemdFile := path[strings.LastIndex(path, "/")+1:]
+	systemdFile := filepath.Base(path)
 
 	systemdLocation := "/etc/systemd/system/"
 	copyFile := ("/opt/" + path + " " + systemdLocation)
