@@ -31,7 +31,7 @@ func systemdPodman(path string) error {
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "cp " + copyFile, "chroot", "/host", "sh", "-c", "systemctl restart " + systemdFile}
+	s.Command = []string{"sh", "-c", "cp " + copyFile, "chroot", "/host", "sh", "-c", "systemctl start " + systemdFile}
 	s.Mounts = []specs.Mount{{Source: "/run", Destination: "/run", Type: "bind", Options: []string{"rw"}}, {Source: "/", Destination: "/host", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
