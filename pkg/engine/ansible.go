@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
@@ -15,7 +14,6 @@ import (
 
 func ansiblePodman(path string) error {
 	fmt.Printf("Deploying Ansible playbook %s\n", path)
-	playbook := filepath.Base(path)
 
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
@@ -23,7 +21,7 @@ func ansiblePodman(path string) error {
 		fmt.Println(err)
 	}
 
-	copyFile := ("/opt/" + path + " " + playbook)
+	copyFile := ("/opt/" + path)
 	sshImage := "quay.io/rcook/tools:ansible"
 
 	_, err = images.Pull(conn, sshImage, nil)
@@ -38,7 +36,7 @@ func ansiblePodman(path string) error {
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "cp " + copyFile, "sh", "-c", "/usr/bin/ansible-playbook " + playbook}
+	s.Command = []string{"sh", "-c", "/usr/bin/ansible-playbook -e ansible_connection=ssh " + copyFile}
 	s.Mounts = []specs.Mount{{Source: "/home/rcook/.ssh", Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}, {Source: "/home/rcook/ansible.cfg", Destination: "/etc/ansible/ansible.cfg", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
