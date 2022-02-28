@@ -1,6 +1,8 @@
 {"Image":"docker.io/mmumshad/simple-webapp-color:latest",
     "Name": "colors",
     "Env": {"APP_COLOR": "pink", "tree": "trunk"},
+    "Mounts": ""
+    "Volumes: ""
     "Ports": [{
         "host_ip":        "",
         "container_port": 8080,
