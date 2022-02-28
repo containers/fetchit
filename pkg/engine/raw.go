@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/podman/v4/pkg/bindings"
@@ -49,13 +48,11 @@ func RawPodman(path string) error {
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	_, err = images.Pull(conn, raw.Image, nil)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	inspectData, err := containers.Inspect(conn, raw.Name, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
@@ -74,13 +71,11 @@ func RawPodman(path string) error {
 	s.RestartPolicy = "always"
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	fmt.Println("Container created.")
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 	fmt.Println("Container started....Requeuing")
 	return nil
