@@ -5,4 +5,4 @@
   become_method: sudo
   tasks:
   - name: update httpd
-    yum: name=httpd state=latest
+    ansible.builtin.package: name=httpd state=latest
