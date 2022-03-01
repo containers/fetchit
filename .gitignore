@@ -9,4 +9,4 @@ vendor
 _output
 harpoon
 !harpoon/
-config.json
+config.yaml
