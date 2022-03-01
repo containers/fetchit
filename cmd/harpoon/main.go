@@ -15,12 +15,14 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
 	"github.com/redhat-et/harpoon/pkg/engine"
 )
 
 type Repo struct {
 	Url          string
+	PAT          string
 	Branch       string
 	Method       string
 	Subdirectory string
@@ -55,10 +57,18 @@ func (repo *Repo) process() {
 	} else if !os.IsNotExist(err) {
 		log.Fatalf("Error when retrieving repository: %s\n", err)
 	}
-	if !exists {
-		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)
 
+	if !exists {
+		var user string
+		if repo.PAT != "" {
+			user = "harpoon"
+		}
+		fmt.Printf("git clone %s %s --recursive\n", repo.Url, repo.Branch)
 		_, err := git.PlainClone(directory, false, &git.CloneOptions{
+			Auth: &http.BasicAuth{
+				Username: user,
+				Password: repo.PAT,
+			},
 			URL:           repo.Url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Branch)),
 			SingleBranch:  true,
