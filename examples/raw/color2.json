@@ -1,6 +1,6 @@
 {
     "Image":"docker.io/mmumshad/simple-webapp-color:latest",
-    "Name": "colors",
+    "Name": "colors2",
     "Env": {"APP_COLOR": "pink", "tree": "trunk"},
     "Mounts": "",
     "Volumes": "",
