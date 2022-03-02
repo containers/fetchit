@@ -3,8 +3,6 @@ module github.com/redhat-et/harpoon
 go 1.15
 
 require (
-	github.com/compose-spec/compose-go v1.1.0
-	github.com/containerd/nerdctl v0.17.0 // indirect
 	github.com/containers/common v0.47.4
 	github.com/containers/podman/v4 v4.0.0
 	github.com/go-co-op/gocron v1.12.0
