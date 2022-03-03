@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/specgen"
@@ -42,6 +43,11 @@ func systemdPodman(path string) error {
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
+	var (
+		stopped = define.ContainerStateStopped
+	)
+	// Wait for the container to exit
+	containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
 
 	containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
 
