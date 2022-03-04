@@ -1,9 +1,5 @@
 package engine
 
-import (
-	"fmt"
-)
-
 const (
 	harpoonImage  = "quay.io/harpoon/harpoon:latest"
 	harpoonVolume = "harpoon-volume"
@@ -20,7 +16,9 @@ func EngineMethod(path string, method string) error {
 			return err
 		}
 	case "kube":
-		return fmt.Errorf("TBD")
+		if err := kubePodman(path); err != nil {
+			return err
+		}
 	}
 	return nil
 }
