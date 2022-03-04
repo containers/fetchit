@@ -9,7 +9,7 @@ data:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: colors
+  name: colors_pod
 spec:
   containers:
   - name: colors
