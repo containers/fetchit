@@ -3,4 +3,4 @@
   become: true
   tasks:
   - name: update httpd
-    ansible.builtin.package: name=httpd state=latest
+    ansible.builtin.package: name=zsh state=latest
