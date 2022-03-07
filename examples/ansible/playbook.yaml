@@ -2,5 +2,5 @@
 - hosts: localhost
   become: true
   tasks:
-  - name: update httpd
+  - name: zsh install
     ansible.builtin.package: name=zsh state=latest

@@ -176,7 +176,7 @@ jobs:
         run: sudo podman logs ansible
       
       - name: list packages
-        run: sudo apt list --installed | grep httpd
+        run: sudo apt list --installed | grep zsh
 
 
   push-amd-image-to-registry:
