@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/specgen"
@@ -21,10 +22,10 @@ func systemdPodman(path string) error {
 	// Create a new Podman client
 	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("error podman socket: %w", err)
 	}
 
-	s := specgen.NewSpecGenerator("quay.io/harpoon/harpoon:latest", false)
+	s := specgen.NewSpecGenerator(harpoonImage, false)
 	s.Name = "systemd" + "-" + systemdFile
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
@@ -33,15 +34,20 @@ func systemdPodman(path string) error {
 	}
 	s.Command = []string{"sh", "-c", "cp " + copyFile}
 	s.Mounts = []specs.Mount{{Source: systemdLocation, Destination: systemdLocation, Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	fmt.Println("Container created.")
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
-		fmt.Println(err)
+		return err
 	}
+	var (
+		stopped = define.ContainerStateStopped
+	)
+	// Wait for the container to exit
+	containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
 
 	containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
 

@@ -64,10 +64,10 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: verify container is running
-        run: if [[ $(sudo podman ps -l | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
       - name: Print the current running container
-        run: sudo podman ps -l
+        run: sudo podman ps
 
   systemd-validate:
     runs-on: ubuntu-latest
@@ -106,9 +106,79 @@ jobs:
       - name: ensure systemd container is gone
         run: sudo podman ps -a
 
+  kube-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+  
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v ./examples/kube_config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+        
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: verify container is running
+        run: if [[ $(sudo podman pod ps | grep -v CON= | grep colors_pod | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: sudo podman ps
+
+  ansible-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: ssh-keygen
+        run: sudo ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+
+      - name: echo pub into authorized
+        run: sudo cp ~/.ssh/id_rsa.pub" ~/.ssh/authorized_keys
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v ~/.ssh:/root/.ssh -v ./examples/ansible.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock -v ./examples/ansible/ansible.cfg:/etc/ansible/ansible.cfg quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+      
+      - name: list packages
+        run: sudo apt list --installed | grep httpd
+        
+
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -178,7 +248,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -229,3 +299,47 @@ jobs:
         run: |
           podman manifest add --arch arm64 quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-arm:latest
           podman manifest add quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-amd:latest
+
+
+  publish-binary-to-github:
+    runs-on: ubuntu-latest
+    needs: [ build-arm-and-manifest-list ]
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - name: pull arm image
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-arm-image
+          path: /tmp
+
+      - name: Load the arm image
+        run: podman load -i /tmp/harpoon-arm.tar
+
+      - name: Pull amd image
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the amd image
+        run: podman load -i /tmp/harpoon.tar
+
+      - name: move binary
+        run: |
+          arm=$(podman images | grep arm | awk '{print $3}')
+          amd=$(podman images | grep amd | awk '{print $3}')
+          podman cp $(podman create --rm $arm):/usr/local/bin/harpoon ./harpoon-arm
+          podman cp $(podman create --rm $amd):/usr/local/bin/harpoon ./harpoon-amd
+
+      - name: push binary
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Latest Build"
+          files: |
+            harpoon-arm
+            harpoon-amd
