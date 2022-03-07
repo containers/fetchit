@@ -39,7 +39,7 @@ func ansiblePodman(path string) error {
 
 	// TODO: Remove rcook entries
 	s.Command = []string{"sh", "-c", "/usr/bin/ansible-playbook -e ansible_connection=ssh " + copyFile}
-	s.Mounts = []specs.Mount{{Source: "/root/.ssh", Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}, {Source: "./examples/ansible/ansible.cfg", Destination: "/etc/ansible/ansible.cfg", Type: "bind", Options: []string{"rw"}}}
+	s.Mounts = []specs.Mount{{Source: "/root/.ssh", Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}, {Source: "/home/runner/work/harpoon/harpoon/examples/ansible/ansible.cfg", Destination: "/etc/ansible/ansible.cfg", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: "harpoon-volume", Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
 		NSMode: "host",
