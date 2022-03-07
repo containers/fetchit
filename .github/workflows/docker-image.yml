@@ -158,10 +158,10 @@ jobs:
         run: sudo podman load -i /tmp/harpoon.tar
 
       - name: ssh-keygen
-        run: sudo ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+        run: sudo ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
 
-      - name: echo pub into authorized
-        run: sudo cp ~/.ssh/id_rsa.pub" ~/.ssh/authorized_keys
+      - name: cp pub into authorized
+        run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ~/.ssh:/root/.ssh -v ./examples/ansible.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock -v ./examples/ansible/ansible.cfg:/etc/ansible/ansible.cfg quay.io/harpoon/harpoon-amd:latest
@@ -174,11 +174,11 @@ jobs:
       
       - name: list packages
         run: sudo apt list --installed | grep httpd
-        
+
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate, ansible ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -248,7 +248,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate, ansible ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
