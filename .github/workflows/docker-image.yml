@@ -170,6 +170,9 @@ jobs:
         run: sleep 2m
 
       - name: Logs
+        run: sudo podman logs ansible
+
+      - name: Logs
         run: sudo podman logs harpoon
       
       - name: list packages
