@@ -164,7 +164,7 @@ jobs:
         run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ~/.ssh:/root/.ssh -v ./examples/ansible.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock -v ./examples/ansible/ansible.cfg:/etc/ansible/ansible.cfg quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v /root/.ssh:/root/.ssh -v ./examples/ansible.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock -v ./examples/ansible/ansible.cfg:/etc/ansible/ansible.cfg quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
