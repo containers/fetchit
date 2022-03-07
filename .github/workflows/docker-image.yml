@@ -170,10 +170,10 @@ jobs:
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs ansible
+        run: sudo podman logs harpoon
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs ansible
       
       - name: list packages
         run: sudo apt list --installed | grep httpd

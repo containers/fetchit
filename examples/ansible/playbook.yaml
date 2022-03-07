@@ -1,8 +1,6 @@
 ---
 - hosts: localhost
   become: true
-  remote_user: rcook
-  become_method: sudo
   tasks:
   - name: update httpd
     ansible.builtin.package: name=httpd state=latest
