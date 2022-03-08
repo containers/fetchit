@@ -69,6 +69,43 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
+  default-volume-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+  
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v ./examples/default-volume.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+        
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: verify container is running
+        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: sudo podman ps
+
+      - name: verify harpoon-volume is volume name
+        run: if [[ $(sudo podman volume inspect harpoon-volume) ]] ; then echo "Harpoon successfully used default volume name"; else exit 1; fi
+
+
   systemd-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -218,7 +255,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -244,7 +281,7 @@ jobs:
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, build-arm-and-manifest-list ]
+    needs: [ build, raw-validate, default-volume-validate, build-arm-and-manifest-list ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -288,7 +325,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
