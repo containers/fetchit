@@ -31,8 +31,8 @@ const (
 	harpoonImage      = "quay.io/harpoon/harpoon:latest"
 
 	rawMethod          = "raw"
-	kubeMethod         = "kube"
 	systemdMethod      = "systemd"
+	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
 )
 
@@ -221,39 +221,49 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedul
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, rawMethod, err)
 	}
+	var targetFile = ""
+	tag := ".json"
 	if initial {
-		tree, err := getTree(gitRepo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Raw.Subdirectory, rawMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		subDir := repo.Target.Raw.Subdirectory
-		subDirTree, err := tree.Tree(subDir)
-		if err != nil {
-			log.Fatalf("Repo: %s, Method: %s error when switching to subdirectory tree for directory %s: %s", repo.Name, rawMethod, subDir, err)
-		}
-
-		// ... get the files iterator and print the file
-		// .. make sure we're only calling the raw engine method on json files
-		subDirTree.Files().ForEach(func(f *object.File) error {
-			if strings.HasSuffix(f.Name, ".json") {
-				path := filepath.Join(directory, subDir, f.Name)
-				if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
-					return err
-				}
+		if fileName != "" {
+			targetFile = fileName
+			if !strings.HasSuffix(fileName, tag) {
+				log.Fatalf("%s target file must be of type %s", rawMethod, tag)
 			}
-			return nil
-		})
+			path := filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag) {
+					path := filepath.Join(directory, repo.Target.Raw.Subdirectory, f.Name)
+					if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 	}
 	changes, isDiff := hc.findDiff(gitRepo, directory, rawMethod, repo.Target.Branch, initial)
 	if !isDiff && !initial {
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, rawMethod)
 	}
 
+	targetPath := repo.Target.Raw.Subdirectory
+	if targetFile != "" {
+		targetPath = targetFile
+	}
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, repo.Target.Raw.Subdirectory) {
+		if strings.Contains(change.To.Name, targetPath) {
 			path := directory + "/" + change.To.Name
-			if err = hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
+			if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -271,29 +281,35 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, systemdMethod, err)
 	}
+	var targetFile = ""
+	tag := ".service"
 	if initial {
-		tree, err := getTree(gitRepo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Systemd.Subdirectory, systemdMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		subDir := repo.Target.Systemd.Subdirectory
-		subDirTree, err := tree.Tree(subDir)
-		if err != nil {
-			log.Fatalf("Repo: %s, Method: %s error when switching to subdirectory tree for directory %s: %s", repo.Name, systemdMethod, subDir, err)
-		}
-
-		// ... get the files iterator and print the file
-		// .. make sure we're only calling the raw engine method on json files
-		subDirTree.Files().ForEach(func(f *object.File) error {
-			if strings.HasSuffix(f.Name, ".service") {
-				path := filepath.Join(directory, subDir, f.Name)
-				if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
-					return err
-				}
+		if fileName != "" {
+			targetFile = fileName
+			if !strings.HasSuffix(fileName, tag) {
+				log.Fatalf("%s target file must be of type %s", systemdMethod, tag)
 			}
-			return nil
-		})
+			path := filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag) {
+					path := filepath.Join(directory, repo.Target.Systemd.Subdirectory, f.Name)
+					if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 	}
 
 	changes, isDiff := hc.findDiff(gitRepo, directory, systemdMethod, repo.Target.Branch, initial)
@@ -302,10 +318,15 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 		return
 	}
 
+	targetPath := repo.Target.Systemd.Subdirectory
+	if targetFile != "" {
+		targetPath = targetFile
+	}
+
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, repo.Target.Systemd.Subdirectory) {
+		if strings.Contains(change.To.Name, targetPath) {
 			path := directory + "/" + change.To.Name
-			if err = hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
+			if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -323,27 +344,29 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, fileTransferMethod, err)
 	}
+	var targetFile = ""
 	if initial {
-		tree, err := getTree(gitRepo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.FileTransfer.Subdirectory, fileTransferMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		subDir := repo.Target.FileTransfer.Subdirectory
-		subDirTree, err := tree.Tree(subDir)
-		if err != nil {
-			log.Fatalf("Repo: %s, Method: %s error when switching to subdirectory tree for directory %s: %s", repo.Name, fileTransferMethod, subDir, err)
-		}
-
-		// ... get the files iterator and print the file
-		// .. make sure we're only calling the raw engine method on json files
-		subDirTree.Files().ForEach(func(f *object.File) error {
-			path := filepath.Join(directory, subDir, f.Name)
+		if fileName != "" {
+			targetFile = fileName
+			path := filepath.Join(directory, fileName)
 			if err := hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
-				return err
+				log.Fatal(err)
 			}
-			return nil
-		})
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				path := filepath.Join(directory, repo.Target.FileTransfer.Subdirectory, f.Name)
+				if err := hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
+					return err
+				}
+				return nil
+			})
+		}
 	}
 
 	changes, isDiff := hc.findDiff(gitRepo, directory, fileTransferMethod, repo.Target.Branch, initial)
@@ -352,10 +375,15 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo
 		return
 	}
 
+	targetPath := repo.Target.FileTransfer.Subdirectory
+	if targetFile != "" {
+		targetPath = targetFile
+	}
+
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, repo.Target.FileTransfer.Subdirectory) {
+		if strings.Contains(change.To.Name, targetPath) {
 			path := directory + "/" + change.To.Name
-			if err = hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
+			if err := hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -373,29 +401,42 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, kubeMethod, err)
 	}
+	tag := []string{"yaml", "yml"}
+	var targetFile = ""
 	if initial {
-		tree, err := getTree(gitRepo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Kube.Subdirectory, kubeMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		subDir := repo.Target.Kube.Subdirectory
-		subDirTree, err := tree.Tree(subDir)
-		if err != nil {
-			log.Fatalf("Repo: %s, Method: %s error when switching to subdirectory tree for directory %s: %s", repo.Name, kubeMethod, subDir, err)
-		}
-
-		// ... get the files iterator and print the file
-		// .. make sure we're only calling the raw engine method on json files
-		subDirTree.Files().ForEach(func(f *object.File) error {
-			if strings.HasSuffix(f.Name, ".yaml") || strings.HasSuffix(f.Name, ".yml") {
-				path := filepath.Join(directory, subDir, f.Name)
-				if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
-					return err
+		if fileName != "" {
+			targetFile = fileName
+			found := false
+			for _, ft := range tag {
+				if strings.HasSuffix(fileName, ft) {
+					found = true
+					path := filepath.Join(directory, fileName)
+					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+						log.Fatal(err)
+					}
 				}
 			}
-			return nil
-		})
+			if !found {
+				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
+			}
+
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
+					path := filepath.Join(directory, repo.Target.Kube.Subdirectory, f.Name)
+					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
 	}
 	changes, isDiff := hc.findDiff(gitRepo, directory, kubeMethod, repo.Target.Branch, initial)
 	if !isDiff && !initial {
@@ -403,10 +444,15 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 		return
 	}
 
+	targetPath := repo.Target.Kube.Subdirectory
+	if targetFile != "" {
+		targetPath = targetFile
+	}
+
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, repo.Target.Kube.Subdirectory) {
+		if strings.Contains(change.To.Name, targetPath) {
 			path := directory + "/" + change.To.Name
-			if err = hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+			if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -427,7 +473,7 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 	if gitRepo == nil {
 		gitRepo, err = git.PlainOpen(directory)
 		if err != nil {
-			log.Fatalf("Repo: %s, error while opening the repository: %s", directory, err)
+			log.Fatalf("error while opening the repository: %s: %s", directory, err)
 		}
 	}
 	w, err := gitRepo.Worktree()
@@ -541,4 +587,27 @@ func getTree(r *git.Repository) (*object.Tree, error) {
 		return nil, fmt.Errorf("Error when retrieving tree: %s\n", err)
 	}
 	return tree, nil
+}
+
+func getPathOrTree(directory, subDir, method string, repo *api.Repo) (string, *object.Tree, error) {
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		log.Fatalf("Repo: %s, error while opening the repository: %s", directory, err)
+	}
+	tree, err := getTree(gitRepo)
+	if err != nil {
+		return "", nil, err
+	}
+
+	subDirTree, err := tree.Tree(subDir)
+	if err != nil {
+		if err == object.ErrDirectoryNotFound {
+			// check if exact filepath
+			file, err := tree.File(subDir)
+			if err == nil {
+				return file.Name, nil, nil
+			}
+		}
+	}
+	return "", subDirTree, err
 }

@@ -3,7 +3,7 @@ repos:
 - name: harpoon
   target:
     url: http://github.com/redhat-et/harpoon
-    raw: 
+    raw:
       subdirectory: examples/raw
       schedule: "*/1 * * * *"
     branch: main
