@@ -55,7 +55,7 @@ jobs:
         run: sudo podman load -i /tmp/harpoon.tar
   
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/engine.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v ./examples/raw-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -92,7 +92,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -125,7 +125,7 @@ jobs:
         run: sudo podman load -i /tmp/harpoon.tar
   
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/kube_config.json:/opt/config.json -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v ./examples/kube-play-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m

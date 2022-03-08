@@ -1,0 +1,9 @@
+volume: raw-volume # this needs to match the volume name passed to the podman run command
+repos:
+- name: harpoon
+  target:
+    url: http://github.com/redhat-et/harpoon
+    raw: 
+      subdirectory: examples/raw
+      schedule: "*/1 * * * *"
+    branch: main
