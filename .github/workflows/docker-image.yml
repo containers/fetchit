@@ -105,6 +105,42 @@ jobs:
       - name: ensure systemd container is gone
         run: sudo podman ps -a
 
+  systemd-validate-exact-file:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+ 
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+ 
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/examples/systemd-config-single-file.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+ 
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+ 
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
   kube-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -182,7 +218,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -252,7 +288,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, kube-validate, systemd-validate ]
+    needs: [ build, raw-validate, kube-validate, systemd-validate, systemd-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
