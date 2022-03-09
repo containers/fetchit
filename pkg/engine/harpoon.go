@@ -34,6 +34,7 @@ const (
 	systemdMethod      = "systemd"
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
+	ansibleMethod      = "ansible"
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -116,7 +117,7 @@ func (hc *HarpoonConfig) getTargets() {
 	for _, repo := range hc.Targets {
 		schedMap := make(map[string]string)
 		// TODO: this should not be hard-coded, in the future might allow for arbitrary target types with an interface
-		targets = append(targets, repo.Raw, repo.Systemd, repo.Kube, repo.FileTransfer)
+		targets = append(targets, repo.Raw, repo.Systemd, repo.Kube, repo.FileTransfer, repo.Ansible)
 		for _, i := range targets {
 			switch i.(type) {
 			case api.Raw:
@@ -139,6 +140,11 @@ func (hc *HarpoonConfig) getTargets() {
 					continue
 				}
 				schedMap[fileTransferMethod] = repo.FileTransfer.Schedule
+			case api.Ansible:
+				if repo.Ansible.Schedule == "" {
+					continue
+				}
+				schedMap[ansibleMethod] = repo.Ansible.Schedule
 			default:
 				log.Fatalf("unknown target method")
 			}
@@ -202,6 +208,12 @@ func (hc *HarpoonConfig) runTargets() {
 			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
 			repo.FileTransfer.InitialRun = true
 			s.Cron(schedule).Do(hc.processFileTransfer, ctx, &repo, schedule)
+		case ansibleMethod:
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
+			repo.Ansible.InitialRun = true
+			s.Cron(schedule).Do(hc.processAnsible, ctx, &repo, schedule)
 		default:
 			log.Fatalf("unknown target method")
 		}
@@ -391,6 +403,75 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Targ
 	hc.update(repo)
 }
 
+func (hc *HarpoonConfig) processAnsible(ctx context.Context, repo *api.Target, schedule string) {
+	repo.Mu.Lock()
+	defer repo.Mu.Unlock()
+	initial := repo.Ansible.InitialRun
+	repo.Ansible.InitialRun = false
+	directory := filepath.Base(repo.Url)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, ansibleMethod, err)
+	}
+	tag := []string{"yaml", "yml"}
+	var targetFile = ""
+	if initial {
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Ansible.TargetPath, ansibleMethod, repo)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if fileName != "" {
+			targetFile = fileName
+			found := false
+			for _, ft := range tag {
+				if strings.HasSuffix(fileName, ft) {
+					found = true
+					path := filepath.Join(directory, fileName)
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, repo); err != nil {
+						log.Fatal(err)
+					}
+				}
+			}
+			if !found {
+				log.Fatalf("%s target file must be of type %v", ansibleMethod, tag)
+			}
+
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
+					path := filepath.Join(directory, repo.Ansible.TargetPath, f.Name)
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, repo); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
+	}
+	changes, isDiff := hc.findDiff(gitRepo, directory, ansibleMethod, repo.Branch, initial)
+	if !isDiff && !initial {
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, ansibleMethod)
+		return
+	}
+
+	tp := repo.Ansible.TargetPath
+	if targetFile != "" {
+		tp = targetFile
+	}
+
+	for _, change := range changes {
+		if strings.Contains(change.To.Name, tp) {
+			path := directory + "/" + change.To.Name
+			if err := hc.EngineMethod(ctx, path, ansibleMethod, repo); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	hc.update(repo)
+}
+
 func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
@@ -520,6 +601,10 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		// TODO
 	case kubeMethod:
 		if err := kubePodman(ctx, path); err != nil {
+			return err
+		}
+	case ansibleMethod:
+		if err := ansiblePodman(ctx, path, repo.Name); err != nil {
 			return err
 		}
 	default:
