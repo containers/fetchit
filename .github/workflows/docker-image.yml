@@ -41,8 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: make ansible amd
-        run: docker build -f method_containers/ansible/. -t quay.io/harpoon/harpoon-ansible-amd:latest .
+      - name: Build the image
+        run: go mod tidy && go mod vendor && docker build -f method_containers/ansible/Dockerfile -t quay.io/harpoon/harpoon-ansible-amd:latest .
 
       - name: Export image
         run: docker save -o /tmp/ansible-amd.tar quay.io/harpoon/harpoon-ansible-amd:latest
@@ -58,8 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: make ansible arm
-        run: CTR_CMD=podman make build-containerized-cross-build-linux-arm64-ansible
+      - name: Build the image
+        run: go mod tidy && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64-ansible
 
       - name: Export image
         run: docker save -o /tmp/ansible-arm.tar quay.io/harpoon/harpoon-ansible-arm:latest
