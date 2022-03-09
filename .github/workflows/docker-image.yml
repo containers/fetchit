@@ -27,6 +27,9 @@ jobs:
       - name: Build the image
         run: go mod tidy && go mod vendor && docker build . --file Dockerfile --tag quay.io/harpoon/harpoon-amd:latest
     
+      - name: list images
+        run: podman image list
+
       - name: Export image
         run: docker save -o /tmp/harpoon.tar quay.io/harpoon/harpoon-amd:latest
 
