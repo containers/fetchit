@@ -502,7 +502,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, repo *api.Target, s
 				}
 			}
 			if !found {
-				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
+				log.Fatalf("%s target file must be of type %v", ansibleMethod, tag)
 			}
 
 		} else {
