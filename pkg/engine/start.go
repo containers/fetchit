@@ -10,8 +10,8 @@ var startCmd = &cobra.Command{
 	Long:  `Start harpoon engine`,
 	Run: func(cmd *cobra.Command, args []string) {
 		harpoonConfig.initConfig(cmd)
-		if len(harpoonConfig.Repos) == 0 {
-			panic("no harpoon repositories collected")
+		if len(harpoonConfig.Targets) == 0 {
+			panic("no harpoon target repositories collected")
 		}
 		harpoonConfig.runTargets()
 	},

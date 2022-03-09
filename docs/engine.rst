@@ -16,7 +16,7 @@ The engine references a file to ensure the repository and how to deploy the cont
 
    {
    "Url":"http://github.com/redhat-et/harpoon",
-   "Subdirectory": "examples/raw",
+   "TargetPath": "examples/raw",
    "Branch":"main",
    "Method":"raw",
    "Schedule": "*/1 * * * *"

@@ -25,15 +25,18 @@ To enable the socker for root:
 systemctl enable podman.socket
 ```
 
-Define the parameters in your `config.json` to relate to your git repository.
+Define the parameters in your `config.yaml` to relate to your git repository.
 ```
-{
-"Url":"http://github.com/redhat-et/harpoon",
-"Subdirectory": "examples/raw",
-"Branch":"main",
-"Method":"raw",
-"Schedule": "*/1 * * * *"
-}
+targets:
+- name: harpoon
+  url: http://github.com/redhat-et/harpoon
+  branch: main
+  systemd:
+    targetPath: examples/systemd/httpd.service
+    schedule: "*/1 * * * *" 
+  raw:
+    targetPath: examples/raw
+    schedule: "*/1 * * * *"
 ```
 Verify running characters before deploying harpoon.
 ```

@@ -38,12 +38,13 @@ const (
 
 // HarpoonConfig requires necessary objects to process targets
 type HarpoonConfig struct {
-	Repos []api.Repo `mapstructure:"repos"`
+	Targets []*api.Target `mapstructure:"targets"`
+	PAT     string        `mapstructure:"pat"`
 
-	// map of repoName to map of method:schedule
+	// map of Target.Name to map of method:schedule
 	RepoTargetMap map[string]map[string]string
 	Volume        string
-	configFile    string // "./config.yaml"
+	configFile    string // "currently not configurable, ./config.yaml"
 }
 
 func NewHarpoonConfig() *HarpoonConfig {
@@ -105,39 +106,39 @@ func (o *HarpoonConfig) initConfig(cmd *cobra.Command) {
 	}
 
 	harpoonVolume = config.Volume
-	o.Repos = config.Repos
+	o.Targets = config.Targets
 }
 
 // getTargets returns map of repoName to map of method:Schedule
 func (hc *HarpoonConfig) getTargets() {
 	RepoTargetMap := make(map[string]map[string]string)
 	var targets []interface{}
-	for _, repo := range hc.Repos {
+	for _, repo := range hc.Targets {
 		schedMap := make(map[string]string)
 		// TODO: this should not be hard-coded, in the future might allow for arbitrary target types with an interface
-		targets = append(targets, repo.Target.Raw, repo.Target.Systemd, repo.Target.Kube, repo.Target.FileTransfer)
+		targets = append(targets, repo.Raw, repo.Systemd, repo.Kube, repo.FileTransfer)
 		for _, i := range targets {
 			switch i.(type) {
 			case api.Raw:
-				if repo.Target.Raw.Schedule == "" {
+				if repo.Raw.Schedule == "" {
 					continue
 				}
-				schedMap[rawMethod] = repo.Target.Raw.Schedule
+				schedMap[rawMethod] = repo.Raw.Schedule
 			case api.Kube:
-				if repo.Target.Kube.Schedule == "" {
+				if repo.Kube.Schedule == "" {
 					continue
 				}
-				schedMap[kubeMethod] = repo.Target.Kube.Schedule
+				schedMap[kubeMethod] = repo.Kube.Schedule
 			case api.Systemd:
-				if repo.Target.Systemd.Schedule == "" {
+				if repo.Systemd.Schedule == "" {
 					continue
 				}
-				schedMap[systemdMethod] = repo.Target.Systemd.Schedule
+				schedMap[systemdMethod] = repo.Systemd.Schedule
 			case api.FileTransfer:
-				if repo.Target.FileTransfer.Schedule == "" {
+				if repo.FileTransfer.Schedule == "" {
 					continue
 				}
-				schedMap[fileTransferMethod] = repo.Target.FileTransfer.Schedule
+				schedMap[fileTransferMethod] = repo.FileTransfer.Schedule
 			default:
 				log.Fatalf("unknown target method")
 			}
@@ -150,12 +151,11 @@ func (hc *HarpoonConfig) getTargets() {
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (hc *HarpoonConfig) runTargets() {
 	hc.getTargets()
-	// TODO there must be a better way
-	var split = "-SPLIT-"
 	allTargets := make(map[string]string)
-	for _, repo := range hc.Repos {
-		directory := filepath.Base(repo.Target.Url)
-		if err := hc.getClone(&repo, directory); err != nil {
+	var split = "-SPLIT-"
+	for _, repo := range hc.Targets {
+		directory := filepath.Base(repo.Url)
+		if err := hc.getClone(repo, directory); err != nil {
 			log.Fatal(err)
 		}
 		for method, schedule := range hc.RepoTargetMap[repo.Name] {
@@ -171,10 +171,10 @@ func (hc *HarpoonConfig) runTargets() {
 		methodAndRepo := strings.Split(methodRepo, split)
 		method := methodAndRepo[0]
 		repoName := methodAndRepo[1]
-		var repo api.Repo
-		for _, r := range hc.Repos {
+		var repo api.Target
+		for _, r := range hc.Targets {
 			if repoName == r.Name {
-				repo = r
+				repo = *r
 			}
 		}
 		switch method {
@@ -182,25 +182,25 @@ func (hc *HarpoonConfig) runTargets() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
-			repo.Target.Kube.InitialRun = true
+			repo.Kube.InitialRun = true
 			s.Cron(schedule).Do(hc.processKube, ctx, &repo, schedule)
 		case rawMethod:
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
-			repo.Target.Raw.InitialRun = true
+			repo.Raw.InitialRun = true
 			s.Cron(schedule).Do(hc.processRaw, ctx, &repo, schedule)
 		case systemdMethod:
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
-			repo.Target.Systemd.InitialRun = true
+			repo.Systemd.InitialRun = true
 			s.Cron(schedule).Do(hc.processSystemd, ctx, &repo, schedule)
 		case fileTransferMethod:
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			klog.Infof("Processing Repo: %s Method: %s", repo.Name, method)
-			repo.Target.FileTransfer.InitialRun = true
+			repo.FileTransfer.InitialRun = true
 			s.Cron(schedule).Do(hc.processFileTransfer, ctx, &repo, schedule)
 		default:
 			log.Fatalf("unknown target method")
@@ -210,13 +210,13 @@ func (hc *HarpoonConfig) runTargets() {
 	select {}
 }
 
-func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedule string) {
+func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
 
-	initial := repo.Target.Raw.InitialRun
-	repo.Target.Raw.InitialRun = false
-	directory := filepath.Base(repo.Target.Url)
+	initial := repo.Raw.InitialRun
+	repo.Raw.InitialRun = false
+	directory := filepath.Base(repo.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, rawMethod, err)
@@ -224,7 +224,7 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedul
 	var targetFile = ""
 	tag := ".json"
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Raw.Subdirectory, rawMethod, repo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Raw.TargetPath, rawMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -242,7 +242,7 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedul
 			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag) {
-					path := filepath.Join(directory, repo.Target.Raw.Subdirectory, f.Name)
+					path := filepath.Join(directory, repo.Raw.TargetPath, f.Name)
 					if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
 						return err
 					}
@@ -251,17 +251,17 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedul
 			})
 		}
 	}
-	changes, isDiff := hc.findDiff(gitRepo, directory, rawMethod, repo.Target.Branch, initial)
+	changes, isDiff := hc.findDiff(gitRepo, directory, rawMethod, repo.Branch, initial)
 	if !isDiff && !initial {
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, rawMethod)
 	}
 
-	targetPath := repo.Target.Raw.Subdirectory
+	tp := repo.Raw.TargetPath
 	if targetFile != "" {
-		targetPath = targetFile
+		tp = targetFile
 	}
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
+		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, rawMethod, repo); err != nil {
 				log.Fatal(err)
@@ -271,12 +271,12 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, repo *api.Repo, schedul
 	hc.update(repo)
 }
 
-func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, schedule string) {
+func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
-	initial := repo.Target.Systemd.InitialRun
-	repo.Target.Systemd.InitialRun = false
-	directory := filepath.Base(repo.Target.Url)
+	initial := repo.Systemd.InitialRun
+	repo.Systemd.InitialRun = false
+	directory := filepath.Base(repo.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, systemdMethod, err)
@@ -284,7 +284,7 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 	var targetFile = ""
 	tag := ".service"
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Systemd.Subdirectory, systemdMethod, repo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Systemd.TargetPath, systemdMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -302,7 +302,7 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag) {
-					path := filepath.Join(directory, repo.Target.Systemd.Subdirectory, f.Name)
+					path := filepath.Join(directory, repo.Systemd.TargetPath, f.Name)
 					if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
 						return err
 					}
@@ -312,19 +312,19 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 		}
 	}
 
-	changes, isDiff := hc.findDiff(gitRepo, directory, systemdMethod, repo.Target.Branch, initial)
+	changes, isDiff := hc.findDiff(gitRepo, directory, systemdMethod, repo.Branch, initial)
 	if !isDiff && !initial {
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, systemdMethod)
 		return
 	}
 
-	targetPath := repo.Target.Systemd.Subdirectory
+	tp := repo.Systemd.TargetPath
 	if targetFile != "" {
-		targetPath = targetFile
+		tp = targetFile
 	}
 
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
+		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, systemdMethod, repo); err != nil {
 				log.Fatal(err)
@@ -334,19 +334,19 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, repo *api.Repo, sch
 	hc.update(repo)
 }
 
-func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo, schedule string) {
+func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
-	initial := repo.Target.FileTransfer.InitialRun
-	repo.Target.FileTransfer.InitialRun = false
-	directory := filepath.Base(repo.Target.Url)
+	initial := repo.FileTransfer.InitialRun
+	repo.FileTransfer.InitialRun = false
+	directory := filepath.Base(repo.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, fileTransferMethod, err)
 	}
 	var targetFile = ""
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.FileTransfer.Subdirectory, fileTransferMethod, repo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.FileTransfer.TargetPath, fileTransferMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -360,7 +360,7 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo
 			// ... get the files iterator and print the file
 			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
-				path := filepath.Join(directory, repo.Target.FileTransfer.Subdirectory, f.Name)
+				path := filepath.Join(directory, repo.FileTransfer.TargetPath, f.Name)
 				if err := hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
 					return err
 				}
@@ -369,19 +369,19 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo
 		}
 	}
 
-	changes, isDiff := hc.findDiff(gitRepo, directory, fileTransferMethod, repo.Target.Branch, initial)
+	changes, isDiff := hc.findDiff(gitRepo, directory, fileTransferMethod, repo.Branch, initial)
 	if !isDiff && !initial {
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, fileTransferMethod)
 		return
 	}
 
-	targetPath := repo.Target.FileTransfer.Subdirectory
+	tp := repo.FileTransfer.TargetPath
 	if targetFile != "" {
-		targetPath = targetFile
+		tp = targetFile
 	}
 
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
+		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, fileTransferMethod, repo); err != nil {
 				log.Fatal(err)
@@ -391,12 +391,12 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Repo
 	hc.update(repo)
 }
 
-func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedule string) {
+func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
-	initial := repo.Target.Kube.InitialRun
-	repo.Target.Kube.InitialRun = false
-	directory := filepath.Base(repo.Target.Url)
+	initial := repo.Kube.InitialRun
+	repo.Kube.InitialRun = false
+	directory := filepath.Base(repo.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, kubeMethod, err)
@@ -404,7 +404,7 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 	tag := []string{"yaml", "yml"}
 	var targetFile = ""
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, repo.Target.Kube.Subdirectory, kubeMethod, repo)
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Kube.TargetPath, kubeMethod, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -429,7 +429,7 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
-					path := filepath.Join(directory, repo.Target.Kube.Subdirectory, f.Name)
+					path := filepath.Join(directory, repo.Kube.TargetPath, f.Name)
 					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
 						return err
 					}
@@ -438,19 +438,19 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 			})
 		}
 	}
-	changes, isDiff := hc.findDiff(gitRepo, directory, kubeMethod, repo.Target.Branch, initial)
+	changes, isDiff := hc.findDiff(gitRepo, directory, kubeMethod, repo.Branch, initial)
 	if !isDiff && !initial {
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, kubeMethod)
 		return
 	}
 
-	targetPath := repo.Target.Kube.Subdirectory
+	tp := repo.Kube.TargetPath
 	if targetFile != "" {
-		targetPath = targetFile
+		tp = targetFile
 	}
 
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
+		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
 				log.Fatal(err)
@@ -460,10 +460,10 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Repo, schedu
 	hc.update(repo)
 }
 
-func (hc *HarpoonConfig) update(repo *api.Repo) {
-	for _, r := range hc.Repos {
+func (hc *HarpoonConfig) update(repo *api.Target) {
+	for _, r := range hc.Targets {
 		if repo.Name == r.Name {
-			r = *repo
+			r = repo
 		}
 	}
 }
@@ -503,7 +503,7 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 	return changes, firstRun
 }
 
-func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, repo *api.Repo) error {
+func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, repo *api.Target) error {
 	switch method {
 	case rawMethod:
 		if err := RawPodman(ctx, path); err != nil {
@@ -529,7 +529,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 }
 
 // This assumes unique urls - only 1 repo per "directory"
-func (hc *HarpoonConfig) getClone(repo *api.Repo, directory string) error {
+func (hc *HarpoonConfig) getClone(repo *api.Target, directory string) error {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
 	absPath, err := filepath.Abs(directory)
@@ -550,18 +550,18 @@ func (hc *HarpoonConfig) getClone(repo *api.Repo, directory string) error {
 	if !exists {
 		// TODO: Allow multiple branches per repository
 		// Will need to add a Checkout per branch, per target
-		klog.Infof("git clone %s %s --recursive", repo.Target.Url, repo.Target.Branch)
+		klog.Infof("git clone %s %s --recursive", repo.Url, repo.Branch)
 		var user string
-		if repo.PAT != "" {
+		if hc.PAT != "" {
 			user = "harpoon"
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
 			Auth: &http.BasicAuth{
 				Username: user,
-				Password: repo.PAT,
+				Password: hc.PAT,
 			},
-			URL:           repo.Target.Url,
-			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Target.Branch)),
+			URL:           repo.Url,
+			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", repo.Branch)),
 			SingleBranch:  true,
 		})
 		if err != nil {
@@ -589,7 +589,7 @@ func getTree(r *git.Repository) (*object.Tree, error) {
 	return tree, nil
 }
 
-func getPathOrTree(directory, subDir, method string, repo *api.Repo) (string, *object.Tree, error) {
+func getPathOrTree(directory, subDir, method string, repo *api.Target) (string, *object.Tree, error) {
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s, error while opening the repository: %s", directory, err)

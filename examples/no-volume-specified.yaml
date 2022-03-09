@@ -1,8 +1,7 @@
-repos:
+targets:
 - name: harpoon
-  target:
-    url: http://github.com/redhat-et/harpoon
-    raw: 
-      subdirectory: examples/raw
-      schedule: "*/1 * * * *"
-    branch: main
+  url: http://github.com/redhat-et/harpoon
+  raw: 
+    targetPath: examples/raw
+    schedule: "*/1 * * * *"
+  branch: main
