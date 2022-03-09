@@ -94,6 +94,40 @@ build-containerized-cross-build:
 	+$(MAKE) build-containerized-cross-build-linux-arm64
 .PHONY: build-containerized-cross-build
 
+#################################
+# additional containers targets #
+#################################
+_build_containerized_amd_ansible:
+	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
+	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/harpoon/harpoon-ansible-amd:latest \
+		--build-arg ARCH=amd64 \
+		--platform="linux/amd64"
+
+.PHONY: _build_containerized_amd_ansible
+
+_build_containerized_arm_ansible:
+	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
+	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/harpoon/harpoon-ansbile-arm:latest \
+		--build-arg ARCH=arm64 \
+		--platform="linux/arm64"
+
+.PHONY: _build_containerized_arm_ansible
+
+build-containerized-cross-build-linux-amd64-ansible:
+	+$(MAKE) _build_containerized_amd_ansible ARCH=amd64
+.PHONY: build-containerized-cross-build-linux-amd64-ansible
+
+build-containerized-cross-build-linux-arm64-ansible:
+	+$(MAKE) _build_containerized_arm_ansible ARCH=arm64
+.PHONY: build-containerized-cross-build-linux-arm64-ansible
+
+build-containerized-cross-build:
+	+$(MAKE) build-containerized-cross-build-linux-amd64-ansible
+	+$(MAKE) build-containerized-cross-build-linux-arm64-ansible
+.PHONY: build-containerized-cross-build-ansible
+
+
+
 ###############################
 # dev targets                 #
 ###############################

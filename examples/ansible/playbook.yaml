@@ -1,0 +1,6 @@
+---
+- hosts: localhost
+  become: true
+  tasks:
+  - name: zsh install
+    ansible.builtin.package: name=zsh state=latest
