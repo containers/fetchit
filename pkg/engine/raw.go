@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 
 	"github.com/containers/common/libnetwork/types"
@@ -12,6 +11,8 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	"k8s.io/klog/v2"
 )
 
 /* below is an example.json file:
@@ -27,7 +28,7 @@ import (
 }
 */
 
-type Raw struct {
+type RawPod struct {
 	Image   string                 `json:"Image"`
 	Name    string                 `json:"Name"`
 	Env     map[string]string      `json:"Env"`
@@ -36,17 +37,17 @@ type Raw struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func RawPodman(path string) error {
-	fmt.Printf("Creating podman container from %s\n", path)
+func RawPodman(ctx context.Context, path string) error {
+	klog.Infof("Creating podman container from %s", path)
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	raw := Raw{Ports: []types.PortMapping{}}
+	raw := RawPod{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
 	// Create a new Podman client
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func RawPodman(path string) error {
 	}
 	inspectData, err := containers.Inspect(conn, raw.Name, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
-		fmt.Printf("A container named %s already exists. Removing the container before redeploy.\n", raw.Name)
+		klog.Infof("A container named %s already exists. Removing the container before redeploy.", raw.Name)
 		containers.Stop(conn, raw.Name, nil)
 		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
 
@@ -73,10 +74,10 @@ func RawPodman(path string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Container created.")
+	klog.Infof("Container %s created.", s.Name)
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
-	fmt.Println("Container started....Requeuing")
+	klog.Infof("Container %s started....Requeuing", s.Name)
 	return nil
 }

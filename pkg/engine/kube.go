@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 
@@ -15,6 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	k8syaml "sigs.k8s.io/yaml"
 )
 
@@ -23,8 +23,8 @@ type YamlMeta struct {
 	Kind       string `yaml:"kind"`
 }
 
-func kubePodman(path string) error {
-	fmt.Printf("Creating podman container from %s using kube method\n", path)
+func kubePodman(ctx context.Context, path string) error {
+	klog.Infof("Creating podman container from %s using kube method", path)
 
 	kubeYaml, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -71,7 +71,7 @@ func kubePodman(path string) error {
 		}
 		pod_map[pod.ObjectMeta.Name] = true
 	}
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
 		return err
 	}
@@ -98,6 +98,6 @@ func kubePodman(path string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Print("Played kube successfully!\n\n")
+	klog.Infof("Played kube successfully!")
 	return nil
 }

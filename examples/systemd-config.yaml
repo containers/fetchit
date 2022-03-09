@@ -1,0 +1,9 @@
+volume: harpoon-volume # this needs to match the volume name passed to the podman run command
+targets:
+- name: harpoon
+  url: http://github.com/redhat-et/harpoon
+  systemd:
+    targetPath: examples/systemd
+    user: root
+    schedule: "*/1 * * * *"
+  branch: main

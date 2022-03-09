@@ -12,11 +12,11 @@ metadata:
   name: colors_pod
 spec:
   containers:
-  - name: colors
+  - name: colors-kubeplay
     image: docker.io/mmumshad/simple-webapp-color:latest
     ports:
     - containerPort: 8080
-      hostPort: 8080
+      hostPort: 7080
     envFrom:
     - configMapRef:
         name: env

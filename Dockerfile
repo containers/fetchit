@@ -27,4 +27,4 @@ COPY --from=builder /usr/local/bin/harpoon /usr/local/bin/
 
 WORKDIR /opt
 
-CMD ["/usr/local/bin/harpoon"]
+CMD ["/usr/local/bin/harpoon", "start"]
