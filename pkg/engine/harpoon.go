@@ -141,11 +141,11 @@ func (hc *HarpoonConfig) getTargets() {
 					continue
 				}
 				schedMethods[fileTransferMethod] = target.FileTransfer.Schedule
-      case api.AnsibleTransfer:
-				if target.AnsibleTransfer.Schedule == "" {
+      case api.Ansible:
+				if target.Ansible.Schedule == "" {
 					continue
 				}
-				schedMethods[ansibleMethod] = target.AnsibleTransfer.Schedule
+				schedMethods[ansibleMethod] = target.Ansible.Schedule
 			default:
 				log.Fatalf("unknown target method")
 			}
@@ -204,7 +204,7 @@ func (hc *HarpoonConfig) runTargets() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				target.AnsibleTransfer.InitialRun = true
+				target.Ansible.InitialRun = true
 				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
 			default:
 				log.Fatalf("unknown target method")
