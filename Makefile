@@ -113,7 +113,7 @@ _build_ansbile_arm:
 		--build-arg MAKE_TARGET="cross-build-linux-arm64" \
 		--platform="linux/arm64"
 
-.PHONY: _build_ansbile_arm
+.PHONY: _build_ansible_arm
 
 build-ansible-cross-build-linux-amd64:
 	+$(MAKE) _build_ansible_amd ARCH=amd64
