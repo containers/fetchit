@@ -28,6 +28,9 @@ func ansiblePodman(ctx context.Context, path, repoName string) error {
 	if err != nil {
 		return err
 	}
+	if exists {
+		klog.Info("Image %s already exists", sshImage)
+	}
 	if !exists {
 		klog.Infof("Pulling %s\n", sshImage)
 		_, err = images.Pull(conn, sshImage, nil)
