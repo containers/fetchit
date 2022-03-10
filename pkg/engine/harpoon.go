@@ -280,7 +280,6 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
 	target.Mu.Lock()
 	defer target.Mu.Unlock()
-
 	initial := target.Ansible.InitialRun
 	target.Ansible.InitialRun = false
 	directory := filepath.Base(target.Url)
@@ -288,8 +287,8 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	if err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, ansibleMethod, err)
 	}
+	tag := []string{"yaml", "yml"}
 	var targetFile = ""
-	tag := ".json"
 	if initial {
 		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, ansibleMethod, target)
 		if err != nil {
@@ -297,17 +296,24 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 		}
 		if fileName != "" {
 			targetFile = fileName
-			if !strings.HasSuffix(fileName, tag) {
-				log.Fatalf("%s target file must be of type %s", ansibleMethod, tag)
+			found := false
+			for _, ft := range tag {
+				if strings.HasSuffix(fileName, ft) {
+					found = true
+					path := filepath.Join(directory, fileName)
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+						log.Fatal(err)
+					}
+				}
 			}
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
-				log.Fatal(err)
+			if !found {
+				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
 			}
+
 		} else {
 			// ... get the files iterator and print the file
 			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag) {
+				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
 					path := filepath.Join(directory, target.Ansible.TargetPath, f.Name)
 					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
 						return err
@@ -317,6 +323,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 			})
 		}
 	}
+
 	changes := hc.findDiff(gitRepo, directory, ansibleMethod, target.Branch)
 	if changes == nil {
 		hc.update(target)
@@ -328,6 +335,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	if targetFile != "" {
 		tp = targetFile
 	}
+
 	for _, change := range changes {
 		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
@@ -506,7 +514,7 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, systemdMethod, target.Branch)
+	changes := hc.findDiff(gitRepo, directory, kubeMethod, target.Branch)
 	if changes == nil {
 		hc.update(target)
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, kubeMethod)
