@@ -48,7 +48,7 @@ jobs:
         run: docker images
 
       - name: Export image
-        run: docker save -o /tmp/ansible-amd.tar quay.io/harpoon/harpoon-ansible-amd:latest
+        run: podman save -o /tmp/ansible-amd.tar quay.io/harpoon/harpoon-ansible-amd:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
@@ -65,7 +65,7 @@ jobs:
         run: go mod tidy && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
 
       - name: Export image
-        run: docker save -o /tmp/ansible-arm.tar quay.io/harpoon/harpoon-ansible-arm:latest
+        run: podman save -o /tmp/ansible-arm.tar quay.io/harpoon/harpoon-ansible-arm:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
