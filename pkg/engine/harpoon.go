@@ -403,75 +403,6 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, repo *api.Targ
 	hc.update(repo)
 }
 
-func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Target, schedule string) {
-	repo.Mu.Lock()
-	defer repo.Mu.Unlock()
-	initial := repo.Kube.InitialRun
-	repo.Kube.InitialRun = false
-	directory := filepath.Base(repo.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, kubeMethod, err)
-	}
-	tag := []string{"yaml", "yml"}
-	var targetFile = ""
-	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, repo.Kube.TargetPath, kubeMethod, repo)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if fileName != "" {
-			targetFile = fileName
-			found := false
-			for _, ft := range tag {
-				if strings.HasSuffix(fileName, ft) {
-					found = true
-					path := filepath.Join(directory, fileName)
-					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
-						log.Fatal(err)
-					}
-				}
-			}
-			if !found {
-				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
-			}
-
-		} else {
-			// ... get the files iterator and print the file
-			// .. make sure we're only calling the raw engine method on json files
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
-					path := filepath.Join(directory, repo.Kube.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-		}
-	}
-	changes, isDiff := hc.findDiff(gitRepo, directory, kubeMethod, repo.Branch, initial)
-	if !isDiff && !initial {
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, kubeMethod)
-		return
-	}
-
-	tp := repo.Kube.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(repo)
-}
-
 func (hc *HarpoonConfig) processAnsible(ctx context.Context, repo *api.Target, schedule string) {
 	repo.Mu.Lock()
 	defer repo.Mu.Unlock()
@@ -534,6 +465,75 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, repo *api.Target, s
 		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, ansibleMethod, repo); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	hc.update(repo)
+}
+
+func (hc *HarpoonConfig) processKube(ctx context.Context, repo *api.Target, schedule string) {
+	repo.Mu.Lock()
+	defer repo.Mu.Unlock()
+	initial := repo.Kube.InitialRun
+	repo.Kube.InitialRun = false
+	directory := filepath.Base(repo.Url)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", repo.Name, kubeMethod, err)
+	}
+	tag := []string{"yaml", "yml"}
+	var targetFile = ""
+	if initial {
+		fileName, subDirTree, err := getPathOrTree(directory, repo.Kube.TargetPath, kubeMethod, repo)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if fileName != "" {
+			targetFile = fileName
+			found := false
+			for _, ft := range tag {
+				if strings.HasSuffix(fileName, ft) {
+					found = true
+					path := filepath.Join(directory, fileName)
+					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+						log.Fatal(err)
+					}
+				}
+			}
+			if !found {
+				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
+			}
+
+		} else {
+			// ... get the files iterator and print the file
+			// .. make sure we're only calling the raw engine method on json files
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
+					path := filepath.Join(directory, repo.Kube.TargetPath, f.Name)
+					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
+	}
+	changes, isDiff := hc.findDiff(gitRepo, directory, kubeMethod, repo.Branch, initial)
+	if !isDiff && !initial {
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", repo.Name, kubeMethod)
+		return
+	}
+
+	tp := repo.Kube.TargetPath
+	if targetFile != "" {
+		tp = targetFile
+	}
+
+	for _, change := range changes {
+		if strings.Contains(change.To.Name, tp) {
+			path := directory + "/" + change.To.Name
+			if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
 				log.Fatal(err)
 			}
 		}
