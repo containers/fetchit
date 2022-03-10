@@ -511,7 +511,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, repo *api.Target, s
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
 					path := filepath.Join(directory, repo.Ansible.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, kubeMethod, repo); err != nil {
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, repo); err != nil {
 						return err
 					}
 				}
