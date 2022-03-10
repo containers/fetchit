@@ -22,7 +22,7 @@ func ansiblePodman(ctx context.Context, path, repoName string) error {
 	}
 
 	copyFile := ("/opt/" + path)
-	sshImage := "quay.io/harpoon/harpoon-ansible-amd:latest"
+	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
 
 	_, err = images.Pull(conn, sshImage, nil)
 	if err != nil {

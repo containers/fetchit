@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Build the image
-        run: go mod tidy && go mod vendor && make build-containerized-cross-build-linux-amd64-ansible
+        run: go mod tidy && go mod vendor && make build-ansible-cross-build-linux-amd64
 
       - name: docker list images
         run: docker images
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Build the image
-        run: go mod tidy && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64-ansible
+        run: go mod tidy && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
 
       - name: Export image
         run: docker save -o /tmp/ansible-arm.tar quay.io/harpoon/harpoon-ansible-arm:latest
@@ -313,7 +313,10 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
-        
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-ansible-amd:latest quay.io/harpoon/harpoon-ansible:latest 
+
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ansible.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
