@@ -117,7 +117,7 @@ func (hc *HarpoonConfig) getTargets() {
 	for _, repo := range hc.Targets {
 		schedMap := make(map[string]string)
 		// TODO: this should not be hard-coded, in the future might allow for arbitrary target types with an interface
-		targets = append(targets, repo.Raw, repo.Systemd, repo.Kube, repo.FileTransfer)
+		targets = append(targets, repo.Raw, repo.Systemd, repo.Kube, repo.FileTransfer, repo.Ansible)
 		for _, i := range targets {
 			switch i.(type) {
 			case api.Raw:
