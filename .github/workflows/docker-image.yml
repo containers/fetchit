@@ -292,7 +292,7 @@ jobs:
 
   ansible-valiate:
     runs-on: ubuntu-latest
-    needs: [ build-ansible-amd ]
+    needs: [ build, build-ansible-amd ]
     steps:
       - uses: actions/checkout@v2
 
