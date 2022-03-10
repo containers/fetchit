@@ -34,7 +34,7 @@ const (
 	systemdMethod      = "systemd"
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
-  ansibleMethod      = "ansible"
+	ansibleMethod      = "ansible"
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -141,7 +141,7 @@ func (hc *HarpoonConfig) getTargets() {
 					continue
 				}
 				schedMethods[fileTransferMethod] = target.FileTransfer.Schedule
-      case api.Ansible:
+			case api.Ansible:
 				if target.Ansible.Schedule == "" {
 					continue
 				}
@@ -200,7 +200,7 @@ func (hc *HarpoonConfig) runTargets() {
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				target.FileTransfer.InitialRun = true
 				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
-  		case ansibleMethod:
+			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
@@ -598,6 +598,10 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		// TODO
 	case kubeMethod:
 		if err := kubePodman(ctx, path); err != nil {
+			return err
+		}
+	case ansibleMethod:
+		if err := ansiblePodman(ctx, path, target.Name); err != nil {
 			return err
 		}
 	default:
