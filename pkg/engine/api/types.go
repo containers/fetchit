@@ -4,8 +4,6 @@ import (
 	"sync"
 )
 
-// TODO Each Target can hold 1 each of Raw, Systemd, FileTransfer
-// Or, add a new Target for each in the config file.
 type Target struct {
 	Name         string       `mapstructure:"name"`
 	Url          string       `mapstructure:"url"`
@@ -14,7 +12,6 @@ type Target struct {
 	Systemd      Systemd      `mapstructure:"systemd"`
 	Kube         Kube         `mapstructure:"kube"`
 	FileTransfer FileTransfer `mapstructure:"fileTransfer"`
-	// map of method:schedule
 	MethodSchedules map[string]string
 	Mu              sync.Mutex
 }

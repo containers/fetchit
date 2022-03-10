@@ -157,7 +157,6 @@ func (hc *HarpoonConfig) runTargets() {
 		if err := hc.getClone(target, directory); err != nil {
 			log.Fatal(err)
 		}
-		// schedMethods is method:schedule
 		allTargets[target.Name] = target.MethodSchedules
 	}
 
@@ -233,7 +232,6 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 			}
 		} else {
 			// ... get the files iterator and print the file
-			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag) {
 					path := filepath.Join(directory, target.Raw.TargetPath, f.Name)
@@ -246,7 +244,6 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 		}
 	}
 	changes := hc.findDiff(gitRepo, directory, rawMethod, target.Branch)
-	// if first run, don't want to return here
 	if changes == nil {
 		hc.update(target)
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, rawMethod)
@@ -296,7 +293,6 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 			}
 		} else {
 			// ... get the files iterator and print the file
-			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag) {
 					path := filepath.Join(directory, target.Systemd.TargetPath, f.Name)
@@ -356,7 +352,6 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 			}
 		} else {
 			// ... get the files iterator and print the file
-			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				path := filepath.Join(directory, target.FileTransfer.TargetPath, f.Name)
 				if err := hc.EngineMethod(ctx, path, fileTransferMethod, target); err != nil {
@@ -425,7 +420,6 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 
 		} else {
 			// ... get the files iterator and print the file
-			// .. make sure we're only calling the raw engine method on json files
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
 					path := filepath.Join(directory, target.Kube.TargetPath, f.Name)
@@ -550,8 +544,6 @@ func (hc *HarpoonConfig) getClone(target *api.Target, directory string) error {
 	}
 
 	if !exists {
-		// TODO: Allow multiple branches per repository
-		// Will need to add a Checkout per branch, per target
 		klog.Infof("git clone %s %s --recursive", target.Url, target.Branch)
 		var user string
 		if hc.PAT != "" {
