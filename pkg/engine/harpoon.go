@@ -118,7 +118,7 @@ func (hc *HarpoonConfig) getTargets() {
 	for _, target := range hc.Targets {
 		schedMethods := make(map[string]string)
 		// TODO: this should not be hard-coded, in the future might allow for arbitrary target types with an interface
-		methods = append(methods, target.Raw, target.Systemd, target.Kube, target.FileTransfer)
+		methods = append(methods, target.Raw, target.Systemd, target.Kube, target.FileTransfer, target.Ansible)
 		for _, i := range methods {
 			switch i.(type) {
 			case api.Raw:
@@ -270,6 +270,68 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, rawMethod, target); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	hc.update(target)
+}
+
+func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
+	target.Mu.Lock()
+	defer target.Mu.Unlock()
+
+	initial := target.Ansible.InitialRun
+	target.Ansible.InitialRun = false
+	directory := filepath.Base(target.Url)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, ansibleMethod, err)
+	}
+	var targetFile = ""
+	tag := ".json"
+	if initial {
+		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, ansibleMethod, target)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if fileName != "" {
+			targetFile = fileName
+			if !strings.HasSuffix(fileName, tag) {
+				log.Fatalf("%s target file must be of type %s", ansibleMethod, tag)
+			}
+			path := filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			// ... get the files iterator and print the file
+			subDirTree.Files().ForEach(func(f *object.File) error {
+				if strings.HasSuffix(f.Name, tag) {
+					path := filepath.Join(directory, target.Ansible.TargetPath, f.Name)
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
+	}
+	changes := hc.findDiff(gitRepo, directory, ansibleMethod, target.Branch)
+	if changes == nil {
+		hc.update(target)
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, ansibleMethod)
+		return
+	}
+
+	tp := target.Ansible.TargetPath
+	if targetFile != "" {
+		tp = targetFile
+	}
+	for _, change := range changes {
+		if strings.Contains(change.To.Name, tp) {
+			path := directory + "/" + change.To.Name
+			if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -460,76 +522,6 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
 			if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(target)
-}
-
-func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
-	initial := target.Ansible.InitialRun
-	target.Ansible.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, ansibleMethod, err)
-	}
-	tag := []string{"yaml", "yml"}
-	var targetFile = ""
-	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, ansibleMethod, target)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if fileName != "" {
-			targetFile = fileName
-			found := false
-			for _, ft := range tag {
-				if strings.HasSuffix(fileName, ft) {
-					found = true
-					path := filepath.Join(directory, fileName)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
-						log.Fatal(err)
-					}
-				}
-			}
-			if !found {
-				log.Fatalf("%s target file must be of type %v", ansibleMethod, tag)
-			}
-
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
-					path := filepath.Join(directory, target.Ansible.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-		}
-	}
-
-	changes := hc.findDiff(gitRepo, directory, systemdMethod, target.Branch)
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, ansibleMethod)
-		return
-	}
-
-	tp := target.Ansible.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
 				log.Fatal(err)
 			}
 		}
