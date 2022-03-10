@@ -16,7 +16,7 @@ func ansiblePodman(ctx context.Context, path, repoName string) error {
 	klog.Infof("Deploying Ansible playbook %s\n", path)
 
 	// Create a new Podman client
-	conn, err := bindings.NewConnection(context.Background(), "unix://run/podman/podman.sock")
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
 		return err
 	}
