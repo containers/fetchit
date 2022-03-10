@@ -443,10 +443,9 @@ jobs:
       - name: push image
         run: docker push quay.io/harpoon/harpoon-amd:latest
 
-
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build-arm-and-manifest-list, push-amd-image-to-registry ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -500,7 +499,7 @@ jobs:
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
