@@ -205,7 +205,7 @@ func (hc *HarpoonConfig) runTargets() {
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				target.Ansible.InitialRun = true
-				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
+				s.Cron(schedule).Do(hc.processAnsible, ctx, &target, schedule)
 			default:
 				log.Fatalf("unknown target method")
 			}
