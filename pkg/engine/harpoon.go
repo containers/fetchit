@@ -432,7 +432,7 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, systemdMethod, target.Branch)
+	changes := hc.findDiff(gitRepo, directory, kubeMethod, target.Branch)
 	if changes == nil {
 		hc.update(target)
 		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, kubeMethod)
