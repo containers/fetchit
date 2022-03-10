@@ -2,7 +2,7 @@ volume: harpoon-volume # this needs to match the volume name passed to the podma
 targets:
 - name: harpoon
   url: http://github.com/cooktheryan/harpoon
-  kube: 
+  ansible: 
     targetPath: examples/ansible
     schedule: "*/1 * * * *"
   branch: ansible-v2
