@@ -4,8 +4,6 @@ import (
 	"sync"
 )
 
-// TODO Each Target can hold 1 each of Raw, Systemd, FileTransfer
-// Or, add a new Target for each in the config file.
 type Target struct {
 	Name         string       `mapstructure:"name"`
 	Url          string       `mapstructure:"url"`
@@ -15,7 +13,8 @@ type Target struct {
 	Kube         Kube         `mapstructure:"kube"`
 	Ansible      Ansible      `mapstructure:"ansible"`
 	FileTransfer FileTransfer `mapstructure:"fileTransfer"`
-	Mu           sync.Mutex
+	MethodSchedules map[string]string
+	Mu              sync.Mutex
 }
 
 type Raw struct {
@@ -49,4 +48,5 @@ type Ansible struct {
 	SshDirectory string `mapstructure:"sshDirectory"`
 	Schedule     string `mapstructure:"schedule"`
 	InitialRun   bool
+
 }
