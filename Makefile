@@ -106,7 +106,7 @@ _build_ansible_amd:
 
 .PHONY: _build_ansible_amd
 
-_build_ansbile_arm:
+_build_ansible_arm:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
 	$(CTR_CMD) build . -f method_containers/ansible/Dockerfile --tag quay.io/harpoon/harpoon-ansible-arm:latest \
 		--build-arg ARCH="arm64" \
