@@ -12,7 +12,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func ansiblePodman(ctx context.Context, path, repoName string) error {
+func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory string) error {
 	klog.Infof("Deploying Ansible playbook %s\n", path)
 
 	// Create a new Podman client
@@ -39,7 +39,7 @@ func ansiblePodman(ctx context.Context, path, repoName string) error {
 
 	// TODO: Remove rcook entries
 	s.Command = []string{"sh", "-c", "/usr/bin/ansible-playbook -e ansible_connection=ssh " + copyFile}
-	s.Mounts = []specs.Mount{{Source: "/root/.ssh", Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}}
+	s.Mounts = []specs.Mount{{Source: SshDirectory, Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
 		NSMode: "host",
