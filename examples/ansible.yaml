@@ -4,5 +4,6 @@ targets:
   url: http://github.com/cooktheryan/harpoon
   ansible: 
     targetPath: examples/ansible
+    sshDirectory: /root/.ssh
     schedule: "*/1 * * * *"
   branch: ansible-v2

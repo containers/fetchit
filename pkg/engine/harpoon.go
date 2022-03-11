@@ -601,7 +601,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 			return err
 		}
 	case ansibleMethod:
-		if err := ansiblePodman(ctx, path, target.Name); err != nil {
+		if err := ansiblePodman(ctx, path, target.Name, target.Ansible.SshDirectory); err != nil {
 			return err
 		}
 	default:
