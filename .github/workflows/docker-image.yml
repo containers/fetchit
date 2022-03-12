@@ -259,7 +259,13 @@ jobs:
     needs: [ build ]
     steps:
       - uses: actions/checkout@v2
-        
+      
+      - name: ssh-keygen
+        run: sudo ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
+
+      - name: cp pub into authorized
+        run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -271,6 +277,18 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: Pull ansible artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: ansible-image-amd
+          path: /tmp
+
+      - name: Load the ansible image
+        run: sudo podman load -i /tmp/ansible-amd.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-ansible-amd:latest quay.io/harpoon/harpoon-ansible:latest 
   
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/full-suite.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
@@ -295,6 +313,9 @@ jobs:
 
       - name: verify raw container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: list packages
+        run: sudo apt list --installed | grep zsh
 
   ansible-validate:
     runs-on: ubuntu-latest
@@ -340,9 +361,6 @@ jobs:
       
       - name: Logs
         run: sudo podman logs harpoon
-        
-      - name: Ansible logs
-        run: sudo podman logs ansible
       
       - name: list packages
         run: sudo apt list --installed | grep zsh
