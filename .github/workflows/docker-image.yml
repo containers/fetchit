@@ -106,6 +106,84 @@ jobs:
         run: if [[ $(sudo podman volume inspect harpoon-volume) ]] ; then echo "Harpoon successfully used default volume name"; else exit 1; fi
 
 
+  filetransfer-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: Create destination directory
+        run: sudo mkdir /tmp/ft
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/file-transfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /tmp/ft/anotherfile.txt  /tmp/ft/hello.txt
+
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
+  filetransfer-validate-exact-file:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: Create destination directory
+        run: sudo mkdir -p /tmp/ft/single
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /tmp/ft/single/hello.txt
+
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
   systemd-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -226,6 +304,9 @@ jobs:
           name: harpoon-image
           path: /tmp
 
+      - name: Create destination directory
+        run: sudo mkdir /tmp/ft
+
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
   
@@ -238,8 +319,11 @@ jobs:
       - name: Logs
         run: sudo podman logs harpoon
 
-      - name: list files
+      - name: list systemd files
         run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: list transferred files
+        run: sudo ls /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
 
       - name: ensure systemd container is gone
         run: sudo podman ps -a
@@ -326,7 +410,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -353,7 +437,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -407,7 +491,7 @@ jobs:
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

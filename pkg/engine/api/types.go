@@ -5,13 +5,13 @@ import (
 )
 
 type Target struct {
-	Name         string       `mapstructure:"name"`
-	Url          string       `mapstructure:"url"`
-	Branch       string       `mapstructure:"branch"`
-	Raw          Raw          `mapstructure:"raw"`
-	Systemd      Systemd      `mapstructure:"systemd"`
-	Kube         Kube         `mapstructure:"kube"`
-	FileTransfer FileTransfer `mapstructure:"fileTransfer"`
+	Name            string       `mapstructure:"name"`
+	Url             string       `mapstructure:"url"`
+	Branch          string       `mapstructure:"branch"`
+	Raw             Raw          `mapstructure:"raw"`
+	Systemd         Systemd      `mapstructure:"systemd"`
+	Kube            Kube         `mapstructure:"kube"`
+	FileTransfer    FileTransfer `mapstructure:"fileTransfer"`
 	MethodSchedules map[string]string
 	Mu              sync.Mutex
 }
@@ -30,10 +30,10 @@ type Systemd struct {
 }
 
 type FileTransfer struct {
-	TargetPath string `mapstructure:"targetPath"`
-	Dest       string `mapstructure:"dest"`
-	Schedule   string `mapstructure:"schedule"`
-	InitialRun bool
+	TargetPath           string `mapstructure:"targetPath"`
+	DestinationDirectory string `mapstructure:"destinationDirectory"`
+	Schedule             string `mapstructure:"schedule"`
+	InitialRun           bool
 }
 
 type Kube struct {
