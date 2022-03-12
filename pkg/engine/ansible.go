@@ -30,7 +30,7 @@ func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory stri
 	}
 
 	s := specgen.NewSpecGenerator(sshImage, false)
-	s.Name = "ansible"
+	s.Name = "ansible"+ repoName
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
