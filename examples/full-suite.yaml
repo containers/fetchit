@@ -9,6 +9,10 @@ targets:
     targetPath: examples/systemd
     user: root
     schedule: "*/1 * * * *"
+  ansible: 
+    targetPath: examples/ansible
+    sshDirectory: /root/.ssh
+    schedule: "*/1 * * * *"
   kube:
     targetPath: examples/kube
     schedule: "*/1 * * * *"
