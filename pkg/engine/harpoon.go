@@ -367,8 +367,8 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, gitRepo *gi
 
 	// the change logic is backwards "From" is actually "To"
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
+		if strings.Contains(change.From.Name, tp) {
+			path := directory + "/" + change.From.Name
 			if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
 				log.Fatal(err)
 			}
