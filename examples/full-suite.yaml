@@ -9,7 +9,7 @@ targets:
     targetPath: examples/systemd
     user: root
     schedule: "*/1 * * * *"
-  systemd:
+  filetransfer:
     targetPath: examples/filetransfer
     destinationDirectory: /tmp/ft
     schedule: "*/1 * * * *"
