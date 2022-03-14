@@ -34,7 +34,7 @@ func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory stri
 	}
 
 	if !present {
-		_, err = images.Pull(conn, raw.Image, nil)
+		_, err = images.Pull(conn, sshImage, nil)
 		if err != nil {
 			return err
 		}
