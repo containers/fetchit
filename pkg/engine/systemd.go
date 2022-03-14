@@ -29,10 +29,22 @@ func SystemdPodman(ctx context.Context, path, repoName string) error {
 		return fmt.Errorf("error podman socket: %w", err)
 	}
 
-	_, err = images.Pull(conn, harpoonImage, nil)
+	klog.Infof("Identifying if image exists locally")
+	// Pull image if it doesn't exist
+	var present bool
+	present, err = images.Exists(conn, harpoonImage, nil)
+	klog.Infof("Is image present? %t", present)
 	if err != nil {
 		return err
 	}
+
+	if !present {
+		_, err = images.Pull(conn, harpoonImage, nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	s := specgen.NewSpecGenerator(harpoonImage, false)
 	s.Name = "systemd" + "-" + repoName + "-" + systemdFile
 	s.Privileged = true
