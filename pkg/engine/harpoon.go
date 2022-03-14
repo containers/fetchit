@@ -502,7 +502,7 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target) error {
 	switch method {
 	case rawMethod:
-		if err := RawPodman(ctx, path); err != nil {
+		if err := RawPodman(ctx, path, target.Raw.PullImage); err != nil {
 			return err
 		}
 	case systemdMethod:

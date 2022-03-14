@@ -37,7 +37,7 @@ type RawPod struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func RawPodman(ctx context.Context, path string) error {
+func RawPodman(ctx context.Context, path string, pullImage bool) error {
 	klog.Infof("Creating podman container from %s", path)
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -61,7 +61,7 @@ func RawPodman(ctx context.Context, path string) error {
 		return err
 	}
 
-	if !present {
+	if !present || pullImage {
 		_, err = images.Pull(conn, raw.Image, nil)
 		if err != nil {
 			return err
