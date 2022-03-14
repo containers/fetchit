@@ -13,6 +13,10 @@ import (
 )
 
 func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory string) error {
+	// TODO: add logic to remove
+	if path == deleteFile {
+		return nil
+	}
 	klog.Infof("Deploying Ansible playbook %s\n", path)
 
 	// Create a new Podman client

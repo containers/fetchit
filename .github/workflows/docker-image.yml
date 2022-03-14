@@ -153,6 +153,56 @@ jobs:
         run: if [[ $(sudo podman volume inspect harpoon-volume) ]] ; then echo "Harpoon successfully used default volume name"; else exit 1; fi
 
 
+  filetransfer-validate-add-file-to-repo:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: main
+      - uses: actions/checkout@v3
+        with:
+          path: ci
+          ref: ci
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: set values relating to the current env
+        run: |
+          sed -i 's|  url: http://github.com/redhat-et/harpoon|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/harpoon/harpoon/main/examples/ci-filetransfer-config.yaml
+          sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/harpoon/harpoon/main/examples/ci-filetransfer-config.yaml
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v /home/runner/work/harpoon/harpoon/main/examples/ci-filetransfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: create new file and commit
+        run: |
+            cat <<< "this is a new file" > ./ci/examples/filetransfer/newfile.txt
+            cd ci
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -m "add new file" -a
+            git push -f
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: list new file
+        run: sudo ls /tmp/ft/newfile.txt /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
+
   filetransfer-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -509,7 +559,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, filetransfer-validate-add-file-to-repo, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -536,7 +586,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, filetransfer-validate-add-file-to-repo, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -564,7 +614,7 @@ jobs:
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list, filetransfer-validate, filetransfer-validate-exact-file ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list, filetransfer-validate, filetransfer-validate-exact-file, filetransfer-validate-add-file-to-repo ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

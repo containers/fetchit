@@ -20,7 +20,7 @@ import (
 )
 
 func kubePodman(ctx context.Context, path string, prev *string) error {
-	if path != "" {
+	if path != deleteFile {
 		klog.Infof("Creating podman container from %s using kube method", path)
 	}
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
@@ -35,7 +35,7 @@ func kubePodman(ctx context.Context, path string, prev *string) error {
 		}
 	}
 
-	if path != "" {
+	if path != deleteFile {
 		kubeYaml, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
