@@ -24,9 +24,20 @@ func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory stri
 	copyFile := ("/opt/" + path)
 	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
 
-	_, err = images.Pull(conn, sshImage, nil)
+	klog.Infof("Identifying if image exists locally")
+	// Pull image if it doesn't exist
+	var present bool
+	present, err = images.Exists(conn, sshImage, nil)
+	klog.Infof("Is image present? %t", present)
 	if err != nil {
 		return err
+	}
+
+	if !present {
+		_, err = images.Pull(conn, raw.Image, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	s := specgen.NewSpecGenerator(sshImage, false)
