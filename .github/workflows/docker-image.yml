@@ -131,7 +131,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/file-transfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
