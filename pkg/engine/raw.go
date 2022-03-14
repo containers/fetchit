@@ -37,7 +37,7 @@ type RawPod struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func RawPodman(ctx context.Context, path string) error {
+func rawPodman(ctx context.Context, path string) error {
 	klog.Infof("Creating podman container from %s", path)
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {

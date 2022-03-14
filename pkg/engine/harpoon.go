@@ -418,28 +418,22 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 }
 
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target) error {
+	// TODO: make processMethod interface, to add arbitrary methods
 	switch method {
 	case rawMethod:
-		if err := RawPodman(ctx, path); err != nil {
-			return err
-		}
+		return rawPodman(ctx, path)
 	case systemdMethod:
-		if err := SystemdPodman(ctx, path, target.Name); err != nil {
-			return err
-		}
-		// TODO
+		// TODO: add logic for non-root services
+		dest := "/etc/systemd/system"
+		return systemdPodman(ctx, path, dest, target)
 	case fileTransferMethod:
-		klog.Infof("Called FileTransfer Method, returning nil, since we haven't written the logic yet")
-		return nil
-		// TODO
+		dest := target.FileTransfer.DestinationDirectory
+		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
 	case kubeMethod:
-		if err := kubePodman(ctx, path); err != nil {
-			return err
-		}
+		return kubePodman(ctx, path)
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}
-	return nil
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
