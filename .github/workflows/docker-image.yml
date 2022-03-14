@@ -58,6 +58,9 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@v2
 
