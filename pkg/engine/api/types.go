@@ -31,10 +31,10 @@ type Systemd struct {
 }
 
 type FileTransfer struct {
-	TargetPath string `mapstructure:"targetPath"`
-	Dest       string `mapstructure:"dest"`
-	Schedule   string `mapstructure:"schedule"`
-	InitialRun bool
+	TargetPath           string `mapstructure:"targetPath"`
+	DestinationDirectory string `mapstructure:"destinationDirectory"`
+	Schedule             string `mapstructure:"schedule"`
+	InitialRun           bool
 }
 
 type Kube struct {

@@ -106,6 +106,84 @@ jobs:
         run: if [[ $(sudo podman volume inspect harpoon-volume) ]] ; then echo "Harpoon successfully used default volume name"; else exit 1; fi
 
 
+  filetransfer-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: Create destination directory
+        run: sudo mkdir /tmp/ft
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /tmp/ft/anotherfile.txt  /tmp/ft/hello.txt
+
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
+  filetransfer-validate-exact-file:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: Create destination directory
+        run: sudo mkdir -p /tmp/ft/single
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /tmp/ft/single/hello.txt
+
+      - name: ensure systemd container is gone
+        run: sudo podman ps -a
+
   systemd-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -226,6 +304,9 @@ jobs:
           name: harpoon-image
           path: /tmp
 
+      - name: Create destination directory
+        run: sudo mkdir /tmp/ft
+
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
   
@@ -238,8 +319,11 @@ jobs:
       - name: Logs
         run: sudo podman logs harpoon
 
-      - name: list files
+      - name: list systemd files
         run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: list transferred files
+        run: sudo ls /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
 
       - name: ensure systemd container is gone
         run: sudo podman ps -a
@@ -257,27 +341,27 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          path: main
+      - uses: actions/checkout@v3
+        with:
+          path: ci
+          ref: ci
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
-      - name: ensure value
+      - name: ensure value and commit
         run: |
-          cat <<< $(jq '.Env.APP_COLOR |= "blue"' ./examples/raw/color1.json) > ./examples/raw/color1.json 
-
-      - name: Commit files
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git commit -m "color changes" -a
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ci
-          force: true
+          if [[ $( grep pink ./ci/examples/raw/color1.json | wc -l ) = "1" ]] ; then
+            cat <<< $(jq '.Env.APP_COLOR |= "blue"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json 
+            cd ci
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -m "color changes" -a
+            git push -f
+          fi
 
       - name: pull artifact
         uses: actions/download-artifact@v1
@@ -288,8 +372,13 @@ jobs:
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
 
+      - name: set values relating to the current env
+        run: | 
+          sed -i 's|  url: http://github.com/redhat-et/harpoon|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
+          sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
+
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ci-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -302,18 +391,15 @@ jobs:
 
       - name: update variable
         run: |
-          cat <<< $(jq '.Env.APP_COLOR |= "pink"' ./examples/raw/color1.json) > ./examples/raw/color1.json 
-
+          cat <<< $(jq '.Env.APP_COLOR |= "pink"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json 
 
       - name: Commit files
         run: |
-          git commit -m "Add changes" -a
-    
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ci
+          cd ci
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -m "color changes" -a
+            git push -f
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -326,7 +412,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -353,7 +439,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -407,7 +493,7 @@ jobs:
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, make-change-to-repo, multi-engine-validate, build-arm-and-manifest-list, filetransfer-validate, filetransfer-validate-exact-file ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

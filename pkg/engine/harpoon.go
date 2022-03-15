@@ -215,54 +215,19 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, rawMethod, err)
 	}
 	var targetFile = ""
-	tag := ".json"
+	tag := []string{".json"}
 	if initial {
 		fileName, subDirTree, err := getPathOrTree(directory, target.Raw.TargetPath, rawMethod, target)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if fileName != "" {
-			targetFile = fileName
-			if !strings.HasSuffix(fileName, tag) {
-				log.Fatalf("%s target file must be of type %s", rawMethod, tag)
-			}
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, rawMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag) {
-					path := filepath.Join(directory, target.Raw.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, rawMethod, target); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Raw.TargetPath, rawMethod)
+		if err != nil {
+			log.Fatal(err)
 		}
-	}
-	changes := hc.findDiff(gitRepo, directory, rawMethod, target.Branch)
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, rawMethod)
-		return
 	}
 
-	tp := target.Raw.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, rawMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(target)
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, rawMethod, target, targetFile, target.Raw.TargetPath)
 }
 
 func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target, schedule string) {
@@ -276,56 +241,19 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, systemdMethod, err)
 	}
 	var targetFile = ""
-	tag := ".service"
+	tag := []string{".service"}
 	if initial {
 		fileName, subDirTree, err := getPathOrTree(directory, target.Systemd.TargetPath, systemdMethod, target)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if fileName != "" {
-			targetFile = fileName
-			if !strings.HasSuffix(fileName, tag) {
-				log.Fatalf("%s target file must be of type %s", systemdMethod, tag)
-			}
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, systemdMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag) {
-					path := filepath.Join(directory, target.Systemd.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, systemdMethod, target); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Systemd.TargetPath, systemdMethod)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, systemdMethod, target.Branch)
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, systemdMethod)
-		return
-	}
-
-	tp := target.Systemd.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, systemdMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(target)
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, systemdMethod, target, targetFile, target.Systemd.TargetPath)
 }
 
 func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Target, schedule string) {
@@ -344,45 +272,13 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 		if err != nil {
 			log.Fatal(err)
 		}
-		if fileName != "" {
-			targetFile = fileName
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, fileTransferMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				path := filepath.Join(directory, target.FileTransfer.TargetPath, f.Name)
-				if err := hc.EngineMethod(ctx, path, fileTransferMethod, target); err != nil {
-					return err
-				}
-				return nil
-			})
+		targetFile, err = hc.applyInitial(ctx, fileName, nil, directory, target, subDirTree, target.FileTransfer.TargetPath, fileTransferMethod)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, systemdMethod, target.Branch)
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, fileTransferMethod)
-		return
-	}
-
-	tp := target.FileTransfer.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, fileTransferMethod, target); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(target)
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, fileTransferMethod, target, targetFile, target.FileTransfer.TargetPath)
 }
 
 func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, schedule string) {
@@ -402,51 +298,77 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		if err != nil {
 			log.Fatal(err)
 		}
-		if fileName != "" {
-			targetFile = fileName
-			found := false
-			for _, ft := range tag {
-				if strings.HasSuffix(fileName, ft) {
-					found = true
-					path := filepath.Join(directory, fileName)
-					if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
-						log.Fatal(err)
-					}
-				}
-			}
-			if !found {
-				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
-			}
-
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
-					path := filepath.Join(directory, target.Kube.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Kube.TargetPath, kubeMethod)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, kubeMethod, target.Branch)
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, kubeMethod, target, targetFile, target.Kube.TargetPath)
+}
+
+func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName string, tag *[]string, directory string, target *api.Target, subDirTree *object.Tree, tp string, method string) (string, error) {
+	if fileName != "" {
+		found := false
+		if hc.checkTag(tag, fileName) {
+			found = true
+			path := filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, path, method, target); err != nil {
+				return fileName, err
+			}
+		}
+		if !found {
+			log.Fatalf("%s target file must be of type %v", method, tag)
+		}
+
+	} else {
+		// ... get the files iterator and print the file
+		err := subDirTree.Files().ForEach(func(f *object.File) error {
+			if hc.checkTag(tag, f.Name) {
+				path := filepath.Join(directory, tp, f.Name)
+				if err := hc.EngineMethod(ctx, path, method, target); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return fileName, nil
+		}
+	}
+	return fileName, nil
+}
+
+func (hc *HarpoonConfig) checkTag(tags *[]string, name string) bool {
+	if tags == nil {
+		return true
+	}
+	for _, tag := range *tags {
+		if strings.HasSuffix(name, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, gitRepo *git.Repository, directory string, method string, target *api.Target, targetFile string, targetPath string) {
+	changes := hc.findDiff(gitRepo, directory, method, target.Branch)
+
 	if changes == nil {
 		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, kubeMethod)
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, method)
 		return
 	}
 
-	tp := target.Kube.TargetPath
+	tp := targetPath
 	if targetFile != "" {
 		tp = targetFile
 	}
 
+	// the change logic is backwards "From" is actually "To"
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
+		if strings.Contains(change.From.Name, tp) {
+			path := directory + "/" + change.From.Name
 			if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
 				log.Fatal(err)
 			}
@@ -464,10 +386,6 @@ func (hc *HarpoonConfig) update(target *api.Target) {
 }
 
 func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, branch string) []*object.Change {
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("error while opening the repository: %s: %s", directory, err)
-	}
 	w, err := gitRepo.Worktree()
 	if err != nil {
 		log.Fatalf("error while opening the worktree: %s\n", err)
@@ -500,28 +418,22 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 }
 
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target) error {
+	// TODO: make processMethod interface, to add arbitrary methods
 	switch method {
 	case rawMethod:
-		if err := RawPodman(ctx, path, target.Raw.PullImage); err != nil {
-			return err
-		}
+		return rawPodman(ctx, path)
 	case systemdMethod:
-		if err := SystemdPodman(ctx, path, target.Name); err != nil {
-			return err
-		}
-		// TODO
+		// TODO: add logic for non-root services
+		dest := "/etc/systemd/system"
+		return systemdPodman(ctx, path, dest, target)
 	case fileTransferMethod:
-		klog.Infof("Called FileTransfer Method, returning nil, since we haven't written the logic yet")
-		return nil
-		// TODO
+		dest := target.FileTransfer.DestinationDirectory
+		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
 	case kubeMethod:
-		if err := kubePodman(ctx, path); err != nil {
-			return err
-		}
+		return kubePodman(ctx, path)
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}
-	return nil
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
