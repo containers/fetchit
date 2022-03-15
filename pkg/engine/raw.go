@@ -45,51 +45,62 @@ func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) e
 		return err
 	}
 
+	// Delete previous file's podxz
 	if prev != nil {
-		raw := RawPod{Ports: []types.PortMapping{}}
-		json.Unmarshal([]byte(*prev), &raw)
+		raw := rawPodFromBytes([]byte(*prev))
 
-		containers.Stop(conn, raw.Name, nil)
-		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
+		err := deleteContainer(conn, raw.Name)
+		if err != nil {
+			return err
+		}
+
 		klog.Infof("Deleted podman container %s", raw.Name)
 	}
 
+	// Don't continue if no path is set, this means we just have to delete the
+	// previous file
 	if path == "" {
 		return nil
 	}
 
 	klog.Infof("Creating podman container from %s", path)
+
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
-	raw := RawPod{Ports: []types.PortMapping{}}
-	json.Unmarshal([]byte(rawJson), &raw)
+	raw := rawPodFromBytes(rawJson)
 
 	klog.Infof("Identifying if image exists locally")
-	// Pull image if it doesn't exist
-	var present bool
-	present, err = images.Exists(conn, raw.Image, nil)
-	klog.Infof("Is image present? %t", present)
+
+	err = detectOrFetchImage(conn, raw.Image, pullImage)
 	if err != nil {
 		return err
 	}
 
-	if !present || pullImage {
-		_, err = images.Pull(conn, raw.Image, nil)
-		if err != nil {
-			return err
-		}
+	err = removeExisting(conn, raw.Name)
+	if err != nil {
+		return err
 	}
 
-	inspectData, err := containers.Inspect(conn, raw.Name, new(containers.InspectOptions).WithSize(true))
-	if err == nil || inspectData == nil {
-		klog.Infof("A container named %s already exists. Removing the container before redeploy.", raw.Name)
-		containers.Stop(conn, raw.Name, nil)
-		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
+	s := createSpecGen(raw)
 
+	createResponse, err := containers.CreateWithSpec(conn, s, nil)
+	if err != nil {
+		return err
 	}
+	klog.Infof("Container %s created.", s.Name)
+
+	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+		return err
+	}
+	klog.Infof("Container %s started....Requeuing", s.Name)
+
+	return nil
+}
+
+func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 	// Create a new container
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
@@ -98,14 +109,58 @@ func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) e
 	s.PortMappings = []types.PortMapping(raw.Ports)
 	s.Volumes = []*specgen.NamedVolume(raw.Volumes)
 	s.RestartPolicy = "always"
-	createResponse, err := containers.CreateWithSpec(conn, s, nil)
+	return s
+}
+
+func deleteContainer(conn context.Context, podName string) error {
+	err := containers.Stop(conn, podName, nil)
 	if err != nil {
 		return err
 	}
-	klog.Infof("Container %s created.", s.Name)
-	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+
+	containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
+	if err != nil {
 		return err
 	}
-	klog.Infof("Container %s started....Requeuing", s.Name)
+
+	return nil
+}
+
+func detectOrFetchImage(conn context.Context, imageName string, force bool) error {
+	// Pull image if it doesn't exist
+	var present bool
+	present, err := images.Exists(conn, imageName, nil)
+	klog.Infof("Is image present? %t", present)
+	if err != nil {
+		return err
+	}
+
+	if !present || force {
+		_, err = images.Pull(conn, imageName, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func rawPodFromBytes(b []byte) RawPod {
+	raw := RawPod{Ports: []types.PortMapping{}}
+	json.Unmarshal(b, &raw)
+	return raw
+}
+
+// Using this might not be necessary
+func removeExisting(conn context.Context, podName string) error {
+	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
+	if err == nil || inspectData == nil {
+		klog.Infof("A container named %s already exists. Removing the container before redeploy.", podName)
+		err := deleteContainer(conn, podName)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
