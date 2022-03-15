@@ -442,6 +442,7 @@ jobs:
         with:
           path: ci
           ref: ci
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
