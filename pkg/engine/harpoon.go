@@ -513,10 +513,8 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
 	case kubeMethod:
 		return kubePodman(ctx, path)
-		}
 	case ansibleMethod:
 		return ansiblePodman(ctx, path, target.Name, target.Ansible.SshDirectory)
-		}
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}
