@@ -421,7 +421,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 	// TODO: make processMethod interface, to add arbitrary methods
 	switch method {
 	case rawMethod:
-		return rawPodman(ctx, path)
+		return rawPodman(ctx, path, target.Raw.PullImage)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		dest := "/etc/systemd/system"
