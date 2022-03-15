@@ -37,7 +37,8 @@ type RawPod struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func rawPodman(ctx context.Context, path string) error {
+func rawPodman(ctx context.Context, path string, pullImage bool) error {
+
 	klog.Infof("Creating podman container from %s", path)
 	rawJson, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -51,10 +52,23 @@ func rawPodman(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	_, err = images.Pull(conn, raw.Image, nil)
+
+	klog.Infof("Identifying if image exists locally")
+	// Pull image if it doesn't exist
+	var present bool
+	present, err = images.Exists(conn, raw.Image, nil)
+	klog.Infof("Is image present? %t", present)
 	if err != nil {
 		return err
 	}
+
+	if !present || pullImage {
+		_, err = images.Pull(conn, raw.Image, nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	inspectData, err := containers.Inspect(conn, raw.Name, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
 		klog.Infof("A container named %s already exists. Removing the container before redeploy.", raw.Name)

@@ -19,6 +19,7 @@ type Target struct {
 type Raw struct {
 	TargetPath string `mapstructure:"targetPath"`
 	Schedule   string `mapstructure:"schedule"`
+	PullImage  bool   `mapstructure:"pullImage"`
 	InitialRun bool
 }
 
