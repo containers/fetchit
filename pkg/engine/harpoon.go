@@ -425,7 +425,8 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target, change *object.Change) error {
 	switch method {
 	case rawMethod:
-		return rawPodman(ctx, path, target.Raw.PullImage)
+		var prev *string = getChangeString(change)
+		return rawPodman(ctx, path, target.Raw.PullImage, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		dest := "/etc/systemd/system"
@@ -434,24 +435,28 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		dest := target.FileTransfer.DestinationDirectory
 		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
 	case kubeMethod:
-		var prev *string = nil
-		if change != nil {
-			_, to, err := change.Files()
-			if err != nil {
-				log.Fatal(err)
-			}
-			if to != nil {
-				s, err := to.Contents()
-				if err != nil {
-					log.Fatal(err)
-				}
-				prev = &s
-			}
-		}
+		var prev *string = getChangeString(change)
 		return kubePodman(ctx, path, prev)
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}
+}
+
+func getChangeString(change *object.Change) *string {
+	if change != nil {
+		_, to, err := change.Files()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if to != nil {
+			s, err := to.Contents()
+			if err != nil {
+				log.Fatal(err)
+			}
+			return &s
+		}
+	}
+	return nil
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
