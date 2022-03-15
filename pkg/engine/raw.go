@@ -37,7 +37,26 @@ type RawPod struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func rawPodman(ctx context.Context, path string, pullImage bool) error {
+func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) error {
+
+	// Create a new Podman client
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil {
+		return err
+	}
+
+	if prev != nil {
+		raw := RawPod{Ports: []types.PortMapping{}}
+		json.Unmarshal([]byte(*prev), &raw)
+
+		containers.Stop(conn, raw.Name, nil)
+		containers.Remove(conn, raw.Name, new(containers.RemoveOptions).WithForce(true))
+		klog.Infof("Deleted podman container %s", raw.Name)
+	}
+
+	if path == "" {
+		return nil
+	}
 
 	klog.Infof("Creating podman container from %s", path)
 	rawJson, err := ioutil.ReadFile(path)
@@ -47,11 +66,6 @@ func rawPodman(ctx context.Context, path string, pullImage bool) error {
 
 	raw := RawPod{Ports: []types.PortMapping{}}
 	json.Unmarshal([]byte(rawJson), &raw)
-	// Create a new Podman client
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil {
-		return err
-	}
 
 	klog.Infof("Identifying if image exists locally")
 	// Pull image if it doesn't exist
