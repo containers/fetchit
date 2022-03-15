@@ -255,61 +255,17 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	tag := []string{"yaml", "yml"}
 	var targetFile = ""
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, ansibleMethod, target)
+		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, kubeMethod, target)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if fileName != "" {
-			targetFile = fileName
-			found := false
-			for _, ft := range tag {
-				if strings.HasSuffix(fileName, ft) {
-					found = true
-					path := filepath.Join(directory, fileName)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
-						log.Fatal(err)
-					}
-				}
-			}
-			if !found {
-				log.Fatalf("%s target file must be of type %v", kubeMethod, tag)
-			}
-
-		} else {
-			// ... get the files iterator and print the file
-			subDirTree.Files().ForEach(func(f *object.File) error {
-				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
-					path := filepath.Join(directory, target.Ansible.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Ansible.TargetPath, ansibleMethod)
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
-	changes := hc.findDiff(gitRepo, directory, ansibleMethod, target.Branch)
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, ansibleMethod)
-		return
-	}
-
-	tp := target.Ansible.TargetPath
-	if targetFile != "" {
-		tp = targetFile
-	}
-
-	for _, change := range changes {
-		if strings.Contains(change.To.Name, tp) {
-			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-	hc.update(target)
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, ansibleMethod, target, targetFile, target.Ansible.TargetPath)
 }
 
 func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target, schedule string) {
