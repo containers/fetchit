@@ -395,7 +395,7 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName string, tag 
 		if hc.checkTag(tag, fileName) {
 			found = true
 			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, method, target); err != nil {
+			if err := hc.EngineMethod(ctx, path, method, target, nil); err != nil {
 				return fileName, err
 			}
 		}
@@ -408,7 +408,7 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName string, tag 
 		err := subDirTree.Files().ForEach(func(f *object.File) error {
 			if hc.checkTag(tag, f.Name) {
 				path := filepath.Join(directory, tp, f.Name)
-				if err := hc.EngineMethod(ctx, path, method, target); err != nil {
+				if err := hc.EngineMethod(ctx, path, method, target, nil); err != nil {
 					return err
 				}
 			}
@@ -451,7 +451,12 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, gitRepo *gi
 	for _, change := range changes {
 		if strings.Contains(change.From.Name, tp) {
 			path := directory + "/" + change.From.Name
-			if err := hc.EngineMethod(ctx, path, kubeMethod, target); err != nil {
+			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
+				log.Fatal(err)
+			}
+		} else if strings.Contains(change.To.Name, tp) {
+			path := ""
+			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -499,11 +504,11 @@ func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, br
 	return changes
 }
 
-func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target) error {
-	// TODO: make processMethod interface, to add arbitrary methods
+func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target, change *object.Change) error {
 	switch method {
 	case rawMethod:
-		return rawPodman(ctx, path)
+		var prev *string = getChangeString(change)
+		return rawPodman(ctx, path, target.Raw.PullImage, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		dest := "/etc/systemd/system"
@@ -512,12 +517,30 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		dest := target.FileTransfer.DestinationDirectory
 		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
 	case kubeMethod:
-		return kubePodman(ctx, path)
+		var prev *string = getChangeString(change)
+		return kubePodman(ctx, path, prev)
 	case ansibleMethod:
 		return ansiblePodman(ctx, path, target.Name, target.Ansible.SshDirectory)
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}
+}
+
+func getChangeString(change *object.Change) *string {
+	if change != nil {
+		_, to, err := change.Files()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if to != nil {
+			s, err := to.Contents()
+			if err != nil {
+				log.Fatal(err)
+			}
+			return &s
+		}
+	}
+	return nil
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
