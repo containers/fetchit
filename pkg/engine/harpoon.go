@@ -266,7 +266,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 				if strings.HasSuffix(fileName, ft) {
 					found = true
 					path := filepath.Join(directory, fileName)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
 						log.Fatal(err)
 					}
 				}
@@ -280,7 +280,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 			subDirTree.Files().ForEach(func(f *object.File) error {
 				if strings.HasSuffix(f.Name, tag[0]) || strings.HasSuffix(f.Name, tag[1]) {
 					path := filepath.Join(directory, target.Ansible.TargetPath, f.Name)
-					if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+					if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
 						return err
 					}
 				}
@@ -304,7 +304,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	for _, change := range changes {
 		if strings.Contains(change.To.Name, tp) {
 			path := directory + "/" + change.To.Name
-			if err := hc.EngineMethod(ctx, path, ansibleMethod, target); err != nil {
+			if err := hc.EngineMethod(ctx, path, ansibleMethod, target, nil); err != nil {
 				log.Fatal(err)
 			}
 		}
