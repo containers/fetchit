@@ -12,6 +12,9 @@ targets:
   ansible: 
     targetPath: examples/ansible
     sshDirectory: /root/.ssh
+  filetransfer:
+    targetPath: examples/filetransfer
+    destinationDirectory: /tmp/ft
     schedule: "*/1 * * * *"
   kube:
     targetPath: examples/kube
