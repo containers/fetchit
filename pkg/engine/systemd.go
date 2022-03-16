@@ -10,7 +10,7 @@ import (
 
 func systemdPodman(ctx context.Context, path, dest string, target *api.Target) error {
 	klog.Infof("Deploying systemd file(s) %s", path)
-	if err := fileTransferPodman(ctx, path, dest, systemdMethod, target); err != nil {
+	if err := fileTransferPodman(ctx, path, dest, systemdMethod, target, nil); err != nil {
 		return fmt.Errorf("Repo: %s, Method: %s, %v", err)
 	}
 	// TODO: Add logic to start services, root/non-root

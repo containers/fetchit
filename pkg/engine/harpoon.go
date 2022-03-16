@@ -408,12 +408,12 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, gitRepo *gi
 		if strings.Contains(change.From.Name, tp) {
 			path := directory + "/" + change.From.Name
 			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
-				log.Fatal(err)
+				klog.Fatal(err)
 			}
 		} else if strings.Contains(change.To.Name, tp) {
 			path := ""
 			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
-				log.Fatal(err)
+				klog.Fatal(err)
 			}
 		}
 	}
@@ -470,8 +470,14 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		dest := "/etc/systemd/system"
 		return systemdPodman(ctx, path, dest, target)
 	case fileTransferMethod:
+		var prev *string = nil
+		if change != nil {
+			if change.To.Name != "" {
+				prev = &change.To.Name
+			}
+		}
 		dest := target.FileTransfer.DestinationDirectory
-		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target)
+		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target, prev)
 	case kubeMethod:
 		var prev *string = getChangeString(change)
 		return kubePodman(ctx, path, prev)
