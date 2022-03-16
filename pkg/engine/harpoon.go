@@ -34,6 +34,7 @@ const (
 	systemdMethod      = "systemd"
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
+	ansibleMethod      = "ansible"
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -117,7 +118,7 @@ func (hc *HarpoonConfig) getTargets() {
 	for _, target := range hc.Targets {
 		schedMethods := make(map[string]string)
 		// TODO: this should not be hard-coded, in the future might allow for arbitrary target types with an interface
-		methods = append(methods, target.Raw, target.Systemd, target.Kube, target.FileTransfer)
+		methods = append(methods, target.Raw, target.Systemd, target.Kube, target.FileTransfer, target.Ansible)
 		for _, i := range methods {
 			switch i.(type) {
 			case api.Raw:
@@ -140,6 +141,11 @@ func (hc *HarpoonConfig) getTargets() {
 					continue
 				}
 				schedMethods[fileTransferMethod] = target.FileTransfer.Schedule
+			case api.Ansible:
+				if target.Ansible.Schedule == "" {
+					continue
+				}
+				schedMethods[ansibleMethod] = target.Ansible.Schedule
 			default:
 				log.Fatalf("unknown target method")
 			}
@@ -194,6 +200,12 @@ func (hc *HarpoonConfig) runTargets() {
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				target.FileTransfer.InitialRun = true
 				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
+			case ansibleMethod:
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Ansible.InitialRun = true
+				s.Cron(schedule).Do(hc.processAnsible, ctx, &target, schedule)
 			default:
 				log.Fatalf("unknown target method")
 			}
@@ -228,6 +240,32 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 	}
 
 	hc.getChangesAndRunEngine(ctx, gitRepo, directory, rawMethod, target, targetFile, target.Raw.TargetPath)
+}
+
+func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
+	target.Mu.Lock()
+	defer target.Mu.Unlock()
+	initial := target.Ansible.InitialRun
+	target.Ansible.InitialRun = false
+	directory := filepath.Base(target.Url)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, ansibleMethod, err)
+	}
+	tag := []string{"yaml", "yml"}
+	var targetFile = ""
+	if initial {
+		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, kubeMethod, target)
+		if err != nil {
+			log.Fatal(err)
+		}
+		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Ansible.TargetPath, ansibleMethod)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	hc.getChangesAndRunEngine(ctx, gitRepo, directory, ansibleMethod, target, targetFile, target.Ansible.TargetPath)
 }
 
 func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target, schedule string) {
@@ -437,6 +475,8 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 	case kubeMethod:
 		var prev *string = getChangeString(change)
 		return kubePodman(ctx, path, prev)
+	case ansibleMethod:
+		return ansiblePodman(ctx, path, target.Name, target.Ansible.SshDirectory)
 	default:
 		return fmt.Errorf("unsupported method: %s", method)
 	}

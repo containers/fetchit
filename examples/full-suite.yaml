@@ -9,6 +9,9 @@ targets:
     targetPath: examples/systemd
     user: root
     schedule: "*/1 * * * *"
+  ansible: 
+    targetPath: examples/ansible
+    sshDirectory: /root/.ssh
   filetransfer:
     targetPath: examples/filetransfer
     destinationDirectory: /tmp/ft
