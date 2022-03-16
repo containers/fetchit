@@ -333,7 +333,7 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName string, tag 
 			return nil
 		})
 		if err != nil {
-			return fileName, nil
+			return fileName, err
 		}
 	}
 	return fileName, nil
