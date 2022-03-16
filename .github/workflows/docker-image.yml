@@ -426,9 +426,6 @@ jobs:
       - name: ensure systemd container is gone
         run: sudo podman ps -a
 
-      - name: verify container is running
-        run: if [[ $(sudo podman pod ps | grep -v CON= | grep colors_pod | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
       - name: Print the current running container
         run: sudo podman ps      
 
