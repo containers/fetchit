@@ -1,18 +1,7 @@
 
 
-Dependencies
+Running
 ============
-
-Required
---------
-For compiling the engine the following packages are required.
-
-- gpgme-devel
-- libbtrfs
-- btrfs-progs-devel
-- device-mapper-devel
-
-
 For running the engine the podman socket must be enabled. This can be enabled for the user account that will be running harpoon or for root.
 
 User
@@ -36,3 +25,18 @@ For the root user enable the socket by running the following.
 .. code-block:: bash
 
    systemctl enable --now podman.socket
+
+Launching
+---------
+The podman engine can be launched by running the following command. Most methods except for systemd can be ran without sudo. 
+
+.. code-block:: bash
+   sudo setenforce 0
+   podman run -d --name harpoon -v harpoon-volume:/opt -v ./config.yaml:/opt/config.yaml -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+
+Harpoon will clone the repository and attempt to remediate those items defined in the config.yaml file. To follow the status.
+
+.. code-block:: bash
+
+   podman logs -f harpoon
+   
