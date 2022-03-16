@@ -1,16 +1,9 @@
 # Harpoon
 The purpose of Harpoon is to allow for GitOps management of podman managed containers.
 
-This project is currently under development.
+This project is currently under development. For a more detailed explanation of the project visit the docs page.
+https://podman-harpoon.readthedocs.io/
 
-## Requirements:
-To compile harpoon outside of the Dockerfile the following must be installed on the system:
-
-On Fedora:
-- gpgme-devel
-- libbtrfs
-- btrfs-progs-devel
-- device-mapper-devel
 
 ##  Running
 Harpoon requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
