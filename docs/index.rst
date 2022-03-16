@@ -12,5 +12,5 @@ Harpoon was designed to allow for the hands off management of containers running
    :maxdepth: 2
 
    purpose.rst
-   engine.rst
-   client.rst
+   methods.rst
+   running.rst
