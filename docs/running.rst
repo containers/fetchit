@@ -31,6 +31,7 @@ Launching
 The podman engine can be launched by running the following command. Most methods except for systemd can be ran without sudo. 
 
 .. code-block:: bash
+   
    sudo setenforce 0
    podman run -d --name harpoon -v harpoon-volume:/opt -v ./config.yaml:/opt/config.yaml -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 
