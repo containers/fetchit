@@ -467,8 +467,14 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 		return rawPodman(ctx, path, target.Raw.PullImage, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
+		var prev *string = nil
+		if change != nil {
+			if change.To.Name != "" {
+				prev = &change.To.Name
+			}
+		}
 		dest := "/etc/systemd/system"
-		return systemdPodman(ctx, path, dest, target)
+		return systemdPodman(ctx, path, dest, target, prev)
 	case fileTransferMethod:
 		var prev *string = nil
 		if change != nil {

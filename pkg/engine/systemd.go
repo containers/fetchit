@@ -8,9 +8,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func systemdPodman(ctx context.Context, path, dest string, target *api.Target) error {
+func systemdPodman(ctx context.Context, path, dest string, target *api.Target, prev *string) error {
 	klog.Infof("Deploying systemd file(s) %s", path)
-	if err := fileTransferPodman(ctx, path, dest, systemdMethod, target, nil); err != nil {
+	if err := fileTransferPodman(ctx, path, dest, systemdMethod, target, prev); err != nil {
 		return fmt.Errorf("Repo: %s, Method: %s, %v", err)
 	}
 	// TODO: Add logic to start services, root/non-root
