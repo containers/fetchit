@@ -64,7 +64,6 @@ func fileTransferPodman(ctx context.Context, path, dest, method string, target *
 	s := generateSpec(method, file, copyFile, dest, target)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
-		klog.Infof("createError: %s\n", err)
 		return err
 	}
 
