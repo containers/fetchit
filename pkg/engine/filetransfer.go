@@ -43,7 +43,7 @@ func fileTransferPodman(ctx context.Context, path, dest, method string, target *
 		}
 	}
 
-	if path == "" {
+	if path == deleteFile {
 		return nil
 	}
 

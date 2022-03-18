@@ -2,17 +2,19 @@ package api
 
 import (
 	"sync"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 type Target struct {
-	Name         string       `mapstructure:"name"`
-	Url          string       `mapstructure:"url"`
-	Branch       string       `mapstructure:"branch"`
-	Raw          Raw          `mapstructure:"raw"`
-	Systemd      Systemd      `mapstructure:"systemd"`
-	Kube         Kube         `mapstructure:"kube"`
-	Ansible      Ansible      `mapstructure:"ansible"`
-	FileTransfer FileTransfer `mapstructure:"fileTransfer"`
+	Name            string       `mapstructure:"name"`
+	Url             string       `mapstructure:"url"`
+	Branch          string       `mapstructure:"branch"`
+	Raw             Raw          `mapstructure:"raw"`
+	Systemd         Systemd      `mapstructure:"systemd"`
+	Kube            Kube         `mapstructure:"kube"`
+	Ansible         Ansible      `mapstructure:"ansible"`
+	FileTransfer    FileTransfer `mapstructure:"fileTransfer"`
 	MethodSchedules map[string]string
 	Mu              sync.Mutex
 }
@@ -22,6 +24,7 @@ type Raw struct {
 	Schedule   string `mapstructure:"schedule"`
 	PullImage  bool   `mapstructure:"pullImage"`
 	InitialRun bool
+	LastCommit *object.Commit
 }
 
 type Systemd struct {
@@ -29,6 +32,7 @@ type Systemd struct {
 	User       string `mapstructure:"user"`
 	Schedule   string `mapstructure:"schedule"`
 	InitialRun bool
+	LastCommit *object.Commit
 }
 
 type FileTransfer struct {
@@ -36,12 +40,14 @@ type FileTransfer struct {
 	DestinationDirectory string `mapstructure:"destinationDirectory"`
 	Schedule             string `mapstructure:"schedule"`
 	InitialRun           bool
+	LastCommit           *object.Commit
 }
 
 type Kube struct {
 	TargetPath string `mapstructure:"targetPath"`
 	Schedule   string `mapstructure:"schedule"`
 	InitialRun bool
+	LastCommit *object.Commit
 }
 
 type Ansible struct {
@@ -49,5 +55,5 @@ type Ansible struct {
 	SshDirectory string `mapstructure:"sshDirectory"`
 	Schedule     string `mapstructure:"schedule"`
 	InitialRun   bool
-
+	LastCommit   *object.Commit
 }

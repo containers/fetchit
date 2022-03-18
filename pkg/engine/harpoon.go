@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -35,6 +36,7 @@ const (
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
 	ansibleMethod      = "ansible"
+	deleteFile         = "delete"
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -159,8 +161,7 @@ func (hc *HarpoonConfig) runTargets() {
 	hc.getTargets()
 	allTargets := make(map[string]map[string]string)
 	for _, target := range hc.Targets {
-		directory := filepath.Base(target.Url)
-		if err := hc.getClone(target, directory); err != nil {
+		if err := hc.getClone(target); err != nil {
 			log.Fatal(err)
 		}
 		allTargets[target.Name] = target.MethodSchedules
@@ -174,37 +175,67 @@ func (hc *HarpoonConfig) runTargets() {
 				target = *t
 			}
 		}
+		directory := filepath.Base(target.Url)
+		gitRepo, err := git.PlainOpen(directory)
+		if err != nil {
+			log.Fatalf("Repo: %s, error while opening the repository: %v", directory, err)
+		}
+		_, commit, err := getTree(gitRepo, nil)
+		if err != nil {
+			log.Fatalf("Repo: %s, error getting repository tree: %v", directory, err)
+		}
+
 		for method, schedule := range schedMethods {
 			switch method {
 			case kubeMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Mu.Lock()
 				target.Kube.InitialRun = true
+				target.Kube.LastCommit = commit
+				hc.update(&target)
+				target.Mu.Unlock()
 				s.Cron(schedule).Do(hc.processKube, ctx, &target, schedule)
 			case rawMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Mu.Lock()
 				target.Raw.InitialRun = true
+				target.Raw.LastCommit = commit
+				hc.update(&target)
+				target.Mu.Unlock()
 				s.Cron(schedule).Do(hc.processRaw, ctx, &target, schedule)
 			case systemdMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Mu.Lock()
 				target.Systemd.InitialRun = true
+				target.Systemd.LastCommit = commit
+				hc.update(&target)
+				target.Mu.Unlock()
 				s.Cron(schedule).Do(hc.processSystemd, ctx, &target, schedule)
 			case fileTransferMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Mu.Lock()
 				target.FileTransfer.InitialRun = true
+				target.FileTransfer.LastCommit = commit
+				hc.update(&target)
+				target.Mu.Unlock()
 				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
 			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				target.Mu.Lock()
 				target.Ansible.InitialRun = true
+				target.Ansible.LastCommit = commit
+				hc.update(&target)
+				target.Mu.Unlock()
 				s.Cron(schedule).Do(hc.processAnsible, ctx, &target, schedule)
 			default:
 				log.Fatalf("unknown target method")
@@ -221,25 +252,23 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 
 	initial := target.Raw.InitialRun
 	target.Raw.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, rawMethod, err)
-	}
-	var targetFile = ""
+	hc.update(target)
 	tag := []string{".json"}
+	var targetFile string
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Raw.TargetPath, rawMethod, target)
+		fileName, subDirTree, err := hc.getPathOrTree(target, target.Raw.TargetPath, rawMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Raw.TargetPath, rawMethod)
+		targetFile, err = hc.applyInitial(ctx, fileName, target.Raw.TargetPath, rawMethod, &tag, subDirTree, target)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, rawMethod, err)
 		}
 	}
 
-	hc.getChangesAndRunEngine(ctx, gitRepo, directory, rawMethod, target, targetFile, target.Raw.TargetPath)
+	if err := hc.getChangesAndRunEngine(ctx, rawMethod, targetFile, target); err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, rawMethod, err)
+	}
 }
 
 func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
@@ -247,25 +276,23 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	defer target.Mu.Unlock()
 	initial := target.Ansible.InitialRun
 	target.Ansible.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, ansibleMethod, err)
-	}
+	hc.update(target)
 	tag := []string{"yaml", "yml"}
 	var targetFile = ""
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Ansible.TargetPath, kubeMethod, target)
+		fileName, subDirTree, err := hc.getPathOrTree(target, target.Ansible.TargetPath, ansibleMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Ansible.TargetPath, ansibleMethod)
+		targetFile, err = hc.applyInitial(ctx, fileName, target.Ansible.TargetPath, ansibleMethod, &tag, subDirTree, target)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	hc.getChangesAndRunEngine(ctx, gitRepo, directory, ansibleMethod, target, targetFile, target.Ansible.TargetPath)
+	if err := hc.getChangesAndRunEngine(ctx, ansibleMethod, targetFile, target); err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, ansibleMethod, err)
+	}
 }
 
 func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target, schedule string) {
@@ -273,25 +300,23 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 	defer target.Mu.Unlock()
 	initial := target.Systemd.InitialRun
 	target.Systemd.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, systemdMethod, err)
-	}
-	var targetFile = ""
+	hc.update(target)
+	var targetFile string
 	tag := []string{".service"}
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Systemd.TargetPath, systemdMethod, target)
+		fileName, subDirTree, err := hc.getPathOrTree(target, target.Systemd.TargetPath, systemdMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Systemd.TargetPath, systemdMethod)
+		targetFile, err = hc.applyInitial(ctx, fileName, target.Systemd.TargetPath, systemdMethod, &tag, subDirTree, target)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, systemdMethod, err)
 		}
 	}
 
-	hc.getChangesAndRunEngine(ctx, gitRepo, directory, systemdMethod, target, targetFile, target.Systemd.TargetPath)
+	if err := hc.getChangesAndRunEngine(ctx, systemdMethod, targetFile, target); err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, systemdMethod, err)
+	}
 }
 
 func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Target, schedule string) {
@@ -299,24 +324,22 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 	defer target.Mu.Unlock()
 	initial := target.FileTransfer.InitialRun
 	target.FileTransfer.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, fileTransferMethod, err)
-	}
-	var targetFile = ""
+	hc.update(target)
+	var targetFile string
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.FileTransfer.TargetPath, fileTransferMethod, target)
+		fileName, subDirTree, err := hc.getPathOrTree(target, target.FileTransfer.TargetPath, fileTransferMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, nil, directory, target, subDirTree, target.FileTransfer.TargetPath, fileTransferMethod)
+		targetFile, err = hc.applyInitial(ctx, fileName, target.FileTransfer.TargetPath, fileTransferMethod, nil, subDirTree, target)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, fileTransferMethod, err)
 		}
 	}
 
-	hc.getChangesAndRunEngine(ctx, gitRepo, directory, fileTransferMethod, target, targetFile, target.FileTransfer.TargetPath)
+	if err := hc.getChangesAndRunEngine(ctx, fileTransferMethod, targetFile, target); err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, fileTransferMethod, err)
+	}
 }
 
 func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, schedule string) {
@@ -324,28 +347,27 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 	defer target.Mu.Unlock()
 	initial := target.Kube.InitialRun
 	target.Kube.InitialRun = false
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while opening the repository: %s", target.Name, kubeMethod, err)
-	}
+	hc.update(target)
 	tag := []string{"yaml", "yml"}
-	var targetFile = ""
+	var targetFile string
 	if initial {
-		fileName, subDirTree, err := getPathOrTree(directory, target.Kube.TargetPath, kubeMethod, target)
+		fileName, subDirTree, err := hc.getPathOrTree(target, target.Kube.TargetPath, kubeMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, &tag, directory, target, subDirTree, target.Kube.TargetPath, kubeMethod)
+		targetFile, err = hc.applyInitial(ctx, fileName, target.Kube.TargetPath, kubeMethod, &tag, subDirTree, target)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, kubeMethod, err)
 		}
 	}
 
-	hc.getChangesAndRunEngine(ctx, gitRepo, directory, kubeMethod, target, targetFile, target.Kube.TargetPath)
+	if err := hc.getChangesAndRunEngine(ctx, kubeMethod, targetFile, target); err != nil {
+		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, kubeMethod, err)
+	}
 }
 
-func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName string, tag *[]string, directory string, target *api.Target, subDirTree *object.Tree, tp string, method string) (string, error) {
+func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName, tp, method string, tag *[]string, subDirTree *object.Tree, target *api.Target) (string, error) {
+	directory := filepath.Base(target.Url)
 	if fileName != "" {
 		found := false
 		if hc.checkTag(tag, fileName) {
@@ -389,35 +411,67 @@ func (hc *HarpoonConfig) checkTag(tags *[]string, name string) bool {
 	return false
 }
 
-func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, gitRepo *git.Repository, directory string, method string, target *api.Target, targetFile string, targetPath string) {
-	changes := hc.findDiff(gitRepo, directory, method, target.Branch)
-
-	if changes == nil {
-		hc.update(target)
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, method)
-		return
+func (hc *HarpoonConfig) setLastCommit(target *api.Target, method string, commit *object.Commit) error {
+	switch method {
+	case ansibleMethod:
+		target.Ansible.LastCommit = commit
+	case rawMethod:
+		target.Raw.LastCommit = commit
+	case systemdMethod:
+		target.Systemd.LastCommit = commit
+	case kubeMethod:
+		target.Kube.LastCommit = commit
+	case fileTransferMethod:
+		target.FileTransfer.LastCommit = commit
+	default:
+		return fmt.Errorf("unknown method: %s", method)
 	}
+	hc.update(target)
+	return nil
+}
 
+func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, method, targetFile string, target *api.Target) error {
+	var lastCommit *object.Commit
+	var targetPath string
+	switch method {
+	case rawMethod:
+		lastCommit = target.Raw.LastCommit
+		targetPath = target.Raw.TargetPath
+	case kubeMethod:
+		lastCommit = target.Kube.LastCommit
+		targetPath = target.Kube.TargetPath
+	case ansibleMethod:
+		lastCommit = target.Ansible.LastCommit
+		targetPath = target.Ansible.TargetPath
+	case fileTransferMethod:
+		lastCommit = target.FileTransfer.LastCommit
+		targetPath = target.FileTransfer.TargetPath
+	case systemdMethod:
+		lastCommit = target.Systemd.LastCommit
+		targetPath = target.Systemd.TargetPath
+	default:
+		return fmt.Errorf("unknown method: %s", method)
+	}
 	tp := targetPath
 	if targetFile != "" {
 		tp = targetFile
 	}
+	changesThisMethod, newCommit, err := hc.findDiff(target, method, tp, lastCommit)
+	if err != nil {
+		return err
+	}
+	hc.setLastCommit(target, method, newCommit)
+	if len(changesThisMethod) == 0 {
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, method)
+		return nil
+	}
 
-	// the change logic is backwards "From" is actually "To"
-	for _, change := range changes {
-		if strings.Contains(change.From.Name, tp) {
-			path := directory + "/" + change.From.Name
-			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
-				klog.Fatal(err)
-			}
-		} else if strings.Contains(change.To.Name, tp) {
-			path := ""
-			if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
-				klog.Fatal(err)
-			}
+	for change, path := range changesThisMethod {
+		if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
+			return err
 		}
 	}
-	hc.update(target)
+	return nil
 }
 
 func (hc *HarpoonConfig) update(target *api.Target) {
@@ -428,36 +482,64 @@ func (hc *HarpoonConfig) update(target *api.Target) {
 	}
 }
 
-func (hc *HarpoonConfig) findDiff(gitRepo *git.Repository, directory, method, branch string) []*object.Change {
+func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
+	directory := filepath.Base(target.Url)
+	// map of change to path
+	thisMethodChanges := make(map[*object.Change]string)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		return thisMethodChanges, nil, fmt.Errorf("Repo: %s, Method: %s, error while opening the repository: %v", directory, method, err)
+	}
 	w, err := gitRepo.Worktree()
 	if err != nil {
-		log.Fatalf("error while opening the worktree: %s\n", err)
+		return thisMethodChanges, nil, fmt.Errorf("Repo: %s Method: %s, error while opening the worktree: %s", directory, method, err)
 	}
-	// ... retrieve the tree from the commit
-	prevTree, err := getTree(gitRepo)
+	// ... retrieve the tree from this method's last fetched commit
+	beforeFetchTree, _, err := getTree(gitRepo, commit)
 	if err != nil {
-		log.Fatal(err)
+		// TODO: if LastCommit has disappeared, need to reset and set initial=true instead of exit
+		return thisMethodChanges, nil, fmt.Errorf("Repo: %s Method: %s, error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", directory, method, err)
 	}
-	// Pull the latest changes from the origin remote and merge into the current branch
-	ref := fmt.Sprintf("refs/heads/%s", branch)
-	if err = w.Pull(&git.PullOptions{
-		ReferenceName: plumbing.ReferenceName(ref),
-		SingleBranch:  true,
+
+	// Fetch the latest changes from the origin remote and merge into the current branch
+	ref := fmt.Sprintf("refs/heads/%s", target.Branch)
+	refName := plumbing.ReferenceName(ref)
+	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.Branch, target.Branch))
+	if err = gitRepo.Fetch(&git.FetchOptions{
+		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
+		Force:    true,
+	}); err != nil && err != git.NoErrAlreadyUpToDate {
+		return nil, commit, err
+	}
+
+	// force checkout to latest fetched branch
+	if err := w.Checkout(&git.CheckoutOptions{
+		Branch: refName,
+		Force:  true,
 	}); err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			return nil
+		return thisMethodChanges, nil, fmt.Errorf("Repo: %s, error checking out latest branch %s: %v", directory, ref, err)
+	}
+
+	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
+	if err != nil {
+		return thisMethodChanges, nil, err
+	}
+
+	changes, err := afterFetchTree.Diff(beforeFetchTree)
+	if err != nil {
+		return thisMethodChanges, nil, fmt.Errorf("%s: error while generating diff: %s", directory, err)
+	}
+	// the change logic is backwards "From" is actually "To"
+	for _, change := range changes {
+		if strings.Contains(change.From.Name, targetPath) {
+			path := directory + "/" + change.From.Name
+			thisMethodChanges[change] = path
+		} else if strings.Contains(change.To.Name, targetPath) {
+			thisMethodChanges[change] = deleteFile
 		}
-		log.Fatalf("%s: error while pulling in latest changes from %s", directory, ref)
+
 	}
-	tree, err := getTree(gitRepo)
-	if err != nil {
-		log.Fatal(err)
-	}
-	changes, err := tree.Diff(prevTree)
-	if err != nil {
-		log.Fatalf("%s: error while generating diff: %s", directory, err)
-	}
-	return changes
+	return thisMethodChanges, newestCommit, nil
 }
 
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target, change *object.Change) error {
@@ -512,9 +594,10 @@ func getChangeString(change *object.Change) *string {
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
-func (hc *HarpoonConfig) getClone(target *api.Target, directory string) error {
+func (hc *HarpoonConfig) getClone(target *api.Target) error {
 	target.Mu.Lock()
 	defer target.Mu.Unlock()
+	directory := filepath.Base(target.Url)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
 		return fmt.Errorf("Repo: %s, error while fetching local clone: %s", target.Name, err)
@@ -552,30 +635,41 @@ func (hc *HarpoonConfig) getClone(target *api.Target, directory string) error {
 	return nil
 }
 
-func getTree(r *git.Repository) (*object.Tree, error) {
+func getTree(r *git.Repository, oldCommit *object.Commit) (*object.Tree, *object.Commit, error) {
+	if oldCommit != nil {
+		// ... retrieve the tree from the commit
+		tree, err := oldCommit.Tree()
+		if err != nil {
+			return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
+		}
+		return tree, nil, nil
+	}
+	var newCommit *object.Commit
 	ref, err := r.Head()
 	if err != nil {
-		return nil, fmt.Errorf("Error when retrieving head: %s\n", err)
+		return nil, nil, fmt.Errorf("error when retrieving head: %s", err)
 	}
 	// ... retrieving the commit object
-	commit, err := r.CommitObject(ref.Hash())
+	newCommit, err = r.CommitObject(ref.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("Error when retrieving commit: %s\n", err)
+		return nil, nil, fmt.Errorf("error when retrieving commit: %s", err)
 	}
+
 	// ... retrieve the tree from the commit
-	tree, err := commit.Tree()
+	tree, err := newCommit.Tree()
 	if err != nil {
-		return nil, fmt.Errorf("Error when retrieving tree: %s\n", err)
+		return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
 	}
-	return tree, nil
+	return tree, newCommit, nil
 }
 
-func getPathOrTree(directory, subDir, method string, target *api.Target) (string, *object.Tree, error) {
+func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string) (string, *object.Tree, error) {
+	directory := filepath.Base(target.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		log.Fatalf("Repo: %s, error while opening the repository: %s", directory, err)
 	}
-	tree, err := getTree(gitRepo)
+	tree, _, err := getTree(gitRepo, nil)
 	if err != nil {
 		return "", nil, err
 	}

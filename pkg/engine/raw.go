@@ -57,9 +57,7 @@ func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) e
 		klog.Infof("Deleted podman container %s", raw.Name)
 	}
 
-	// Don't continue if no path is set, this means we just have to delete the
-	// previous file
-	if path == "" {
+	if path == deleteFile {
 		return nil
 	}
 
