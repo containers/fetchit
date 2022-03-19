@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/play"
 	"github.com/containers/podman/v4/pkg/bindings/pods"
 
@@ -19,33 +18,29 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 )
 
-func kubePodman(ctx context.Context, path string, prev *string) error {
-	if path != deleteFile {
-		klog.Infof("Creating podman container from %s using kube method", path)
-	}
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil {
-		return err
+func kubePodman(ctx context.Context, mo *FileMountOptions) error {
+	if mo.Path != deleteFile {
+		klog.Infof("Creating podman container from %s using kube method", mo.Path)
 	}
 
-	if prev != nil {
-		err = stopPods(conn, []byte(*prev))
+	if mo.Previous != nil {
+		err := stopPods(mo.Conn, []byte(*mo.Previous))
 		if err != nil {
 			return err
 		}
 	}
 
-	if path != deleteFile {
-		kubeYaml, err := ioutil.ReadFile(path)
+	if mo.Path != deleteFile {
+		kubeYaml, err := ioutil.ReadFile(mo.Path)
 		if err != nil {
 			return err
 		}
-		err = stopPods(conn, kubeYaml)
+		err = stopPods(mo.Conn, kubeYaml)
 		if err != nil {
 			return err
 		}
 
-		err = createPods(conn, path, kubeYaml)
+		err = createPods(mo.Conn, mo.Path, kubeYaml)
 		if err != nil {
 			return err
 		}
