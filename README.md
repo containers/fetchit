@@ -9,29 +9,36 @@ https://podman-harpoon.readthedocs.io/
 Harpoon requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
 
 To enable the socket for $USER:
+
 ```
 systemctl --user enable podman.socket --now
 ```
 
 To enable the socker for root:
+
 ```
 systemctl enable podman.socket
 ```
 
 Define the parameters in your `config.yaml` to relate to your git repository.
+This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
+
 ```
 targets:
 - name: harpoon
   url: http://github.com/redhat-et/harpoon
   branch: main
-  systemd:
-    targetPath: examples/systemd/httpd.service
+  fileTransfer:
+    targetPath: examples/fileTransfer/hello.txt
+    destinationDirectory: /tmp
     schedule: "*/1 * * * *" 
   raw:
     targetPath: examples/raw
     schedule: "*/1 * * * *"
 ```
-Verify running characters before deploying harpoon.
+
+#### Verify running containers before deploying harpoon.
+
 ```
 podman ps
 
@@ -39,13 +46,16 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ```
 
 
-Launch the harpoon container using a podman volume.
-
-NOTE: If a podman volume is not the preferred storage solution a directory can be used as well. An example would be `-v ~/harpoon-volume:/opt` instead of `-v harpoon-volume:/opt`.
+#### Launch the harpoon container using a podman volume
 
 ```
-podman run -d --name harpoon -v harpoon-volume:/opt -v ./config.json:/opt/config.json -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
+
+**NOTE:**
+* If a podman volume is not the preferred storage solution a directory can be used as well.
+An example would be `-v ~/harpoon-volume:/opt` instead of `-v harpoon-volume:/opt`.
+* For filetransfer, the `destination directory must exist` on the host.
 
 The container will be started and will run in the background. To view the logs:
 
@@ -78,10 +88,27 @@ time="2022-02-15T18:04:14Z" level=info msg="Going to start container \"53d86851a
 Container started....Requeuing
 ```
 
-Verify the sample application is running
+#### Verify the sample applications are running
+
 ```
 podman ps
 
-CONTAINER ID  IMAGE                                          COMMAND               CREATED         STATUS             PORTS                   NAMES
-53d86851aad9  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       53 minutes ago  Up 53 minutes ago  0.0.0.0:8080->8080/tcp  colors
+CONTAINER ID  IMAGE                                          COMMAND               CREATED        STATUS            PORTS                   NAMES
+dcc546457aa2  quay.io/harpoon/harpoon:latest                 /usr/local/bin/ha...  3 minutes ago  Up 3 minutes ago                          harpoon
+392a39209622  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:8080->8080/tcp  colors1
+9e50cd3bdab5  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:9080->8080/tcp  colors2
+```
+
+Also, view applications at `localhost:8080` and `localhost:9080`
+
+#### Verify the file is placed on the host
+
+```
+watch ls -al /tmp/hello.txt
+```
+
+#### Clean up
+
+```
+podman stop harpoon && podman rm harpoon && podman volume rm harpoon-volume
 ```
