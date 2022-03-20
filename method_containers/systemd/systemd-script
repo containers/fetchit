@@ -1,0 +1,39 @@
+#!/usr/bin/env bash 
+
+if [ "$ACTION" == "enable" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl enable "${SERVICE}" --now
+    if ! systemctl is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  else
+    systemctl --user enable "${SERVICE}" --now
+    if ! systemctl --user is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  fi
+fi
+
+if [ "$ACTION" == "restart" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl daemon-reload
+    systemctl restart "${SERVICE}"
+    if ! systemctl is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  else
+    systemctl --user daemon-reload
+    systemctl --user restart  "${SERVICE}"
+    if ! systemctl is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  fi
+fi
+
+if [ "$ACTION" == "stop" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl stop "${SERVICE}" && rm -rf /etc/systemd/system/"${SERVICE}"
+  else
+    systemctl --user stop "${SERVICE}" && rm -rf /etc/systemd/system/"${SERVICE}"
+  fi
+fi

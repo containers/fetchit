@@ -90,7 +90,8 @@ Systemd is a method that will create a systemd unit file. In the future this met
    url: http://github.com/redhat-et/harpoon
    systemd:
       targetPath: examples/systemd
-      user: root
+      root: true
+      enable: true
       schedule: "*/5 * * * *"
    branch: main
 
