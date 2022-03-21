@@ -49,7 +49,7 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 #### Launch the harpoon container using a podman volume
 
 ```
-podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --rm --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
 
 **NOTE:**
@@ -110,5 +110,5 @@ watch ls -al /tmp/hello.txt
 #### Clean up
 
 ```
-podman stop harpoon && podman rm harpoon && podman volume rm harpoon-volume
+podman stop colors1 colors2 harpoon && podman rm colors1 colors2 && podman volume rm harpoon-volume
 ```
