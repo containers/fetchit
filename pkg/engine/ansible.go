@@ -68,6 +68,11 @@ func ansiblePodman(ctx context.Context, path, repoName string, SshDirectory stri
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
-	klog.Infof("Container started....Requeuing")
+	// Wait for the container to exit
+	err = waitAndRemoveContainer(conn, createResponse.ID)
+	if err != nil {
+		return err
+	}
+	klog.Infof("Ansible has successfully ran....Requeuing")
 	return nil
 }
