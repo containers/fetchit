@@ -2,13 +2,10 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 
 	"github.com/containers/podman/v4/libpod/define"
-	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -19,50 +16,36 @@ import (
 
 const stopped = define.ContainerStateStopped
 
-func fileTransferPodman(ctx context.Context, path, dest, method string, target *api.Target, prev *string) error {
-
-	// Create a new Podman client
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil {
-		return fmt.Errorf("error podman socket: %w", err)
-	}
-
-	if prev != nil {
-		pathToRemove := filepath.Join(dest, filepath.Base(*prev))
-		s := generateSpecRemove(method, filepath.Base(pathToRemove), pathToRemove, dest, target)
-		createResponse, err := createAndStartContainer(conn, s)
+func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
+	if mo.Previous != nil {
+		pathToRemove := filepath.Join(mo.Dest, filepath.Base(*mo.Previous))
+		s := generateSpecRemove(mo.Method, filepath.Base(pathToRemove), pathToRemove, mo.Dest, mo.Target)
+		createResponse, err := createAndStartContainer(mo.Conn, s)
 		if err != nil {
 			return err
 		}
 
 		// TODO: check file got removed
 
-		err = waitAndRemoveContainer(conn, createResponse.ID)
+		err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
 		if err != nil {
 			return err
 		}
 	}
 
-	if path == deleteFile {
+	if mo.Path == deleteFile {
 		return nil
 	}
 
-	klog.Infof("Deploying file(s) %s", path)
+	klog.Infof("Deploying file(s) %s", mo.Path)
 
-	file := filepath.Base(path)
+	file := filepath.Base(mo.Path)
 
-	source := filepath.Join("/opt", path)
-	copyFile := (source + " " + dest)
+	source := filepath.Join("/opt", mo.Path)
+	copyFile := (source + " " + mo.Dest)
 
-	klog.Infof("Identifying if image exists locally")
-	// Pull image if it doesn't exist
-	err = fetchImage(conn)
-	if err != nil {
-		return err
-	}
-
-	s := generateSpec(method, file, copyFile, dest, target)
-	createResponse, err := createAndStartContainer(conn, s)
+	s := generateSpec(mo.Method, file, copyFile, mo.Dest, mo.Target)
+	createResponse, err := createAndStartContainer(mo.Conn, s)
 	if err != nil {
 		return err
 	}
@@ -70,7 +53,7 @@ func fileTransferPodman(ctx context.Context, path, dest, method string, target *
 	//TODO: check file got put in the right place
 
 	// Wait for the container to exit
-	err = waitAndRemoveContainer(conn, createResponse.ID)
+	err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
 
 	return err
 }
@@ -101,23 +84,6 @@ func generateSpecRemove(method, file, pathToRemove, dest string, target *api.Tar
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
 	return s
-}
-
-func fetchImage(conn context.Context) error {
-	present, err := images.Exists(conn, harpoonImage, nil)
-	klog.Infof("Is image present? %t", present)
-	if err != nil {
-		return err
-	}
-
-	if !present {
-		_, err = images.Pull(conn, harpoonImage, nil)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func createAndStartContainer(conn context.Context, s *specgen.SpecGenerator) (entities.ContainerCreateResponse, error) {
