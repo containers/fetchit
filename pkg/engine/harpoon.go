@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -44,7 +46,9 @@ type HarpoonConfig struct {
 	Targets []*api.Target `mapstructure:"targets"`
 	PAT     string        `mapstructure:"pat"`
 
-	Volume     string
+	Volume string `mapstructure:"volume"`
+	// Conn holds podman client
+	Conn       context.Context
 	configFile string // "currently not configurable, ./config.yaml"
 }
 
@@ -56,6 +60,16 @@ func NewHarpoonConfig() *HarpoonConfig {
 			},
 		},
 	}
+}
+
+type FileMountOptions struct {
+	// Conn holds the podman client
+	Conn     context.Context
+	Path     string
+	Dest     string
+	Method   string
+	Target   *api.Target
+	Previous *string
 }
 
 var harpoonConfig *HarpoonConfig
@@ -112,6 +126,21 @@ func (o *HarpoonConfig) initConfig(cmd *cobra.Command) {
 
 	harpoonVolume = config.Volume
 	o.Targets = config.Targets
+	ctx := context.Background()
+	// TODO: socket directory same for all platforms?
+	// sock_dir := os.Getenv("XDG_RUNTIME_DIR")
+	// socket := "unix:" + sock_dir + "/podman/podman.sock"
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil || conn == nil {
+		log.Fatalf("error establishing connection to podman.sock: %v", err)
+	}
+
+	klog.Infof("Identifying if harpoon image exists locally")
+	if err := fetchImage(conn); err != nil {
+		cobra.CheckErr(err)
+	}
+	o.Conn = conn
+
 }
 
 // getTargets returns map of repoName to map of method:Schedule
@@ -255,18 +284,25 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 	hc.update(target)
 	tag := []string{".json"}
 	var targetFile string
+	mo := &FileMountOptions{
+		Conn:   hc.Conn,
+		Method: rawMethod,
+		Target: target,
+	}
+
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Raw.TargetPath, rawMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, target.Raw.TargetPath, rawMethod, &tag, subDirTree, target)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Raw.TargetPath, &tag, subDirTree)
 		if err != nil {
 			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, rawMethod, err)
 		}
+		mo.Path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, rawMethod, targetFile, target); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, rawMethod, err)
 	}
 }
@@ -279,18 +315,24 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	hc.update(target)
 	tag := []string{"yaml", "yml"}
 	var targetFile = ""
+	mo := &FileMountOptions{
+		Conn:   hc.Conn,
+		Method: ansibleMethod,
+		Target: target,
+	}
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Ansible.TargetPath, ansibleMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, target.Ansible.TargetPath, ansibleMethod, &tag, subDirTree, target)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Ansible.TargetPath, &tag, subDirTree)
 		if err != nil {
 			log.Fatal(err)
 		}
+		mo.Path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, ansibleMethod, targetFile, target); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, ansibleMethod, err)
 	}
 }
@@ -302,19 +344,25 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 	target.Systemd.InitialRun = false
 	hc.update(target)
 	var targetFile string
+	mo := &FileMountOptions{
+		Conn:   hc.Conn,
+		Method: systemdMethod,
+		Target: target,
+	}
 	tag := []string{".service"}
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Systemd.TargetPath, systemdMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, target.Systemd.TargetPath, systemdMethod, &tag, subDirTree, target)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Systemd.TargetPath, &tag, subDirTree)
 		if err != nil {
 			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, systemdMethod, err)
 		}
+		mo.Path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, systemdMethod, targetFile, target); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, systemdMethod, err)
 	}
 }
@@ -326,18 +374,24 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 	target.FileTransfer.InitialRun = false
 	hc.update(target)
 	var targetFile string
+	mo := &FileMountOptions{
+		Conn:   hc.Conn,
+		Method: fileTransferMethod,
+		Target: target,
+	}
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.FileTransfer.TargetPath, fileTransferMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, target.FileTransfer.TargetPath, fileTransferMethod, nil, subDirTree, target)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.FileTransfer.TargetPath, nil, subDirTree)
 		if err != nil {
 			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, fileTransferMethod, err)
 		}
+		mo.Path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, fileTransferMethod, targetFile, target); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, fileTransferMethod, err)
 	}
 }
@@ -350,43 +404,49 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 	hc.update(target)
 	tag := []string{"yaml", "yml"}
 	var targetFile string
+	mo := &FileMountOptions{
+		Conn:   hc.Conn,
+		Method: kubeMethod,
+		Target: target,
+	}
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Kube.TargetPath, kubeMethod)
 		if err != nil {
 			log.Fatal(err)
 		}
-		targetFile, err = hc.applyInitial(ctx, fileName, target.Kube.TargetPath, kubeMethod, &tag, subDirTree, target)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Kube.TargetPath, &tag, subDirTree)
 		if err != nil {
 			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, kubeMethod, err)
 		}
+		mo.Path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, kubeMethod, targetFile, target); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
 		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, kubeMethod, err)
 	}
 }
 
-func (hc *HarpoonConfig) applyInitial(ctx context.Context, fileName, tp, method string, tag *[]string, subDirTree *object.Tree, target *api.Target) (string, error) {
-	directory := filepath.Base(target.Url)
+func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
+	directory := filepath.Base(mo.Target.Url)
 	if fileName != "" {
 		found := false
 		if hc.checkTag(tag, fileName) {
 			found = true
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, path, method, target, nil); err != nil {
+			mo.Path = filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, mo, nil); err != nil {
 				return fileName, err
 			}
 		}
 		if !found {
-			log.Fatalf("%s target file must be of type %v", method, tag)
+			log.Fatalf("%s target file must be of type %v", mo.Method, tag)
 		}
 
 	} else {
 		// ... get the files iterator and print the file
 		err := subDirTree.Files().ForEach(func(f *object.File) error {
 			if hc.checkTag(tag, f.Name) {
-				path := filepath.Join(directory, tp, f.Name)
-				if err := hc.EngineMethod(ctx, path, method, target, nil); err != nil {
+				mo.Path = filepath.Join(directory, tp, f.Name)
+				if err := hc.EngineMethod(ctx, mo, nil); err != nil {
 					return err
 				}
 			}
@@ -430,44 +490,45 @@ func (hc *HarpoonConfig) setLastCommit(target *api.Target, method string, commit
 	return nil
 }
 
-func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, method, targetFile string, target *api.Target) error {
+func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMountOptions) error {
 	var lastCommit *object.Commit
 	var targetPath string
-	switch method {
+	switch mo.Method {
 	case rawMethod:
-		lastCommit = target.Raw.LastCommit
-		targetPath = target.Raw.TargetPath
+		lastCommit = mo.Target.Raw.LastCommit
+		targetPath = mo.Target.Raw.TargetPath
 	case kubeMethod:
-		lastCommit = target.Kube.LastCommit
-		targetPath = target.Kube.TargetPath
+		lastCommit = mo.Target.Kube.LastCommit
+		targetPath = mo.Target.Kube.TargetPath
 	case ansibleMethod:
-		lastCommit = target.Ansible.LastCommit
-		targetPath = target.Ansible.TargetPath
+		lastCommit = mo.Target.Ansible.LastCommit
+		targetPath = mo.Target.Ansible.TargetPath
 	case fileTransferMethod:
-		lastCommit = target.FileTransfer.LastCommit
-		targetPath = target.FileTransfer.TargetPath
+		lastCommit = mo.Target.FileTransfer.LastCommit
+		targetPath = mo.Target.FileTransfer.TargetPath
 	case systemdMethod:
-		lastCommit = target.Systemd.LastCommit
-		targetPath = target.Systemd.TargetPath
+		lastCommit = mo.Target.Systemd.LastCommit
+		targetPath = mo.Target.Systemd.TargetPath
 	default:
-		return fmt.Errorf("unknown method: %s", method)
+		return fmt.Errorf("unknown method: %s", mo.Method)
 	}
 	tp := targetPath
-	if targetFile != "" {
-		tp = targetFile
+	if mo.Path != "" {
+		tp = mo.Path
 	}
-	changesThisMethod, newCommit, err := hc.findDiff(target, method, tp, lastCommit)
+	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lastCommit)
 	if err != nil {
 		return err
 	}
-	hc.setLastCommit(target, method, newCommit)
+	hc.setLastCommit(mo.Target, mo.Method, newCommit)
 	if len(changesThisMethod) == 0 {
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", target.Name, method)
+		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
 		return nil
 	}
 
 	for change, path := range changesThisMethod {
-		if err := hc.EngineMethod(ctx, path, method, target, change); err != nil {
+		mo.Path = path
+		if err := hc.EngineMethod(ctx, mo, change); err != nil {
 			return err
 		}
 	}
@@ -542,11 +603,12 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 	return thisMethodChanges, newestCommit, nil
 }
 
-func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, target *api.Target, change *object.Change) error {
-	switch method {
+func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, change *object.Change) error {
+	switch mo.Method {
 	case rawMethod:
 		var prev *string = getChangeString(change)
-		return rawPodman(ctx, path, target.Raw.PullImage, prev)
+		mo.Previous = prev
+		return rawPodman(ctx, mo)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		var prev *string = nil
@@ -555,8 +617,9 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 				prev = &change.To.Name
 			}
 		}
-		dest := "/etc/systemd/system"
-		return systemdPodman(ctx, path, dest, target, prev)
+		mo.Previous = prev
+		mo.Dest = "/etc/systemd/system"
+		return systemdPodman(ctx, mo)
 	case fileTransferMethod:
 		var prev *string = nil
 		if change != nil {
@@ -564,15 +627,17 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, path, method string, 
 				prev = &change.To.Name
 			}
 		}
-		dest := target.FileTransfer.DestinationDirectory
-		return fileTransferPodman(ctx, path, dest, fileTransferMethod, target, prev)
+		mo.Previous = prev
+		mo.Dest = mo.Target.FileTransfer.DestinationDirectory
+		return fileTransferPodman(ctx, mo)
 	case kubeMethod:
 		var prev *string = getChangeString(change)
-		return kubePodman(ctx, path, prev)
+		mo.Previous = prev
+		return kubePodman(ctx, mo)
 	case ansibleMethod:
-		return ansiblePodman(ctx, path, target.Name, target.Ansible.SshDirectory)
+		return ansiblePodman(ctx, mo)
 	default:
-		return fmt.Errorf("unsupported method: %s", method)
+		return fmt.Errorf("unsupported method: %s", mo.Method)
 	}
 }
 
@@ -685,4 +750,21 @@ func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string
 		}
 	}
 	return "", subDirTree, err
+}
+
+func fetchImage(conn context.Context) error {
+	present, err := images.Exists(conn, harpoonImage, nil)
+	klog.Infof("Is image present? %t", present)
+	if err != nil {
+		return err
+	}
+
+	if !present {
+		_, err = images.Pull(conn, harpoonImage, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

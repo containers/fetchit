@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 
 	"github.com/containers/common/libnetwork/types"
-	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/specgen"
@@ -37,19 +36,13 @@ type RawPod struct {
 	Volumes []*specgen.NamedVolume `json:"Volumes"`
 }
 
-func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) error {
-
-	// Create a new Podman client
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil {
-		return err
-	}
+func rawPodman(ctx context.Context, mo *FileMountOptions) error {
 
 	// Delete previous file's podxz
-	if prev != nil {
-		raw := rawPodFromBytes([]byte(*prev))
+	if mo.Previous != nil {
+		raw := rawPodFromBytes([]byte(*mo.Previous))
 
-		err := deleteContainer(conn, raw.Name)
+		err := deleteContainer(mo.Conn, raw.Name)
 		if err != nil {
 			return err
 		}
@@ -57,13 +50,13 @@ func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) e
 		klog.Infof("Deleted podman container %s", raw.Name)
 	}
 
-	if path == deleteFile {
+	if mo.Path == deleteFile {
 		return nil
 	}
 
-	klog.Infof("Creating podman container from %s", path)
+	klog.Infof("Creating podman container from %s", mo.Path)
 
-	rawJson, err := ioutil.ReadFile(path)
+	rawJson, err := ioutil.ReadFile(mo.Path)
 	if err != nil {
 		return err
 	}
@@ -72,25 +65,25 @@ func rawPodman(ctx context.Context, path string, pullImage bool, prev *string) e
 
 	klog.Infof("Identifying if image exists locally")
 
-	err = detectOrFetchImage(conn, raw.Image, pullImage)
+	err = detectOrFetchImage(mo.Conn, raw.Image, mo.Target.Raw.PullImage)
 	if err != nil {
 		return err
 	}
 
-	err = removeExisting(conn, raw.Name)
+	err = removeExisting(mo.Conn, raw.Name)
 	if err != nil {
 		return err
 	}
 
 	s := createSpecGen(raw)
 
-	createResponse, err := containers.CreateWithSpec(conn, s, nil)
+	createResponse, err := containers.CreateWithSpec(mo.Conn, s, nil)
 	if err != nil {
 		return err
 	}
 	klog.Infof("Container %s created.", s.Name)
 
-	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(mo.Conn, createResponse.ID, nil); err != nil {
 		return err
 	}
 	klog.Infof("Container %s started....Requeuing", s.Name)
