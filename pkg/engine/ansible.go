@@ -63,7 +63,7 @@ func ansiblePodman(ctx context.Context, mo *FileMountOptions) error {
 		return err
 	}
 	// Wait for the container to exit
-	err = waitAndRemoveContainer(conn, createResponse.ID)
+	err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
 	if err != nil {
 		return err
 	}
