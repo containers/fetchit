@@ -62,6 +62,11 @@ func ansiblePodman(ctx context.Context, mo *FileMountOptions) error {
 	if err := containers.Start(mo.Conn, createResponse.ID, nil); err != nil {
 		return err
 	}
+	// Wait for the container to exit
+	err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
+	if err != nil {
+		return err
+	}
 	klog.Infof("Container started....Requeuing")
 	return nil
 }
