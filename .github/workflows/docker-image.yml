@@ -188,7 +188,7 @@ jobs:
       - name: list files
         run: sudo ls /tmp/ft/anotherfile.txt  /tmp/ft/hello.txt
 
-      - name: ensure systemd container is gone
+      - name: ensure container is gone
         run: sudo podman ps -a
 
   filetransfer-validate-exact-file:
@@ -227,7 +227,7 @@ jobs:
       - name: list files
         run: sudo ls /tmp/ft/single/hello.txt
 
-      - name: ensure systemd container is gone
+      - name: ensure container is gone
         run: sudo podman ps -a
 
   systemd-validate:
@@ -411,7 +411,7 @@ jobs:
         run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/full-suite.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
-        run: sleep 2m
+        run: sleep 150s
         
       - name: Logs
         run: sudo podman logs harpoon
@@ -422,11 +422,8 @@ jobs:
       - name: list transferred files
         run: sudo ls /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
 
-      - name: ensure systemd container is gone
-        run: sudo podman ps -a
-
-      - name: Print the current running container
-        run: sudo podman ps      
+      - name: ensure only required containers are running (colors and harpoon)
+        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v harpoon | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
 
       - name: verify raw container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -486,7 +483,7 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: get environment variable
-        run: sudo podman exec colors1 env | grep APP_COLOR
+        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=blue" ]] ; then exit 1; else echo "Environment variable set"; fi
 
       - name: update variable
         run: |
@@ -507,7 +504,7 @@ jobs:
         run: sudo podman logs harpoon
 
       - name: get environment variable
-        run: sudo podman exec colors1 env | grep APP_COLOR
+        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=pink" ]] ; then exit 1; else echo "Environment variable set"; fi
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
