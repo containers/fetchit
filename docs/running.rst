@@ -28,7 +28,32 @@ For the root user enable the socket by running the following.
 
 Launching
 ---------
-The podman engine can be launched by running the following command. Most methods except for systemd can be ran without sudo. 
+The podman engine can be launched by running the following command or by using the systemd files from the repository. Most methods except for systemd can be ran without sudo. 
+
+Systemd
+-------
+The two systemd files are differentiated by .root and .user.
+
+Ensure that the `config.yaml` is correctly defined in the systemd service file before attmepting to start the service.
+
+For root
+
+.. code-block:: bash
+   
+   cp systemd/harpoon.root /etc/systemd/system/harpoon.service
+   systemctl enable harpoon --now
+
+
+For user ensure that the path for the configuration file `/home/harpooner/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
+
+.. code-block:: bash
+   
+   mkdir -p ~/.config/systemd/user/
+   cp systemd/harpoon.user ~/.config/systemd/user/
+   systemctl --user enable harpoon --now
+
+Manually
+--------
 
 .. code-block:: bash
    

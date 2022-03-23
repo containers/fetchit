@@ -57,6 +57,7 @@ Ensure that the `config.yaml` is correctly defined in the systemd service file b
 
 For root
 ```
+setenforce 0
 cp systemd/harpoon.root /etc/systemd/system/harpoon.service
 systemctl enable harpoon --now
 ```
@@ -65,6 +66,7 @@ For user ensure that the path for the configuration file `/home/harpooner/config
 
 ```
 mkdir -p ~/.config/systemd/user/
+setenforce 0
 cp systemd/harpoon.user ~/.config/systemd/user/
 systemctl --user enable harpoon --now
 ```
