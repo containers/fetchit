@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/redhat-et/harpoon/pkg/engine/api"
+	"github.com/redhat-et/harpoon/pkg/engine/utils"
 
 	"k8s.io/klog/v2"
 )
@@ -418,13 +419,13 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Kube.TargetPath, &tag, subDirTree)
 		if err != nil {
-			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, kubeMethod, err)
+			klog.Error("Error applying kube method on repo %s: %s", target.Name, target.Kube.LastCommit, err.Error())
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, kubeMethod, err)
+		klog.Error("Error applying kube method on repo %s: %s", target.Name, err.Error())
 	}
 }
 
@@ -436,11 +437,14 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 			found = true
 			mo.Path = filepath.Join(directory, fileName)
 			if err := hc.EngineMethod(ctx, mo, nil); err != nil {
-				return fileName, err
+				return fileName, utils.WrapErr(err, "error running engine with method %s, for file %s, for commit %s",
+					mo.Method, fileName, mo.Target.Kube.LastCommit.Hash.String())
 			}
 		}
 		if !found {
-			log.Fatalf("%s target file must be of type %v", mo.Method, tag)
+			err := fmt.Errorf("%s target file must be of type %v", mo.Method, tag)
+			return fileName, utils.WrapErr(err, "error running engine with method %s, for file %s, for commit %s",
+				mo.Method, fileName, mo.Target.Kube.LastCommit.Hash.String())
 		}
 
 	} else {
@@ -449,7 +453,8 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 			if hc.checkTag(tag, f.Name) {
 				mo.Path = filepath.Join(directory, tp, f.Name)
 				if err := hc.EngineMethod(ctx, mo, nil); err != nil {
-					return err
+					return utils.WrapErr(err, "error running engine with method %s, for file %s for commit %s",
+						mo.Method, mo.Path, mo.Target.Kube.LastCommit.Hash.String())
 				}
 			}
 			return nil
@@ -520,7 +525,7 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	}
 	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lastCommit)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting diff for method %s, last commit %s: %s", mo.Method, lastCommit.String(), err)
 	}
 	hc.setLastCommit(mo.Target, mo.Method, newCommit)
 	if len(changesThisMethod) == 0 {
@@ -531,7 +536,7 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	for change, path := range changesThisMethod {
 		mo.Path = path
 		if err := hc.EngineMethod(ctx, mo, change); err != nil {
-			return err
+			return fmt.Errorf("error running engine with method %s, for file %s, for commit %s: %s", mo.Method, mo.Path, newCommit, err.Error())
 		}
 	}
 	return nil
