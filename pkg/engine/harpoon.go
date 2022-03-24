@@ -32,8 +32,7 @@ const (
 	defaultConfigFile = "./config.yaml"
 	defaultVolume     = "harpoon-volume"
 	harpoonImage      = "quay.io/harpoon/harpoon:latest"
-	// TODO: build official image
-	systemdImage = "quay.io/sallyom/harpoon:systemctl"
+	systemdImage      = "quay.io/harpoon/harpoon-systemd:latest"
 
 	rawMethod          = "raw"
 	systemdMethod      = "systemd"
