@@ -21,12 +21,13 @@ import (
 )
 
 func kubePodman(ctx context.Context, mo *FileMountOptions) error {
+
 	if mo.Path != deleteFile {
 		klog.Infof("Creating podman container from %s using kube method", mo.Path)
 	}
 
 	if mo.Previous != nil {
-		err := stopPods(ctx, []byte(*mo.Previous))
+		err := stopPods(mo.Conn, []byte(*mo.Previous))
 		if err != nil {
 			return utils.WrapErr(err, "Error stopping pods")
 		}
@@ -38,7 +39,7 @@ func kubePodman(ctx context.Context, mo *FileMountOptions) error {
 			return utils.WrapErr(err, "Error reading file")
 		}
 
-		err = stopPods(ctx, kubeYaml)
+		err = stopPods(mo.Conn, kubeYaml)
 		if err != nil {
 			return utils.WrapErr(err, "Error stopping pods")
 		}
