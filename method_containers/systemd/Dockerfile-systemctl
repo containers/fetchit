@@ -1,0 +1,4 @@
+FROM registry.access.redhat.com/ubi8/ubi:latest
+USER root
+COPY ./method_containers/systemd/systemd-script /opt/systemd-script
+ENTRYPOINT ["/opt/systemd-script"]

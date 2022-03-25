@@ -1,10 +1,11 @@
 volume: harpoon-volume # this needs to match the volume name passed to the podman run command
 targets:
 - name: harpoon
-  url: http://github.com/redhat-et/harpoon
+  url: http://github.com/sallyom/harpoon
   systemd:
     targetPath: examples/systemd
-    root: true
-    enable: false
+    root: false
+    nonRootHomeDir: "/home/somalley"
+    enable: true
     schedule: "*/1 * * * *"
-  branch: main
+  branch: enable-systemd-allow-nonroot

@@ -58,7 +58,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate,  systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -82,7 +82,54 @@ jobs:
         with:
           name: ansible-image-arm
           path: /tmp/ansible-arm.tar
-          
+
+  build-systemd-amd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build the image
+        run: go mod tidy && go mod vendor && make build-systemd-cross-build-linux-amd64
+
+      - name: docker list images
+        run: docker images
+
+      - name: Export image
+        run: podman save -o /tmp/systemd-amd.tar quay.io/harpoon/harpoon-systemd-amd:latest
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: systemd-image-amd
+          path: /tmp/systemd-amd.tar
+
+  build-systemd-arm:
+    runs-on: ubuntu-latest
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate,  systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: update system
+        run: sudo apt-get update
+
+      - name: Install required packages
+        run: sudo apt install podman build-essential qemu-user qemu-user-static
+
+      - name: Build the image
+        run: go mod tidy && go mod vendor && CTR_CMD=podman make build-systemd-cross-build-linux-arm64
+
+      - name: Export image
+        run: podman save -o /tmp/systemd-arm.tar quay.io/harpoon/harpoon-systemd-arm:latest
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: systemd-image-arm
+          path: /tmp/systemd-arm.tar
+
   raw-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -232,10 +279,10 @@ jobs:
 
   systemd-validate:
     runs-on: ubuntu-latest
-    needs: [ build ]
+    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
-        
+ 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -247,7 +294,7 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
-  
+
       - name: tag the image
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
@@ -265,7 +312,58 @@ jobs:
 
       - name: ensure systemd container is gone
         run: sudo podman ps -a
-        
+
+  systemd-enable-validate:
+    runs-on: ubuntu-latest
+    needs: [ build , build-systemd-amd ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: pull systemd amd artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: systemd-image-amd
+          path: /tmp
+
+      - name: Load the systemd image
+        run: sudo podman load -i /tmp/systemd-amd.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-enable.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: ensure systemd containers are gone
+        run: sudo podman ps -a
+
+      - name: ensure httpd.service is running
+        run:  sudo systemctl is-active --quiet httpd.service
+
   ansible-validate:
     runs-on: ubuntu-latest
     needs: [ build, build-ansible-amd ]
@@ -508,7 +606,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -535,7 +633,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -691,3 +789,47 @@ jobs:
           podman manifest add --arch arm64 quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible-arm:latest
           podman manifest add quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible-amd:latest
           podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible:latest --format=docker
+
+  create-systemd-manifest:
+    runs-on: ubuntu-latest
+    needs: [ systemd-validate, systemd-enable-validate, build-systemd-arm ]
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: systemd-image-arm
+          path: /tmp
+
+      - name: Load the arm image
+        run: podman load -i /tmp/systemd-arm.tar
+
+      - name: pull amd artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: systemd-image-amd
+          path: /tmp
+
+      - name: Load the amd image
+        run: podman load -i /tmp/systemd-amd.tar
+
+      - name: Login to Quay
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: podman login to quay.io
+        run: podman login --authfile ~/.docker/config.json quay.io
+
+      - name: create manifest
+        run: podman manifest create quay.io/harpoon/harpoon-systemd:latest
+
+      - name: add images to manifest list
+        run: |
+          podman manifest add --arch arm64 quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd-arm:latest
+          podman manifest add quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd-amd:latest
+          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd:latest --format=docker

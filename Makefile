@@ -129,6 +129,40 @@ build-ansible-cross-build:
 .PHONY: build-ansible-cross-build
 
 ###############################
+#       systemd targets       #
+###############################
+
+systemd: build-systemd-cross-build-linux-amd64
+.PHONY: systemd
+
+_build_systemd_amd:
+	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
+	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-amd:latest \
+		--platform="linux/amd64"
+
+.PHONY: _build_systemd_amd
+
+_build_systemd_arm:
+	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
+	$(CTR_CMD) build . --file method_containers/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-arm:latest \
+		--platform="linux/arm64"
+
+.PHONY: _build_systemd_arm
+
+build-systemd-cross-build-linux-amd64:
+	+$(MAKE) _build_systemd_amd
+.PHONY: build-systemd-cross-build-linux-amd64
+
+build-systemd-cross-build-linux-arm64:
+	+$(MAKE) _build_systemd_arm
+.PHONY: build-systemd-cross-build-linux-arm64
+
+build-systemd-cross-build:
+	+$(MAKE) build-systemd-cross-build-linux-amd64
+	+$(MAKE) build-systemd-cross-build-linux-arm64
+.PHONY: build-systemd-cross-build
+
+###############################
 # dev targets                 #
 ###############################
 

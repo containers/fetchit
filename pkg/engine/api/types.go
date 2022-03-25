@@ -29,10 +29,15 @@ type Raw struct {
 
 type Systemd struct {
 	TargetPath string `mapstructure:"targetPath"`
-	User       string `mapstructure:"user"`
-	Schedule   string `mapstructure:"schedule"`
-	InitialRun bool
-	LastCommit *object.Commit
+	Root       bool   `mapstructure:"root"`
+	// If non-root, home directory must be supplied to place unit file at $HOME/.config/systemd/user
+	// NonRootHomeDir is only required if root: false
+	// For non-root, host machine $HOME/.config/systemd/user path must exist
+	NonRootHomeDir string `mapstructure:"nonRootHomeDir"`
+	Enable         bool   `mapstructure:"enable"`
+	Schedule       string `mapstructure:"schedule"`
+	InitialRun     bool
+	LastCommit     *object.Commit
 }
 
 type FileTransfer struct {

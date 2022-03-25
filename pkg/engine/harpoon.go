@@ -32,6 +32,7 @@ const (
 	defaultConfigFile = "./config.yaml"
 	defaultVolume     = "harpoon-volume"
 	harpoonImage      = "quay.io/harpoon/harpoon:latest"
+	systemdImage      = "quay.io/harpoon/harpoon-systemd:latest"
 
 	rawMethod          = "raw"
 	systemdMethod      = "systemd"
@@ -39,6 +40,7 @@ const (
 	fileTransferMethod = "filetransfer"
 	ansibleMethod      = "ansible"
 	deleteFile         = "delete"
+	systemdPathRoot    = "/etc/systemd/system"
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -136,7 +138,7 @@ func (o *HarpoonConfig) initConfig(cmd *cobra.Command) {
 	}
 
 	klog.Infof("Identifying if harpoon image exists locally")
-	if err := fetchImage(conn); err != nil {
+	if err := fetchImage(conn, harpoonImage); err != nil {
 		cobra.CheckErr(err)
 	}
 	o.Conn = conn
@@ -618,7 +620,11 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 			}
 		}
 		mo.Previous = prev
-		mo.Dest = "/etc/systemd/system"
+		if mo.Target.Systemd.Root {
+			mo.Dest = systemdPathRoot
+		} else {
+			mo.Dest = filepath.Join(mo.Target.Systemd.NonRootHomeDir, ".config", "systemd", "user")
+		}
 		return systemdPodman(ctx, mo)
 	case fileTransferMethod:
 		var prev *string = nil
@@ -752,15 +758,15 @@ func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string
 	return "", subDirTree, err
 }
 
-func fetchImage(conn context.Context) error {
-	present, err := images.Exists(conn, harpoonImage, nil)
+func fetchImage(conn context.Context, image string) error {
+	present, err := images.Exists(conn, image, nil)
 	klog.Infof("Is image present? %t", present)
 	if err != nil {
 		return err
 	}
 
 	if !present {
-		_, err = images.Pull(conn, harpoonImage, nil)
+		_, err = images.Pull(conn, image, nil)
 		if err != nil {
 			return err
 		}

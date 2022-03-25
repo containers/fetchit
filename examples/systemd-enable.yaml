@@ -3,8 +3,8 @@ targets:
 - name: harpoon
   url: http://github.com/redhat-et/harpoon
   systemd:
-    targetPath: examples/systemd/httpd.service
+    targetPath: examples/systemd
     root: true
-    enable: false
+    enable: true
     schedule: "*/1 * * * *"
   branch: main

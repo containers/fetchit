@@ -53,9 +53,7 @@ func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
 	//TODO: check file got put in the right place
 
 	// Wait for the container to exit
-	err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
-
-	return err
+	return waitAndRemoveContainer(mo.Conn, createResponse.ID)
 }
 
 func generateSpec(method, file, copyFile, dest string, target *api.Target) *specgen.SpecGenerator {
