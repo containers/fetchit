@@ -51,9 +51,11 @@ targets:
 ```
 
 #### Launch using systemd
-Two systemd files are provided to allow for Harpoon to either be ran as a user or as root. The files are differentiated by .root and .user.
+Two systemd files are provided to allow for Harpoon to run as a user or as root. The files are differentiated by .root and .user.
 
-Ensure that the `config.yaml` is correctly defined in the systemd service file before attmepting to start the service.
+Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
+
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
 For root
 ```
@@ -64,6 +66,8 @@ systemctl enable harpoon --now
 
 For user ensure that the path for the configuration file `/home/harpooner/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
 
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
+
 ```
 mkdir -p ~/.config/systemd/user/
 setenforce 0
@@ -73,7 +77,10 @@ systemctl --user enable harpoon --now
 
 #### Manually launch the harpoon container using a podman volume
 
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
+
 ```
+setenforce 0
 podman run -d --rm --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
 
