@@ -193,7 +193,7 @@ func (hc *HarpoonConfig) runTargets() {
 	allTargets := make(map[string]map[string]string)
 	for _, target := range hc.Targets {
 		if err := hc.getClone(target); err != nil {
-			log.Fatal(err)
+			log.Fatalf("Repo: %s, error cloning repository: %v", target.Name, err)
 		}
 		allTargets[target.Name] = target.MethodSchedules
 	}
@@ -295,17 +295,17 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Raw.TargetPath, rawMethod)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, rawMethod, err)
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Raw.TargetPath, &tag, subDirTree)
 		if err != nil {
-			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, rawMethod, err)
+			checkInitialErr(target.Name, rawMethod, err)
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, rawMethod, err)
+		checkProcessingErr(target.Name, rawMethod, err)
 	}
 }
 
@@ -325,17 +325,17 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Ansible.TargetPath, ansibleMethod)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, ansibleMethod, err)
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Ansible.TargetPath, &tag, subDirTree)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, ansibleMethod, err)
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, ansibleMethod, err)
+		checkProcessingErr(target.Name, ansibleMethod, err)
 	}
 }
 
@@ -355,17 +355,17 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Systemd.TargetPath, systemdMethod)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, systemdMethod, err)
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Systemd.TargetPath, &tag, subDirTree)
 		if err != nil {
-			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, systemdMethod, err)
+			checkInitialErr(target.Name, systemdMethod, err)
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, systemdMethod, err)
+		checkProcessingErr(target.Name, systemdMethod, err)
 	}
 }
 
@@ -384,17 +384,17 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.FileTransfer.TargetPath, fileTransferMethod)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, fileTransferMethod, err)
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.FileTransfer.TargetPath, nil, subDirTree)
 		if err != nil {
-			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, fileTransferMethod, err)
+			checkInitialErr(target.Name, fileTransferMethod, err)
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, fileTransferMethod, err)
+		checkProcessingErr(target.Name, fileTransferMethod, err)
 	}
 }
 
@@ -414,17 +414,17 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 	if initial {
 		fileName, subDirTree, err := hc.getPathOrTree(target, target.Kube.TargetPath, kubeMethod)
 		if err != nil {
-			log.Fatal(err)
+			checkInitialErr(target.Name, kubeMethod, err)
 		}
 		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Kube.TargetPath, &tag, subDirTree)
 		if err != nil {
-			log.Fatalf("Repo: %s Method: %s, error while processing the repository: %s", target.Name, kubeMethod, err)
+			checkInitialErr(target.Name, kubeMethod, err)
 		}
 		mo.Path = targetFile
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
-		log.Fatalf("Repo: %s Method: %s, error while processing repository changes: %v", target.Name, kubeMethod, err)
+		checkProcessingErr(target.Name, kubeMethod, err)
 	}
 }
 
@@ -551,17 +551,17 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 	thisMethodChanges := make(map[*object.Change]string)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("Repo: %s, Method: %s, error while opening the repository: %v", directory, method, err)
+		return thisMethodChanges, nil, fmt.Errorf("error while opening the repository: %v", err)
 	}
 	w, err := gitRepo.Worktree()
 	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("Repo: %s Method: %s, error while opening the worktree: %s", directory, method, err)
+		return thisMethodChanges, nil, fmt.Errorf("error while opening the worktree: %v", err)
 	}
 	// ... retrieve the tree from this method's last fetched commit
 	beforeFetchTree, _, err := getTree(gitRepo, commit)
 	if err != nil {
 		// TODO: if LastCommit has disappeared, need to reset and set initial=true instead of exit
-		return thisMethodChanges, nil, fmt.Errorf("Repo: %s Method: %s, error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", directory, method, err)
+		return thisMethodChanges, nil, fmt.Errorf("error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", err)
 	}
 
 	// Fetch the latest changes from the origin remote and merge into the current branch
@@ -580,7 +580,7 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 		Branch: refName,
 		Force:  true,
 	}); err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("Repo: %s, error checking out latest branch %s: %v", directory, ref, err)
+		return thisMethodChanges, nil, fmt.Errorf("error checking out latest branch: %v", err)
 	}
 
 	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
@@ -590,7 +590,7 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 
 	changes, err := afterFetchTree.Diff(beforeFetchTree)
 	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("%s: error while generating diff: %s", directory, err)
+		return thisMethodChanges, nil, fmt.Errorf("error while generating diff: %v", err)
 	}
 	// the change logic is backwards "From" is actually "To"
 	for _, change := range changes {
@@ -608,7 +608,10 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, change *object.Change) error {
 	switch mo.Method {
 	case rawMethod:
-		var prev *string = getChangeString(change)
+		prev, err := getChangeString(change)
+		if err != nil {
+			return err
+		}
 		mo.Previous = prev
 		return rawPodman(ctx, mo)
 	case systemdMethod:
@@ -637,7 +640,10 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 		mo.Dest = mo.Target.FileTransfer.DestinationDirectory
 		return fileTransferPodman(ctx, mo)
 	case kubeMethod:
-		var prev *string = getChangeString(change)
+		prev, err := getChangeString(change)
+		if err != nil {
+			return err
+		}
 		mo.Previous = prev
 		return kubePodman(ctx, mo)
 	case ansibleMethod:
@@ -647,21 +653,21 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 	}
 }
 
-func getChangeString(change *object.Change) *string {
+func getChangeString(change *object.Change) (*string, error) {
 	if change != nil {
 		_, to, err := change.Files()
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		if to != nil {
 			s, err := to.Contents()
 			if err != nil {
-				log.Fatal(err)
+				return nil, err
 			}
-			return &s
+			return &s, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // This assumes unique urls - only 1 git repo per "directory"
@@ -671,7 +677,7 @@ func (hc *HarpoonConfig) getClone(target *api.Target) error {
 	directory := filepath.Base(target.Url)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
-		return fmt.Errorf("Repo: %s, error while fetching local clone: %s", target.Name, err)
+		return fmt.Errorf("error fetching local clone: %v", err)
 	}
 	var exists bool
 	if _, err := os.Stat(directory); err == nil {
@@ -681,7 +687,7 @@ func (hc *HarpoonConfig) getClone(target *api.Target) error {
 			return fmt.Errorf("%s exists but is not a git repository", directory)
 		}
 	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("error retrieving git repository: %s: %v", directory, err)
+		return fmt.Errorf("error retrieving git repository: %v", err)
 	}
 
 	if !exists {
@@ -700,7 +706,7 @@ func (hc *HarpoonConfig) getClone(target *api.Target) error {
 			SingleBranch:  true,
 		})
 		if err != nil {
-			return fmt.Errorf("Error while cloning the repository: %s", err)
+			return fmt.Errorf("error cloning the repository: %v", err)
 		}
 	}
 	return nil
@@ -738,7 +744,7 @@ func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string
 	directory := filepath.Base(target.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
-		log.Fatalf("Repo: %s, error while opening the repository: %s", directory, err)
+		return "", nil, fmt.Errorf("error while opening repository %s: %v", directory, err)
 	}
 	tree, _, err := getTree(gitRepo, nil)
 	if err != nil {
@@ -756,6 +762,14 @@ func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string
 		}
 	}
 	return "", subDirTree, err
+}
+
+func checkInitialErr(name, method string, err error) {
+	log.Fatalf("Repo: %s Method: %s, error with initial processing of repository: %v", name, method, err)
+}
+
+func checkProcessingErr(name, method string, err error) {
+	log.Fatalf("Repo: %s Method: %s, error processing repository: %v", name, method, err)
 }
 
 func fetchImage(conn context.Context, image string) error {

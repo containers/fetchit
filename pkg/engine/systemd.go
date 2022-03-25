@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,7 +14,7 @@ import (
 func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
 	klog.Infof("Deploying systemd file(s) %s", mo.Path)
 	if err := fileTransferPodman(ctx, mo); err != nil {
-		return fmt.Errorf("Repo: %s, Method: %s, %v", err)
+		return err
 	}
 	sd := mo.Target.Systemd
 	if !sd.Enable {
