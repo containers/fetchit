@@ -144,7 +144,7 @@ _build_systemd_amd:
 
 _build_systemd_arm:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build . --file method_containers/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-arm:latest \
+	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-arm:latest \
 		--platform="linux/arm64"
 
 .PHONY: _build_systemd_arm
