@@ -525,7 +525,7 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	}
 	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lastCommit)
 	if err != nil {
-		return utils.WrapErr(err, "error getting diff for method %s, last commit %s: %s", mo.Method, lastCommit.String())
+		return utils.WrapErr(err, "error getting diff for method %s, last commit %s", mo.Method, lastCommit.String())
 	}
 	hc.setLastCommit(mo.Target, mo.Method, newCommit)
 	if len(changesThisMethod) == 0 {
@@ -536,7 +536,7 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	for change, path := range changesThisMethod {
 		mo.Path = path
 		if err := hc.EngineMethod(ctx, mo, change); err != nil {
-			return utils.WrapErr(err, "error running engine with method %s, for file %s, for commit %s: %s", mo.Method, mo.Path, newCommit)
+			return utils.WrapErr(err, "error running engine with method %s, for file %s, for commit %s", mo.Method, mo.Path, newCommit)
 
 		}
 	}
@@ -586,7 +586,7 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 		Branch: refName,
 		Force:  true,
 	}); err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error checking out latest branch %s: %v", directory, ref, err)
+		return thisMethodChanges, nil, fmt.Errorf("error checking out latest branch %s: %v", ref, err)
 	}
 
 	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
