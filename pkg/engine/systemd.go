@@ -28,7 +28,7 @@ func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
 
 func enableSystemdService(conn context.Context, root bool, systemdPath, service, repoName string) error {
 	klog.Infof("Identifying if systemd image exists locally")
-	if err := fetchImage(conn, systemdImage); err != nil {
+	if err := utils.FetchImage(conn, systemdImage); err != nil {
 		return err
 	}
 	os.Setenv("ROOT", "true")
