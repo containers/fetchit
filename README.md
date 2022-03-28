@@ -20,6 +20,19 @@ To enable the socker for root:
 systemctl enable podman.socket
 ```
 
+
+#### Verify running containers before deploying harpoon.
+
+```
+podman ps
+
+CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+```
+
+
+### Harpoon launch options
+Harpoon and can be started manually or launched via systemd. 
+
 Define the parameters in your `config.yaml` to relate to your git repository.
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
 
@@ -37,18 +50,37 @@ targets:
     schedule: "*/1 * * * *"
 ```
 
-#### Verify running containers before deploying harpoon.
+#### Launch using systemd
+Two systemd files are provided to allow for Harpoon to run as a user or as root. The files are differentiated by .root and .user.
+
+Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
+
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
+
+For root
+```
+setenforce 0
+cp systemd/harpoon.root /etc/systemd/system/harpoon.service
+systemctl enable harpoon --now
+```
+
+For user ensure that the path for the configuration file `/home/harpooner/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
+
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
 ```
-podman ps
-
-CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
+mkdir -p ~/.config/systemd/user/
+setenforce 0
+cp systemd/harpoon.user ~/.config/systemd/user/
+systemctl --user enable harpoon --now
 ```
 
+#### Manually launch the harpoon container using a podman volume
 
-#### Launch the harpoon container using a podman volume
+NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
 ```
+setenforce 0
 podman run -d --rm --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
 
