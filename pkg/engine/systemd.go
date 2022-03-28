@@ -2,20 +2,21 @@ package engine
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/redhat-et/harpoon/pkg/engine/utils"
 	"k8s.io/klog/v2"
 )
 
 func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
 	klog.Infof("Deploying systemd file(s) %s", mo.Path)
 	if err := fileTransferPodman(ctx, mo); err != nil {
-		return fmt.Errorf("Repo: %s, Method: %s, %v", err)
+		return utils.WrapErr(err, "Error deploying systemd file(s) Repo: %s, Path: %s", mo.Target.Name, mo.Target.Systemd.TargetPath)
 	}
 	sd := mo.Target.Systemd
 	if !sd.Enable {
@@ -27,7 +28,7 @@ func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
 
 func enableSystemdService(conn context.Context, root bool, systemdPath, service, repoName string) error {
 	klog.Infof("Identifying if systemd image exists locally")
-	if err := fetchImage(conn, systemdImage); err != nil {
+	if err := utils.FetchImage(conn, systemdImage); err != nil {
 		return err
 	}
 	os.Setenv("ROOT", "true")

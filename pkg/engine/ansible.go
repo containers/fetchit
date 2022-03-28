@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/redhat-et/harpoon/pkg/engine/utils"
 
 	"k8s.io/klog/v2"
 )
@@ -22,20 +22,8 @@ func ansiblePodman(ctx context.Context, mo *FileMountOptions) error {
 	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
 
 	klog.Infof("Identifying if harpoon-ansible image exists locally")
-	// Pull image if it doesn't exist
-	var present bool
-	var err error
-	present, err = images.Exists(mo.Conn, sshImage, nil)
-	klog.Infof("Is image present? %t", present)
-	if err != nil {
+	if err := utils.FetchImage(mo.Conn, sshImage); err != nil {
 		return err
-	}
-
-	if !present {
-		_, err = images.Pull(mo.Conn, sshImage, nil)
-		if err != nil {
-			return err
-		}
 	}
 
 	s := specgen.NewSpecGenerator(sshImage, false)
