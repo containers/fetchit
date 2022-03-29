@@ -1,0 +1,9 @@
+Image: "docker.io/mmushad/simple-webapp-color:latest"
+Name: "colors1"
+Env:
+  APP_COLOR: "pink"
+  tree: "trunk"
+Ports:
+  - container_port: 8080
+    host_port: 9080
+    range: 0
