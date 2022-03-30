@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -10,6 +11,8 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/images"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/redhat-et/harpoon/pkg/engine/utils"
+	"gopkg.in/yaml.v3"
 
 	"k8s.io/klog/v2"
 )
@@ -27,22 +30,46 @@ import (
 }
 */
 
+type port struct {
+	HostIP        string `json:"host_ip" yaml:"host_ip"`
+	ContainerPort uint16 `json:"container_port" yaml:"container_port"`
+	HostPort      uint16 `json:"host_port" yaml:"host_port"`
+	Range         uint16 `json:"range" yaml:"range"`
+	Protocol      string `json:"protocol" yaml:"protocol"`
+}
+
+type mount struct {
+	Destination string   `json:"destination" yaml:"destination"`
+	Type        string   `json:"type,omitempty" yaml:"type,omitempty" platform:"linux,solaris,zos"`
+	Source      string   `json:"source,omitempty" yaml:"source,omitempty"`
+	Options     []string `json:"options,omitempty" yaml:"options,omitempty"`
+}
+
+type namedVolume struct {
+	Name    string   `json:"name" yaml:"name"`
+	Dest    string   `json:"dest" yaml:"dest"`
+	Options []string `json:"options" yaml:"options"`
+}
+
 type RawPod struct {
-	Image   string                 `json:"Image"`
-	Name    string                 `json:"Name"`
-	Env     map[string]string      `json:"Env"`
-	Ports   []types.PortMapping    `json:"Ports"`
-	Mounts  []specs.Mount          `json:"Mounts"`
-	Volumes []*specgen.NamedVolume `json:"Volumes"`
+	Image   string            `json:"Image" yaml:"Image"`
+	Name    string            `json:"Name" yaml:"Name"`
+	Env     map[string]string `json:"Env" yaml:"Env"`
+	Ports   []port            `json:"Ports" yaml:"Ports"`
+	Mounts  []mount           `json:"Mounts" yaml:"Mounts"`
+	Volumes []namedVolume     `json:"Volumes" yaml:"Volumes"`
 }
 
 func rawPodman(ctx context.Context, mo *FileMountOptions) error {
 
 	// Delete previous file's podxz
 	if mo.Previous != nil {
-		raw := rawPodFromBytes([]byte(*mo.Previous))
+		raw, err := rawPodFromBytes([]byte(*mo.Previous))
+		if err != nil {
+			return err
+		}
 
-		err := deleteContainer(mo.Conn, raw.Name)
+		err = deleteContainer(mo.Conn, raw.Name)
 		if err != nil {
 			return err
 		}
@@ -56,12 +83,15 @@ func rawPodman(ctx context.Context, mo *FileMountOptions) error {
 
 	klog.Infof("Creating podman container from %s", mo.Path)
 
-	rawJson, err := ioutil.ReadFile(mo.Path)
+	rawFile, err := ioutil.ReadFile(mo.Path)
 	if err != nil {
 		return err
 	}
 
-	raw := rawPodFromBytes(rawJson)
+	raw, err := rawPodFromBytes(rawFile)
+	if err != nil {
+		return err
+	}
 
 	klog.Infof("Identifying if image exists locally")
 
@@ -75,7 +105,7 @@ func rawPodman(ctx context.Context, mo *FileMountOptions) error {
 		return err
 	}
 
-	s := createSpecGen(raw)
+	s := createSpecGen(*raw)
 
 	createResponse, err := containers.CreateWithSpec(mo.Conn, s, nil)
 	if err != nil {
@@ -91,14 +121,56 @@ func rawPodman(ctx context.Context, mo *FileMountOptions) error {
 	return nil
 }
 
+func convertMounts(mounts []mount) []specs.Mount {
+	result := []specs.Mount{}
+	for _, m := range mounts {
+		toAppend := specs.Mount{
+			Destination: m.Destination,
+			Type:        m.Type,
+			Source:      m.Source,
+			Options:     m.Options,
+		}
+		result = append(result, toAppend)
+	}
+	return result
+}
+
+func convertPorts(ports []port) []types.PortMapping {
+	result := []types.PortMapping{}
+	for _, p := range ports {
+		toAppend := types.PortMapping{
+			HostIP:        p.HostIP,
+			ContainerPort: p.ContainerPort,
+			HostPort:      p.HostPort,
+			Range:         p.Range,
+			Protocol:      p.Protocol,
+		}
+		result = append(result, toAppend)
+	}
+	return result
+}
+
+func convertVolumes(namedVolumes []namedVolume) []*specgen.NamedVolume {
+	result := []*specgen.NamedVolume{}
+	for _, n := range namedVolumes {
+		toAppend := specgen.NamedVolume{
+			Name:    n.Name,
+			Dest:    n.Dest,
+			Options: n.Options,
+		}
+		result = append(result, &toAppend)
+	}
+	return result
+}
+
 func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 	// Create a new container
 	s := specgen.NewSpecGenerator(raw.Image, false)
 	s.Name = raw.Name
 	s.Env = map[string]string(raw.Env)
-	s.Mounts = []specs.Mount(raw.Mounts)
-	s.PortMappings = []types.PortMapping(raw.Ports)
-	s.Volumes = []*specgen.NamedVolume(raw.Volumes)
+	s.Mounts = convertMounts(raw.Mounts)
+	s.PortMappings = convertPorts(raw.Ports)
+	s.Volumes = convertVolumes(raw.Volumes)
 	s.RestartPolicy = "always"
 	return s
 }
@@ -136,10 +208,21 @@ func detectOrFetchImage(conn context.Context, imageName string, force bool) erro
 	return nil
 }
 
-func rawPodFromBytes(b []byte) RawPod {
-	raw := RawPod{Ports: []types.PortMapping{}}
-	json.Unmarshal(b, &raw)
-	return raw
+func rawPodFromBytes(b []byte) (*RawPod, error) {
+	b = bytes.TrimSpace(b)
+	raw := RawPod{}
+	if b[0] == '{' {
+		err := json.Unmarshal(b, &raw)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal json")
+		}
+	} else {
+		err := yaml.Unmarshal(b, &raw)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal yaml")
+		}
+	}
+	return &raw, nil
 }
 
 // Using this might not be necessary
