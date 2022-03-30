@@ -1,5 +1,5 @@
 Image: "docker.io/mmushad/simple-webapp-color:latest"
-Name: "colors1"
+Name: "colors2"
 Env:
   APP_COLOR: "pink"
   tree: "trunk"
