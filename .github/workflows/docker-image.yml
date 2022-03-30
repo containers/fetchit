@@ -147,7 +147,10 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
-  
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/raw-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
@@ -180,7 +183,10 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
-  
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/default-volume.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
@@ -400,6 +406,9 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/harpoon/harpoon-ansible-amd:latest quay.io/harpoon/harpoon-ansible:latest 
 
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ansible.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
@@ -465,7 +474,10 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
-  
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        
       - name: Start harpoon
         run: sudo podman run -d --name harpoon -v ./examples/kube-play-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
