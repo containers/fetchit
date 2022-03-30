@@ -1,4 +1,4 @@
-Image: "docker.io/mmushad/simple-webapp-color:latest"
+Image: "docker.io/mmumshad/simple-webapp-color:latest"
 Name: "colors2"
 Env:
   APP_COLOR: "pink"
