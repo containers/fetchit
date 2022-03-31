@@ -578,6 +578,10 @@ jobs:
       - name: Load the image
         run: sudo podman load -i /tmp/harpoon.tar
 
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        
       - name: set values relating to the current env
         run: | 
           sed -i 's|  url: http://github.com/redhat-et/harpoon|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
