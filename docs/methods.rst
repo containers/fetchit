@@ -61,6 +61,7 @@ The pullImage field is useful if a container image uses the latest tag. This wil
 A Raw JSON file can contain the following fields.
 
 .. code-block:: json
+
    {
     "Image":"docker.io/mmumshad/simple-webapp-color:latest",
     "Name": "colors1",
