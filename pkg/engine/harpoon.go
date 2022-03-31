@@ -237,7 +237,7 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 	defer target.Mu.Unlock()
 
 	initial := target.Raw.InitialRun
-	tag := []string{".json"}
+	tag := []string{".json", ".yaml", ".yml"}
 	var targetFile string
 	mo := &FileMountOptions{
 		Conn:   hc.Conn,
@@ -648,7 +648,7 @@ func (hc *HarpoonConfig) getClone(target *api.Target) error {
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
 			Auth: &http.BasicAuth{
-				Username: user,
+				Username: user, // the value of this field should not matter when using a PAT
 				Password: hc.PAT,
 			},
 			URL:           target.Url,
