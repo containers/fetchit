@@ -7,9 +7,11 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"strings"
 
+	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/play"
-	"github.com/containers/podman/v4/pkg/bindings/pods"
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/redhat-et/harpoon/pkg/engine/utils"
 
@@ -39,9 +41,12 @@ func kubePodman(ctx context.Context, mo *FileMountOptions) error {
 			return utils.WrapErr(err, "Error reading file")
 		}
 
+		// Try stopping the pods, don't care if they don't exist
 		err = stopPods(mo.Conn, kubeYaml)
 		if err != nil {
-			return utils.WrapErr(err, "Error stopping pods")
+			if !strings.Contains(err.Error(), "no such pod") {
+				return utils.WrapErr(err, "Error stopping pods")
+			}
 		}
 
 		err = createPods(mo.Conn, mo.Path, kubeYaml)
@@ -53,74 +58,22 @@ func kubePodman(ctx context.Context, mo *FileMountOptions) error {
 	return nil
 }
 
-func stopPods(conn context.Context, input []byte) error {
-	podList, err := podFromBytes(input)
+func stopPods(ctx context.Context, podSpec []byte) error {
+	conn, err := bindings.GetClient(ctx)
 	if err != nil {
-		return utils.WrapErr(err, "Error getting list of pods in spec")
+		return utils.WrapErr(err, "Error getting podman connection")
 	}
 
-	podNameList, err := getPodNames(podList)
+	response, err := conn.DoRequest(ctx, bytes.NewReader(podSpec), http.MethodDelete, "/play/kube", nil, nil)
 	if err != nil {
-		return utils.WrapErr(err, "Error getting list of pod names")
+		return utils.WrapErr(err, "Error making podman API call to delete pod")
 	}
 
-	podMap := podMapFromList(podNameList)
-
-	report, err := pods.List(conn, nil)
-	if err != nil {
-		return utils.WrapErr(err, "Error getting list of pods from podman")
+	var report entities.PlayKubeReport
+	if err := response.Process(&report); err != nil {
+		return utils.WrapErr(err, "Error processing podman response when deleting pod")
 	}
 
-	runningPodNameList := reportToPodNameList(report)
-
-	podsToBeDeleted := filterPods(runningPodNameList, podMap)
-
-	err = tearDownPods(conn, podsToBeDeleted)
-	if err != nil {
-		return utils.WrapErr(err, "Error tearing down pods")
-	}
-
-	return nil
-}
-
-func podMapFromList(podNameList []string) map[string]bool {
-	podMap := make(map[string]bool)
-	for _, pod := range podNameList {
-		podMap[pod] = true
-	}
-	return podMap
-}
-
-func reportToPodNameList(report []*entities.ListPodsReport) []string {
-	ret := make([]string, 0)
-	for _, r := range report {
-		ret = append(ret, r.Name)
-	}
-	return ret
-}
-
-func filterPods(runningPodNameList []string, podMap map[string]bool) []string {
-	ret := make([]string, 0)
-	for _, p := range runningPodNameList {
-		if _, ok := podMap[p]; ok {
-			ret = append(ret, p)
-		}
-	}
-
-	return ret
-}
-
-func tearDownPods(ctx context.Context, podNameList []string) error {
-	for _, podName := range podNameList {
-		_, err := pods.Stop(ctx, podName, nil)
-		if err != nil {
-			return utils.WrapErr(err, "Error stopping pod %s", podName)
-		}
-		_, err = pods.Remove(ctx, podName, nil)
-		if err != nil {
-			return utils.WrapErr(err, "Error removing pod %s", podName)
-		}
-	}
 	return nil
 }
 
@@ -144,20 +97,6 @@ func createPods(ctx context.Context, path string, specs []byte) error {
 
 	klog.Infof("Created pods from spec in %s\n", path)
 	return nil
-}
-
-func getPodNames(podList []v1.Pod) ([]string, error) {
-	ret := make([]string, 0)
-
-	for _, pod := range podList {
-		if pod.ObjectMeta.Name != "" {
-			ret = append(ret, pod.ObjectMeta.Name)
-		} else {
-			return nil, errors.New("pod has no name")
-		}
-	}
-
-	return ret, nil
 }
 
 func podFromBytes(input []byte) ([]v1.Pod, error) {
