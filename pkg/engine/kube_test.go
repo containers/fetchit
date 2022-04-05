@@ -1,11 +1,9 @@
 package engine
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/containers/podman/v4/pkg/domain/entities"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,70 +165,4 @@ func TestPodFromBytes(t *testing.T) {
 	}
 
 	comparePodList(t, expectedPodList, actualPodList)
-}
-
-var podListMissingName = []v1.Pod{
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-	},
-}
-
-func TestGetPodNames(t *testing.T) {
-	_, err := getPodNames(podListMissingName)
-	if !strings.Contains(err.Error(), "pod has no name") {
-		t.Errorf("expected no error: %s", err)
-	}
-	res, err := getPodNames(expectedPodList)
-	if err != nil {
-		t.Errorf("expected no error: %s", err)
-	}
-	if !reflect.DeepEqual(res, []string{"test_pod1", "test_pod2"}) {
-		t.Errorf("expected pods to stop: %v, got %v", []string{"test_pod1"}, res)
-	}
-}
-
-func TestPodMapFromList(t *testing.T) {
-	expected := map[string]bool{
-		"test1": true,
-		"test2": true,
-	}
-	s := []string{"test1", "test2"}
-	actual := podMapFromList(s)
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %v, got %v", expected, actual)
-	}
-}
-
-func TestReportToPodNameList(t *testing.T) {
-	lpr := entities.ListPodsReport{
-		Name: "test",
-	}
-
-	report := []*entities.ListPodsReport{
-		&lpr,
-		&lpr,
-	}
-	expected := []string{"test", "test"}
-	actual := reportToPodNameList(report)
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %v, got %v", expected, actual)
-	}
-}
-
-func TestFilterPods(t *testing.T) {
-	expected := []string{"test1", "test2"}
-	l := []string{"test1", "test2", "test3"}
-	m := map[string]bool{
-		"test1": true,
-		"test2": true,
-		"test4": true,
-	}
-	actual := filterPods(l, m)
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %v, got %v", expected, actual)
-	}
-
 }
