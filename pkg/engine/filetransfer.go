@@ -25,8 +25,6 @@ func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
 			return err
 		}
 
-		// TODO: check file got removed
-
 		err = waitAndRemoveContainer(mo.Conn, createResponse.ID)
 		if err != nil {
 			return err
@@ -49,8 +47,6 @@ func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
 	if err != nil {
 		return err
 	}
-
-	//TODO: check file got put in the right place
 
 	// Wait for the container to exit
 	return waitAndRemoveContainer(mo.Conn, createResponse.ID)
