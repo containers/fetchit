@@ -16,10 +16,10 @@ import (
 
 const stopped = define.ContainerStateStopped
 
-func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
-	if mo.Previous != nil {
-		pathToRemove := filepath.Join(mo.Dest, filepath.Base(*mo.Previous))
-		s := generateSpecRemove(mo.Method, filepath.Base(pathToRemove), pathToRemove, mo.Dest, mo.Target)
+func fileTransferPodman(ctx context.Context, mo *FileMountOptions, prev *string, dest string) error {
+	if prev != nil {
+		pathToRemove := filepath.Join(dest, filepath.Base(*prev))
+		s := generateSpecRemove(mo.Method, filepath.Base(pathToRemove), pathToRemove, dest, mo.Target)
 		createResponse, err := createAndStartContainer(mo.Conn, s)
 		if err != nil {
 			return err
@@ -40,9 +40,9 @@ func fileTransferPodman(ctx context.Context, mo *FileMountOptions) error {
 	file := filepath.Base(mo.Path)
 
 	source := filepath.Join("/opt", mo.Path)
-	copyFile := (source + " " + mo.Dest)
+	copyFile := (source + " " + dest)
 
-	s := generateSpec(mo.Method, file, copyFile, mo.Dest, mo.Target)
+	s := generateSpec(mo.Method, file, copyFile, dest, mo.Target)
 	createResponse, err := createAndStartContainer(mo.Conn, s)
 	if err != nil {
 		return err

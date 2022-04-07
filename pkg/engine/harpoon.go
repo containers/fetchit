@@ -66,12 +66,10 @@ func NewHarpoonConfig() *HarpoonConfig {
 
 type FileMountOptions struct {
 	// Conn holds the podman client
-	Conn     context.Context
-	Path     string
-	Dest     string
-	Method   string
-	Target   *api.Target
-	Previous *string
+	Conn   context.Context
+	Path   string
+	Method string
+	Target *api.Target
 }
 
 var harpoonConfig *HarpoonConfig
@@ -575,6 +573,7 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 	return thisMethodChanges, newestCommit, nil
 }
 
+// Each engineMethod call now owns the prev and dest variables instead of being shared in mo
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, change *object.Change) error {
 	switch mo.Method {
 	case rawMethod:
@@ -582,8 +581,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 		if err != nil {
 			return err
 		}
-		mo.Previous = prev
-		return rawPodman(ctx, mo)
+		return rawPodman(ctx, mo, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		var prev *string = nil
@@ -592,13 +590,13 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 				prev = &change.To.Name
 			}
 		}
-		mo.Previous = prev
+		var dest string
 		if mo.Target.Systemd.Root {
-			mo.Dest = systemdPathRoot
+			dest = systemdPathRoot
 		} else {
-			mo.Dest = filepath.Join(mo.Target.Systemd.NonRootHomeDir, ".config", "systemd", "user")
+			dest = filepath.Join(mo.Target.Systemd.NonRootHomeDir, ".config", "systemd", "user")
 		}
-		return systemdPodman(ctx, mo)
+		return systemdPodman(ctx, mo, prev, dest)
 	case fileTransferMethod:
 		var prev *string = nil
 		if change != nil {
@@ -606,16 +604,14 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 				prev = &change.To.Name
 			}
 		}
-		mo.Previous = prev
-		mo.Dest = mo.Target.FileTransfer.DestinationDirectory
-		return fileTransferPodman(ctx, mo)
+		dest := mo.Target.FileTransfer.DestinationDirectory
+		return fileTransferPodman(ctx, mo, prev, dest)
 	case kubeMethod:
 		prev, err := getChangeString(change)
 		if err != nil {
 			return err
 		}
-		mo.Previous = prev
-		return kubePodman(ctx, mo)
+		return kubePodman(ctx, mo, prev)
 	case ansibleMethod:
 		return ansiblePodman(ctx, mo)
 	default:
