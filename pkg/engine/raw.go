@@ -60,11 +60,11 @@ type RawPod struct {
 	Volumes []namedVolume     `json:"Volumes" yaml:"Volumes"`
 }
 
-func rawPodman(ctx context.Context, mo *FileMountOptions) error {
+func rawPodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 
 	// Delete previous file's podxz
-	if mo.Previous != nil {
-		raw, err := rawPodFromBytes([]byte(*mo.Previous))
+	if prev != nil {
+		raw, err := rawPodFromBytes([]byte(*prev))
 		if err != nil {
 			return err
 		}

@@ -22,14 +22,14 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 )
 
-func kubePodman(ctx context.Context, mo *FileMountOptions) error {
+func kubePodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 
 	if mo.Path != deleteFile {
 		klog.Infof("Creating podman container from %s using kube method", mo.Path)
 	}
 
-	if mo.Previous != nil {
-		err := stopPods(mo.Conn, []byte(*mo.Previous))
+	if prev != nil {
+		err := stopPods(mo.Conn, []byte(*prev))
 		if err != nil {
 			return utils.WrapErr(err, "Error stopping pods")
 		}

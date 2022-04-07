@@ -13,9 +13,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
+func systemdPodman(ctx context.Context, mo *FileMountOptions, prev *string, dest string) error {
 	klog.Infof("Deploying systemd file(s) %s", mo.Path)
-	if err := fileTransferPodman(ctx, mo); err != nil {
+	if err := fileTransferPodman(ctx, mo, prev, dest); err != nil {
 		return utils.WrapErr(err, "Error deploying systemd file(s) Repo: %s, Path: %s", mo.Target.Name, mo.Target.Systemd.TargetPath)
 	}
 	sd := mo.Target.Systemd
@@ -23,7 +23,7 @@ func systemdPodman(ctx context.Context, mo *FileMountOptions) error {
 		klog.Infof("Repo: %s, systemd target successfully processed", mo.Target.Name)
 		return nil
 	}
-	return enableSystemdService(mo.Conn, sd.Root, mo.Dest, filepath.Base(mo.Path), mo.Target.Name)
+	return enableSystemdService(mo.Conn, sd.Root, dest, filepath.Base(mo.Path), mo.Target.Name)
 }
 
 func enableSystemdService(conn context.Context, root bool, systemdPath, service, repoName string) error {
