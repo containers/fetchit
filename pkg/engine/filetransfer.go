@@ -16,7 +16,7 @@ import (
 
 const stopped = define.ContainerStateStopped
 
-func fileTransferPodman(ctx context.Context, mo *FileMountOptions, prev *string, dest string) error {
+func fileTransferPodman(ctx context.Context, mo *FileMountOptions, path, dest string, prev *string) error {
 	if prev != nil {
 		pathToRemove := filepath.Join(dest, filepath.Base(*prev))
 		s := generateSpecRemove(mo.Method, filepath.Base(pathToRemove), pathToRemove, dest, mo.Target)
@@ -31,15 +31,15 @@ func fileTransferPodman(ctx context.Context, mo *FileMountOptions, prev *string,
 		}
 	}
 
-	if mo.Path == deleteFile {
+	if path == deleteFile {
 		return nil
 	}
 
-	klog.Infof("Deploying file(s) %s", mo.Path)
+	klog.Infof("Deploying file(s) %s", path)
 
-	file := filepath.Base(mo.Path)
+	file := filepath.Base(path)
 
-	source := filepath.Join("/opt", mo.Path)
+	source := filepath.Join("/opt", path)
 	copyFile := (source + " " + dest)
 
 	s := generateSpec(mo.Method, file, copyFile, dest, mo.Target)
