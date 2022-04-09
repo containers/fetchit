@@ -11,14 +11,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func ansiblePodman(ctx context.Context, mo *FileMountOptions) error {
+func ansiblePodman(ctx context.Context, mo *FileMountOptions, path string) error {
 	// TODO: add logic to remove
-	if mo.Path == deleteFile {
+	if path == deleteFile {
 		return nil
 	}
-	klog.Infof("Deploying Ansible playbook %s\n", mo.Path)
+	klog.Infof("Deploying Ansible playbook %s\n", path)
 
-	copyFile := ("/opt/" + mo.Path)
+	copyFile := ("/opt/" + path)
 	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
 
 	klog.Infof("Identifying if harpoon-ansible image exists locally")

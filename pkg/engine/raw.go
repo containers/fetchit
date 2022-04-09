@@ -60,7 +60,7 @@ type RawPod struct {
 	Volumes []namedVolume     `json:"Volumes" yaml:"Volumes"`
 }
 
-func rawPodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
+func rawPodman(ctx context.Context, mo *FileMountOptions, path string, prev *string) error {
 
 	// Delete previous file's podxz
 	if prev != nil {
@@ -77,13 +77,13 @@ func rawPodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 		klog.Infof("Deleted podman container %s", raw.Name)
 	}
 
-	if mo.Path == deleteFile {
+	if path == deleteFile {
 		return nil
 	}
 
-	klog.Infof("Creating podman container from %s", mo.Path)
+	klog.Infof("Creating podman container from %s", path)
 
-	rawFile, err := ioutil.ReadFile(mo.Path)
+	rawFile, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}

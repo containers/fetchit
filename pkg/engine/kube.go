@@ -22,10 +22,10 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 )
 
-func kubePodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
+func kubePodman(ctx context.Context, mo *FileMountOptions, path string, prev *string) error {
 
-	if mo.Path != deleteFile {
-		klog.Infof("Creating podman container from %s using kube method", mo.Path)
+	if path != deleteFile {
+		klog.Infof("Creating podman container from %s using kube method", path)
 	}
 
 	if prev != nil {
@@ -35,8 +35,8 @@ func kubePodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 		}
 	}
 
-	if mo.Path != deleteFile {
-		kubeYaml, err := ioutil.ReadFile(mo.Path)
+	if path != deleteFile {
+		kubeYaml, err := ioutil.ReadFile(path)
 		if err != nil {
 			return utils.WrapErr(err, "Error reading file")
 		}
@@ -44,12 +44,13 @@ func kubePodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 		// Try stopping the pods, don't care if they don't exist
 		err = stopPods(mo.Conn, kubeYaml)
 		if err != nil {
+			klog.Infof("ERR: %s\n", kubeYaml)
 			if !strings.Contains(err.Error(), "no such pod") {
 				return utils.WrapErr(err, "Error stopping pods")
 			}
 		}
 
-		err = createPods(mo.Conn, mo.Path, kubeYaml)
+		err = createPods(mo.Conn, path, kubeYaml)
 		if err != nil {
 			return utils.WrapErr(err, "Error creating pod")
 		}
@@ -59,6 +60,7 @@ func kubePodman(ctx context.Context, mo *FileMountOptions, prev *string) error {
 }
 
 func stopPods(ctx context.Context, podSpec []byte) error {
+	klog.Info("IN")
 	conn, err := bindings.GetClient(ctx)
 	if err != nil {
 		return utils.WrapErr(err, "Error getting podman connection")

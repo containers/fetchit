@@ -67,7 +67,6 @@ func NewHarpoonConfig() *HarpoonConfig {
 type FileMountOptions struct {
 	// Conn holds the podman client
 	Conn   context.Context
-	Path   string
 	Method string
 	Target *api.Target
 }
@@ -242,7 +241,7 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 		Method: rawMethod,
 		Target: target,
 	}
-
+	var path string
 	if initial {
 		retry := hc.resetTarget(target, rawMethod, true, nil)
 		if retry {
@@ -258,10 +257,10 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 			_ = hc.resetTarget(target, rawMethod, false, err)
 			return
 		}
-		mo.Path = targetFile
+		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
 		target.Raw.InitialRun = hc.resetTarget(target, rawMethod, false, err)
 		return
 	}
@@ -281,6 +280,7 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 		Method: ansibleMethod,
 		Target: target,
 	}
+	var path string
 	if initial {
 		retry := hc.resetTarget(target, ansibleMethod, true, nil)
 		if retry {
@@ -296,10 +296,10 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 			_ = hc.resetTarget(target, ansibleMethod, false, err)
 			return
 		}
-		mo.Path = targetFile
+		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
 		target.Ansible.InitialRun = hc.resetTarget(target, ansibleMethod, false, err)
 		return
 	}
@@ -319,6 +319,7 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 		Target: target,
 	}
 	tag := []string{".service"}
+	var path string
 	if initial {
 		retry := hc.resetTarget(target, systemdMethod, true, nil)
 		if retry {
@@ -334,10 +335,10 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 			_ = hc.resetTarget(target, systemdMethod, false, err)
 			return
 		}
-		mo.Path = targetFile
+		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
 		target.Systemd.InitialRun = hc.resetTarget(target, systemdMethod, false, err)
 		return
 	}
@@ -356,6 +357,7 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 		Method: fileTransferMethod,
 		Target: target,
 	}
+	var path string
 	if initial {
 		retry := hc.resetTarget(target, fileTransferMethod, true, nil)
 		if retry {
@@ -371,10 +373,10 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 			_ = hc.resetTarget(target, fileTransferMethod, false, err)
 			return
 		}
-		mo.Path = targetFile
+		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
 		target.FileTransfer.InitialRun = hc.resetTarget(target, fileTransferMethod, false, err)
 		return
 	}
@@ -394,6 +396,7 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		Method: kubeMethod,
 		Target: target,
 	}
+	var path string
 	if initial {
 		retry := hc.resetTarget(target, kubeMethod, true, nil)
 		if retry {
@@ -409,10 +412,10 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 			_ = hc.resetTarget(target, kubeMethod, false, err)
 			return
 		}
-		mo.Path = targetFile
+		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo); err != nil {
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
 		target.Kube.InitialRun = hc.resetTarget(target, kubeMethod, false, err)
 		return
 	}
@@ -426,8 +429,8 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 		found := false
 		if checkTag(tag, fileName) {
 			found = true
-			mo.Path = filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, mo, nil); err != nil {
+			path := filepath.Join(directory, fileName)
+			if err := hc.EngineMethod(ctx, mo, path, nil); err != nil {
 				return fileName, utils.WrapErr(err, "error running engine with method %s, for file %s",
 					mo.Method, fileName)
 			}
@@ -440,13 +443,27 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 
 	} else {
 		// ... get the files iterator and print the file
-		err := subDirTree.Files().ForEach(func(f *object.File) error {
-			if checkTag(tag, f.Name) {
-				mo.Path = filepath.Join(directory, tp, f.Name)
-				if err := hc.EngineMethod(ctx, mo, nil); err != nil {
-					return utils.WrapErr(err, "error running engine with method %s, for file %s",
-						mo.Method, mo.Path)
+		start := time.Now()
+		ch := make(chan error)
+		subDirTree.Files().ForEach(func(f *object.File) error {
+			go func(ch chan<- error) {
+				if checkTag(tag, f.Name) {
+					path := filepath.Join(directory, tp, f.Name)
+					if err := hc.EngineMethod(ctx, mo, path, nil); err != nil {
+						ch <- utils.WrapErr(err, "error running engine with method %s, for file %s",
+							mo.Method, path)
+					}
 				}
+				ch <- nil
+			}(ch)
+			return nil
+		})
+
+		err := subDirTree.Files().ForEach(func(_ *object.File) error {
+			err := <-ch
+			klog.Info(time.Since(start))
+			if err != nil {
+				return err
 			}
 			return nil
 		})
@@ -457,7 +474,7 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 	return fileName, nil
 }
 
-func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMountOptions) error {
+func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMountOptions, path string) error {
 	var lastCommit *object.Commit
 	var targetPath string
 	switch mo.Method {
@@ -480,8 +497,8 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 		return fmt.Errorf("unknown method: %s", mo.Method)
 	}
 	tp := targetPath
-	if mo.Path != "" {
-		tp = mo.Path
+	if path != "" {
+		tp = path
 	}
 	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lastCommit)
 	if err != nil {
@@ -496,10 +513,9 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 		return nil
 	}
 
-	for change, path := range changesThisMethod {
-		mo.Path = path
-		if err := hc.EngineMethod(ctx, mo, change); err != nil {
-			return utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, mo.Path, newCommit.Hash.String())
+	for change, changePath := range changesThisMethod {
+		if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
+			return utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
 		}
 	}
 	return nil
@@ -574,14 +590,14 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 }
 
 // Each engineMethod call now owns the prev and dest variables instead of being shared in mo
-func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, change *object.Change) error {
+func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, path string, change *object.Change) error {
 	switch mo.Method {
 	case rawMethod:
 		prev, err := getChangeString(change)
 		if err != nil {
 			return err
 		}
-		return rawPodman(ctx, mo, prev)
+		return rawPodman(ctx, mo, path, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		var prev *string = nil
@@ -596,7 +612,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 		} else {
 			dest = filepath.Join(mo.Target.Systemd.NonRootHomeDir, ".config", "systemd", "user")
 		}
-		return systemdPodman(ctx, mo, prev, dest)
+		return systemdPodman(ctx, mo, path, dest, prev)
 	case fileTransferMethod:
 		var prev *string = nil
 		if change != nil {
@@ -605,15 +621,15 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 			}
 		}
 		dest := mo.Target.FileTransfer.DestinationDirectory
-		return fileTransferPodman(ctx, mo, prev, dest)
+		return fileTransferPodman(ctx, mo, path, dest, prev)
 	case kubeMethod:
 		prev, err := getChangeString(change)
 		if err != nil {
 			return err
 		}
-		return kubePodman(ctx, mo, prev)
+		return kubePodman(ctx, mo, path, prev)
 	case ansibleMethod:
-		return ansiblePodman(ctx, mo)
+		return ansiblePodman(ctx, mo, path)
 	default:
 		return fmt.Errorf("unsupported method: %s", mo.Method)
 	}
