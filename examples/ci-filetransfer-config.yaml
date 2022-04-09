@@ -2,8 +2,9 @@ volume: harpoon-volume # this needs to match the volume name passed to the podma
 targets:
 - name: harpoon
   url: http://github.com/redhat-et/harpoon
-  fileTransfer:
-    targetPath: examples/filetransfer
-    destinationDirectory: /tmp/ft
-    schedule: "*/1 * * * *"
+  methods:
+    fileTransfer:
+      targetPath: examples/filetransfer
+      destinationDirectory: /tmp/ft
+      schedule: "*/1 * * * *"
   branch: ci

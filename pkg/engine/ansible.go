@@ -6,12 +6,11 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/redhat-et/harpoon/pkg/engine/utils"
 
 	"k8s.io/klog/v2"
 )
 
-func ansiblePodman(ctx context.Context, mo *FileMountOptions, path string) error {
+func ansiblePodman(ctx context.Context, mo *SingleMethodObj, path string) error {
 	// TODO: add logic to remove
 	if path == deleteFile {
 		return nil
@@ -22,7 +21,7 @@ func ansiblePodman(ctx context.Context, mo *FileMountOptions, path string) error
 	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
 
 	klog.Infof("Identifying if harpoon-ansible image exists locally")
-	if err := utils.FetchImage(mo.Conn, sshImage); err != nil {
+	if err := detectOrFetchImage(mo.Conn, sshImage, true); err != nil {
 		return err
 	}
 
@@ -36,7 +35,7 @@ func ansiblePodman(ctx context.Context, mo *FileMountOptions, path string) error
 
 	// TODO: Remove rcook entries
 	s.Command = []string{"sh", "-c", "/usr/bin/ansible-playbook -e ansible_connection=ssh " + copyFile}
-	s.Mounts = []specs.Mount{{Source: mo.Target.Ansible.SshDirectory, Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}}
+	s.Mounts = []specs.Mount{{Source: mo.Target.Methods.Ansible.SshDirectory, Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
 		NSMode: "host",

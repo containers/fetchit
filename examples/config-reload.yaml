@@ -1,0 +1,16 @@
+# for this test, start with this config, then wait to be sure the
+# targets from .harpoon/config.yaml are populated
+# and for follow-up test, push a change to the config and confirm
+# new targets are fetched & run
+targets:
+- name: harpoon
+  url: http://github.com/sallyom/harpoon
+  methods:
+    configTarget:
+      configUrl: https://raw.githubusercontent.com/sallyom/harpoon/config-upload/examples/config-reload.yaml
+      schedule: "*/4 * * * *"
+    filetransfer:
+      targetPath: examples/filetransfer
+      destinationDirectory: /tmp/ft/
+      schedule: "*/1 * * * *"
+  branch: config-upload

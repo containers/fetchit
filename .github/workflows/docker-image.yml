@@ -152,7 +152,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
         
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/raw-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -188,7 +188,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
         
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/default-volume.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -230,7 +230,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -269,7 +269,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -305,7 +305,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -353,7 +353,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-enable.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-enable.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -410,7 +410,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
         
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ansible.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -443,7 +443,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
  
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -479,7 +479,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
         
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/kube-play-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 2m
@@ -518,7 +518,7 @@ jobs:
         run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
   
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/full-suite.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
         
       - name: Wait for harpoon to deploy
         run: sleep 150s
@@ -588,7 +588,7 @@ jobs:
           sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
 
       - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml:/opt/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
 
       - name: Wait for harpoon to deploy
         run: sleep 2m

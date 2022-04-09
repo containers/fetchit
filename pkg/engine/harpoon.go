@@ -2,8 +2,8 @@ package engine
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,20 +20,18 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/redhat-et/harpoon/pkg/engine/api"
 	"github.com/redhat-et/harpoon/pkg/engine/utils"
 
 	"k8s.io/klog/v2"
 )
 
-// TODO create interface for Method type, so can plug in arbitrary method types
 const (
-	harpoon           = "harpoon"
-	defaultConfigFile = "./config.yaml"
-	defaultVolume     = "harpoon-volume"
-	harpoonImage      = "quay.io/harpoon/harpoon:latest"
-	systemdImage      = "quay.io/harpoon/harpoon-systemd:latest"
+	harpoonService = "harpoon"
+	defaultVolume  = "harpoon-volume"
+	harpoonImage   = "quay.io/harpoon/harpoon:latest"
+	systemdImage   = "quay.io/harpoon/harpoon-systemd-amd:latest"
 
+	configMethod       = "config"
 	rawMethod          = "raw"
 	systemdMethod      = "systemd"
 	kubeMethod         = "kube"
@@ -43,32 +41,40 @@ const (
 	systemdPathRoot    = "/etc/systemd/system"
 )
 
+var (
+	defaultConfigPath     = filepath.Join("/opt", "mount", "config.yaml")
+	defaultConfigBackup   = filepath.Join("/opt", "mount", "config-backup.yaml")
+	defaultHostConfigPath = filepath.Join(os.Getenv("HOME"), ".harpoon", "config.yaml")
+)
+
 // HarpoonConfig requires necessary objects to process targets
 type HarpoonConfig struct {
-	Targets []*api.Target `mapstructure:"targets"`
-	PAT     string        `mapstructure:"pat"`
+	Targets []*Target `mapstructure:"targets"`
+	PAT     string    `mapstructure:"pat"`
 
-	Volume string `mapstructure:"volume"`
-	// Conn holds podman client
-	Conn       context.Context
-	configFile string // "currently not configurable, ./config.yaml"
+	volume string `mapstructure:"volume"`
+	// conn holds podman client
+	conn           context.Context
+	scheduler      *gocron.Scheduler
+	configFile     string
+	restartHarpoon bool
 }
 
 func NewHarpoonConfig() *HarpoonConfig {
 	return &HarpoonConfig{
-		Targets: []*api.Target{
+		Targets: []*Target{
 			{
-				MethodSchedules: make(map[string]string),
+				methodSchedules: make(map[string]string),
 			},
 		},
 	}
 }
 
-type FileMountOptions struct {
+type SingleMethodObj struct {
 	// Conn holds the podman client
 	Conn   context.Context
 	Method string
-	Target *api.Target
+	Target *Target
 }
 
 var harpoonConfig *HarpoonConfig
@@ -77,7 +83,7 @@ var harpoonVolume string
 // harpoonCmd represents the base command when called without any subcommands
 var harpoonCmd = &cobra.Command{
 	Version: "0.0.0",
-	Use:     harpoon,
+	Use:     harpoonService,
 	Short:   "a tool to schedule gitOps workflows",
 	Long:    "Harpoon is a tool to schedule gitOps workflows based on a given configuration file",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -93,100 +99,220 @@ func Execute() {
 
 func (o *HarpoonConfig) bindFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
-	flags.StringVar(&o.configFile, "config", defaultConfigFile, "file that holds harpoon configuration")
-	flags.StringVar(&o.Volume, "volume", defaultVolume, "podman volume to hold harpoon data. If volume doesn't exist, harpoon will create it.")
-	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	flags.StringVar(&o.configFile, "config", defaultConfigPath, "file that holds harpoon configuration")
+	flags.StringVar(&o.volume, "volume", defaultVolume, "podman volume to hold harpoon data. If volume doesn't exist, harpoon will create it.")
 }
 
-// initconfig reads in config file and env variables if set.
-func (o *HarpoonConfig) initConfig(cmd *cobra.Command) {
-	v := viper.New()
-	if o.configFile == "" {
-		o.configFile = defaultConfigFile
+// restart fetches new targets from an updated config
+// new targets will be added, stale removed, and existing
+// will set last commit as last known.
+func (hc *HarpoonConfig) Restart() {
+	if hc.scheduler == nil {
+		return
 	}
-	flagConfigDir := filepath.Dir(o.configFile)
-	flagConfigName := filepath.Base(o.configFile)
+	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod)
+	hc.InitConfig(false)
+	hc.GetTargets()
+	hc.RunTargets()
+}
+
+func isLocalConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
+	if _, err := os.Stat(defaultConfigPath); err != nil {
+		klog.Infof("Local config file not found: %v", err)
+		return nil, false, err
+	}
+	config := NewHarpoonConfig()
+	// duplicate in this function to avoid reading/unmarshalling twice
+	flagConfigDir := filepath.Dir(defaultConfigPath)
+	flagConfigName := filepath.Base(defaultConfigPath)
 	v.AddConfigPath(flagConfigDir)
 	v.SetConfigName(flagConfigName)
 	v.SetConfigType("yaml")
 
-	if err := v.ReadInConfig(); err != nil {
-		cobra.CheckErr(fmt.Errorf("fatal error using config file %s. %w \n", o.configFile, err))
+	if err := v.ReadInConfig(); err == nil {
+		if err := v.Unmarshal(&config); err != nil {
+			klog.Info("Error with unmarshal of existing config file: %v", err)
+			return nil, false, err
+		}
 	}
-	var config = NewHarpoonConfig()
-	klog.Infof("Using config file: %s", v.ConfigFileUsed())
-	if err := v.Unmarshal(&config); err != nil {
-		cobra.CheckErr(err)
+	return config, true, nil
+}
+
+// Initconfig reads in config file and env variables if set.
+func (hc *HarpoonConfig) InitConfig(initial bool) {
+	v := viper.New()
+
+	if hc.configFile != "" {
+		configBytes, err := ioutil.ReadFile(hc.configFile)
+		if err != nil {
+			klog.Infof("error processing config file %s, will try to download from HARPOON_CONFIG_URL: %v", hc.configFile, err)
+		} else {
+			if err = os.WriteFile(defaultConfigPath, configBytes, 0600); err != nil {
+				klog.Infof("error processing config file %s, will try to download from HARPOON_CONFIG_URL: %v", hc.configFile, err)
+			}
+		}
+	}
+	hc.configFile = defaultConfigPath
+
+	config, isLocal, err := isLocalConfig(v)
+	if (initial && !isLocal) || err != nil {
+		// may or may not be from initial startup, CheckForConfigUpdates runs with each processConfig
+		// on initial runs, if config file exists locally, run that first.
+		// If configURL is not set in file, the env var will be picked up with first scheduled processing
+		// env var is set from the configTarget.Url in processConfig, if this is not the initial run.
+		envURL := os.Getenv("HARPOON_CONFIG_URL")
+		_, err = hc.CheckForConfigUpdates(envURL, false, true)
+		if err != nil {
+			log.Fatalf("Error locating config from %s and also from %s", defaultConfigPath, envURL)
+		}
 	}
 
-	if config.Volume == "" {
-		config.Volume = defaultVolume
+	if !isLocal {
+		// if not initial run, only way to get here is if already determined need for reload
+		flagConfigDir := filepath.Dir(defaultConfigPath)
+		flagConfigName := filepath.Base(defaultConfigPath)
+		v.AddConfigPath(flagConfigDir)
+		v.SetConfigName(flagConfigName)
+		v.SetConfigType("yaml")
+
+		if err := v.ReadInConfig(); err == nil {
+			klog.Infof("Using config file: %s", v.ConfigFileUsed())
+			if err := v.Unmarshal(&config); err != nil {
+				cobra.CheckErr(err)
+			}
+		}
 	}
 
-	harpoonVolume = config.Volume
-	o.Targets = config.Targets
+	if config == nil {
+		log.Fatalf("Could not locate config, exiting")
+	}
+	if config.Targets == nil {
+		cobra.CheckErr("no harpoon targets found, exiting")
+	}
+
+	if config.volume == "" {
+		config.volume = defaultVolume
+	}
+
+	harpoonVolume = config.volume
 	ctx := context.Background()
-	// TODO: socket directory same for all platforms?
-	// sock_dir := os.Getenv("XDG_RUNTIME_DIR")
-	// socket := "unix:" + sock_dir + "/podman/podman.sock"
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil || conn == nil {
-		log.Fatalf("error establishing connection to podman.sock: %v", err)
+	if hc.conn == nil {
+		// TODO: socket directory same for all platforms?
+		// sock_dir := os.Getenv("XDG_RUNTIME_DIR")
+		// socket := "unix:" + sock_dir + "/podman/podman.sock"
+		conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+		if err != nil || conn == nil {
+			log.Fatalf("error establishing connection to podman.sock: %v", err)
+		}
+		hc.conn = conn
 	}
 
-	klog.Infof("Identifying if harpoon image exists locally")
-	if err := utils.FetchImage(conn, harpoonImage); err != nil {
+	if err := detectOrFetchImage(hc.conn, harpoonImage, false); err != nil {
 		cobra.CheckErr(err)
 	}
-	o.Conn = conn
 
+	beforeTargets := len(hc.Targets)
+	hc.Targets = config.Targets
+	if beforeTargets > 0 {
+		// replace lastCommit - to avoid re-running same jobs, since the scheduler finished all jobs
+		// with the last commit before arriving here
+		for i, t := range hc.Targets {
+			if t.Methods.Raw != nil {
+				if config.Targets[i].Methods.Raw != nil {
+					t.Methods.Raw.lastCommit = config.Targets[i].Methods.Raw.lastCommit
+				}
+			}
+			if t.Methods.Kube != nil {
+				if config.Targets[i].Methods.Kube != nil {
+					t.Methods.Kube.lastCommit = config.Targets[i].Methods.Kube.lastCommit
+				}
+			}
+			if t.Methods.Ansible != nil {
+				if config.Targets[i].Methods.Ansible != nil {
+					t.Methods.Ansible.lastCommit = config.Targets[i].Methods.Ansible.lastCommit
+				}
+			}
+			if t.Methods.FileTransfer != nil {
+				if config.Targets[i].Methods.FileTransfer != nil {
+					t.Methods.FileTransfer.lastCommit = config.Targets[i].Methods.FileTransfer.lastCommit
+				}
+			}
+			if t.Methods.Systemd != nil {
+				if config.Targets[i].Methods.Systemd != nil {
+					t.Methods.Systemd.lastCommit = config.Targets[i].Methods.Systemd.lastCommit
+				}
+			}
+		}
+	}
+
+	// look for a ConfigFileTarget, only find the first
+	// TODO: add logic to merge multiple configs
+	for _, t := range hc.Targets {
+		if t.Methods.ConfigTarget == nil {
+			continue
+		}
+		// reset URL if necessary
+		// ConfigUrl set in config file overrides env variable
+		// If the same, this is no change, if diff then the new config has updated the configUrl
+		if t.Methods.ConfigTarget.ConfigUrl != "" {
+			os.Setenv("HARPOON_CONFIG_URL", t.Methods.ConfigTarget.ConfigUrl)
+		}
+		break
+	}
+	if hc.scheduler == nil {
+		hc.scheduler = gocron.NewScheduler(time.UTC)
+	}
 }
 
 // getTargets returns map of repoName to map of method:Schedule
-func (hc *HarpoonConfig) getTargets() {
+func (hc *HarpoonConfig) GetTargets() {
 	for _, target := range hc.Targets {
-		target.Mu.Lock()
-		defer target.Mu.Unlock()
+		target.mu.Lock()
+		defer target.mu.Unlock()
 		schedMethods := make(map[string]string)
-		if target.Raw.Schedule != "" {
-			target.Raw.InitialRun = true
-			schedMethods[rawMethod] = target.Raw.Schedule
+		if target.Methods.ConfigTarget != nil {
+			schedMethods[configMethod] = target.Methods.ConfigTarget.Schedule
 		}
-		if target.Kube.Schedule != "" {
-			target.Kube.InitialRun = true
-			schedMethods[kubeMethod] = target.Kube.Schedule
+		if target.Methods.Raw != nil {
+			target.Methods.Raw.initialRun = true
+			schedMethods[rawMethod] = target.Methods.Raw.Schedule
 		}
-		if target.Systemd.Schedule != "" {
-			target.Systemd.InitialRun = true
-			schedMethods[systemdMethod] = target.Systemd.Schedule
+		if target.Methods.Kube != nil {
+			target.Methods.Kube.initialRun = true
+			schedMethods[kubeMethod] = target.Methods.Kube.Schedule
 		}
-		if target.FileTransfer.Schedule != "" {
-			target.FileTransfer.InitialRun = true
-			schedMethods[fileTransferMethod] = target.FileTransfer.Schedule
+		if target.Methods.Systemd != nil {
+			target.Methods.Systemd.initialRun = true
+			schedMethods[systemdMethod] = target.Methods.Systemd.Schedule
 		}
-		if target.Ansible.Schedule != "" {
-			target.Ansible.InitialRun = true
-			schedMethods[ansibleMethod] = target.Ansible.Schedule
+		if target.Methods.FileTransfer != nil {
+			target.Methods.FileTransfer.initialRun = true
+			schedMethods[fileTransferMethod] = target.Methods.FileTransfer.Schedule
 		}
-		target.MethodSchedules = schedMethods
+		if target.Methods.Ansible != nil {
+			target.Methods.Ansible.initialRun = true
+			schedMethods[ansibleMethod] = target.Methods.Ansible.Schedule
+		}
+		target.methodSchedules = schedMethods
 		hc.update(target)
 	}
 }
 
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
-func (hc *HarpoonConfig) runTargets() {
-	hc.getTargets()
+func (hc *HarpoonConfig) RunTargets() {
 	allTargets := make(map[string]map[string]string)
 	for _, target := range hc.Targets {
-		if err := hc.getClone(target); err != nil {
-			klog.Warningf("Repo: %s, clone error: %v, will retry next scheduled run", target.Name, err)
+		if target.Url != "" {
+			if err := hc.getClone(target); err != nil {
+				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", target.Name, err)
+			}
 		}
-		allTargets[target.Name] = target.MethodSchedules
+		allTargets[target.Name] = target.methodSchedules
 	}
 
-	s := gocron.NewScheduler(time.UTC)
+	s := hc.scheduler
 	for repoName, schedMethods := range allTargets {
-		var target api.Target
+		var target Target
 		for _, t := range hc.Targets {
 			if repoName == t.Name {
 				target = *t
@@ -195,49 +321,97 @@ func (hc *HarpoonConfig) runTargets() {
 
 		for method, schedule := range schedMethods {
 			switch method {
+			case configMethod:
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.RemoveByTag(configMethod)
+				s.Cron(schedule).Tag(configMethod).Do(hc.processConfig, ctx, &target)
 			case kubeMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Do(hc.processKube, ctx, &target, schedule)
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(kubeMethod).Do(hc.processKube, ctx, &target)
 			case rawMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Do(hc.processRaw, ctx, &target, schedule)
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(rawMethod).Do(hc.processRaw, ctx, &target)
 			case systemdMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Do(hc.processSystemd, ctx, &target, schedule)
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(systemdMethod).Do(hc.processSystemd, ctx, &target)
 			case fileTransferMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Do(hc.processFileTransfer, ctx, &target, schedule)
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(fileTransferMethod).Do(hc.processFileTransfer, ctx, &target)
 			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Do(hc.processAnsible, ctx, &target, schedule)
+				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target)
 			default:
-				klog.Warningf("Repo: %s Method: %s, unknown method type, ignoring", target.Name, method)
+				klog.Warningf("Target: %s Method: %s, unknown method type, ignoring", target.Name, method)
 			}
 		}
 	}
+	s.StartImmediately()
 	s.StartAsync()
 	select {}
 }
 
-func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
+func (hc *HarpoonConfig) processConfig(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	initial := target.Raw.InitialRun
+	// configUrl in config file will override the environment variable
+	config := target.Methods.ConfigTarget
+	envURL := os.Getenv("HARPOON_CONFIG_URL")
+	// config.Url from target overrides env variable
+	if config.ConfigUrl != "" {
+		envURL = config.ConfigUrl
+	}
+	os.Setenv("HARPOON_CONFIG_URL", envURL)
+	// If ConfigUrl is not populated, warn and leave
+	if envURL == "" {
+		klog.Warningf("Harpoon ConfigFileTarget found, but neither $HARPOON_CONFIG_URL on system nor ConfigTarget.ConfigUrl are set, exiting without updating the config.")
+	}
+	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
+	// if the downloaded config file differs from what's currently on the system.
+	restart, _ := hc.CheckForConfigUpdates(envURL, true, false)
+	if !restart {
+		return
+	}
+	hc.restartHarpoon = restart
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
+		Method: configMethod,
+		Target: target,
+	}
+	if err := hc.EngineMethod(ctx, mo, defaultConfigPath, nil); err != nil {
+		klog.Warningf("Target: %s error updating config targets, will retry next run: %v", err)
+		return
+	}
+
+	hc.update(target)
+	if hc.restartHarpoon {
+		klog.Info("Updated config processed, restarting with new targets")
+		harpoonConfig.Restart()
+	}
+}
+
+func (hc *HarpoonConfig) processRaw(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	raw := target.Methods.Raw
+	initial := raw.initialRun
 	tag := []string{".json", ".yaml", ".yml"}
 	var targetFile string
-	mo := &FileMountOptions{
-		Conn:   hc.Conn,
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
 		Method: rawMethod,
 		Target: target,
 	}
@@ -247,12 +421,12 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, target.Raw.TargetPath, rawMethod)
+		fileName, subDirTree, err := hc.getPathOrTree(target, raw.TargetPath, rawMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, rawMethod, false, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Raw.TargetPath, &tag, subDirTree)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, raw.TargetPath, &tag, subDirTree)
 		if err != nil {
 			_ = hc.resetTarget(target, rawMethod, false, err)
 			return
@@ -261,22 +435,23 @@ func (hc *HarpoonConfig) processRaw(ctx context.Context, target *api.Target, sch
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		target.Raw.InitialRun = hc.resetTarget(target, rawMethod, false, err)
+		raw.initialRun = hc.resetTarget(target, rawMethod, false, err)
 		return
 	}
-	target.Raw.InitialRun = false
+	raw.initialRun = false
 	hc.update(target)
 }
 
-func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
+func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	initial := target.Ansible.InitialRun
+	ans := target.Methods.Ansible
+	initial := ans.initialRun
 	tag := []string{"yaml", "yml"}
 	var targetFile = ""
-	mo := &FileMountOptions{
-		Conn:   hc.Conn,
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
 		Method: ansibleMethod,
 		Target: target,
 	}
@@ -286,12 +461,12 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, target.Ansible.TargetPath, ansibleMethod)
+		fileName, subDirTree, err := hc.getPathOrTree(target, ans.TargetPath, ansibleMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, ansibleMethod, false, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Ansible.TargetPath, &tag, subDirTree)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, ans.TargetPath, &tag, subDirTree)
 		if err != nil {
 			_ = hc.resetTarget(target, ansibleMethod, false, err)
 			return
@@ -300,21 +475,22 @@ func (hc *HarpoonConfig) processAnsible(ctx context.Context, target *api.Target,
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		target.Ansible.InitialRun = hc.resetTarget(target, ansibleMethod, false, err)
+		ans.initialRun = hc.resetTarget(target, ansibleMethod, false, err)
 		return
 	}
-	target.Ansible.InitialRun = false
+	ans.initialRun = false
 	hc.update(target)
 }
 
-func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
+func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	initial := target.Systemd.InitialRun
+	sd := target.Methods.Systemd
+	initial := sd.initialRun
 	var targetFile string
-	mo := &FileMountOptions{
-		Conn:   hc.Conn,
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
 		Method: systemdMethod,
 		Target: target,
 	}
@@ -325,12 +501,12 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, target.Systemd.TargetPath, systemdMethod)
+		fileName, subDirTree, err := hc.getPathOrTree(target, sd.TargetPath, systemdMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, systemdMethod, false, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Systemd.TargetPath, &tag, subDirTree)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, sd.TargetPath, &tag, subDirTree)
 		if err != nil {
 			_ = hc.resetTarget(target, systemdMethod, false, err)
 			return
@@ -339,21 +515,22 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *api.Target,
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		target.Systemd.InitialRun = hc.resetTarget(target, systemdMethod, false, err)
+		sd.initialRun = hc.resetTarget(target, systemdMethod, false, err)
 		return
 	}
-	target.Systemd.InitialRun = false
+	sd.initialRun = false
 	hc.update(target)
 }
 
-func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
+func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	initial := target.FileTransfer.InitialRun
+	ft := target.Methods.FileTransfer
+	initial := ft.initialRun
 	var targetFile string
-	mo := &FileMountOptions{
-		Conn:   hc.Conn,
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
 		Method: fileTransferMethod,
 		Target: target,
 	}
@@ -363,12 +540,12 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, target.FileTransfer.TargetPath, fileTransferMethod)
+		fileName, subDirTree, err := hc.getPathOrTree(target, ft.TargetPath, fileTransferMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, fileTransferMethod, false, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.FileTransfer.TargetPath, nil, subDirTree)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, ft.TargetPath, nil, subDirTree)
 		if err != nil {
 			_ = hc.resetTarget(target, fileTransferMethod, false, err)
 			return
@@ -377,22 +554,23 @@ func (hc *HarpoonConfig) processFileTransfer(ctx context.Context, target *api.Ta
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		target.FileTransfer.InitialRun = hc.resetTarget(target, fileTransferMethod, false, err)
+		ft.initialRun = hc.resetTarget(target, fileTransferMethod, false, err)
 		return
 	}
-	target.FileTransfer.InitialRun = false
+	ft.initialRun = false
 	hc.update(target)
 }
 
-func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, schedule string) {
-	target.Mu.Lock()
-	defer target.Mu.Unlock()
+func (hc *HarpoonConfig) processKube(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	initial := target.Kube.InitialRun
+	kube := target.Methods.Kube
+	initial := kube.initialRun
 	tag := []string{"yaml", "yml"}
 	var targetFile string
-	mo := &FileMountOptions{
-		Conn:   hc.Conn,
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
 		Method: kubeMethod,
 		Target: target,
 	}
@@ -402,12 +580,12 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, target.Kube.TargetPath, kubeMethod)
+		fileName, subDirTree, err := hc.getPathOrTree(target, kube.TargetPath, kubeMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, kubeMethod, false, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, target.Kube.TargetPath, &tag, subDirTree)
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, kube.TargetPath, &tag, subDirTree)
 		if err != nil {
 			_ = hc.resetTarget(target, kubeMethod, false, err)
 			return
@@ -416,14 +594,14 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *api.Target, sc
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		target.Kube.InitialRun = hc.resetTarget(target, kubeMethod, false, err)
+		kube.initialRun = hc.resetTarget(target, kubeMethod, false, err)
 		return
 	}
-	target.Kube.InitialRun = false
+	kube.initialRun = false
 	hc.update(target)
 }
 
-func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
+func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *SingleMethodObj, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
 	directory := filepath.Base(mo.Target.Url)
 	if fileName != "" {
 		found := false
@@ -474,25 +652,25 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 	return fileName, nil
 }
 
-func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMountOptions, path string) error {
-	var lastCommit *object.Commit
+func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleMethodObj, path string) error {
+	var lc *object.Commit
 	var targetPath string
 	switch mo.Method {
 	case rawMethod:
-		lastCommit = mo.Target.Raw.LastCommit
-		targetPath = mo.Target.Raw.TargetPath
+		lc = mo.Target.Methods.Raw.lastCommit
+		targetPath = mo.Target.Methods.Raw.TargetPath
 	case kubeMethod:
-		lastCommit = mo.Target.Kube.LastCommit
-		targetPath = mo.Target.Kube.TargetPath
+		lc = mo.Target.Methods.Kube.lastCommit
+		targetPath = mo.Target.Methods.Kube.TargetPath
 	case ansibleMethod:
-		lastCommit = mo.Target.Ansible.LastCommit
-		targetPath = mo.Target.Ansible.TargetPath
+		lc = mo.Target.Methods.Ansible.lastCommit
+		targetPath = mo.Target.Methods.Ansible.TargetPath
 	case fileTransferMethod:
-		lastCommit = mo.Target.FileTransfer.LastCommit
-		targetPath = mo.Target.FileTransfer.TargetPath
+		lc = mo.Target.Methods.FileTransfer.lastCommit
+		targetPath = mo.Target.Methods.FileTransfer.TargetPath
 	case systemdMethod:
-		lastCommit = mo.Target.Systemd.LastCommit
-		targetPath = mo.Target.Systemd.TargetPath
+		lc = mo.Target.Methods.Systemd.lastCommit
+		targetPath = mo.Target.Methods.Systemd.TargetPath
 	default:
 		return fmt.Errorf("unknown method: %s", mo.Method)
 	}
@@ -500,16 +678,16 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	if path != "" {
 		tp = path
 	}
-	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lastCommit)
+	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
 	if err != nil {
-		return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lastCommit.Hash.String())
+		return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
 	}
 
-	hc.setLastCommit(mo.Target, mo.Method, newCommit)
+	hc.setlastCommit(mo.Target, mo.Method, newCommit)
 	hc.update(mo.Target)
 
 	if len(changesThisMethod) == 0 {
-		klog.Infof("Repo: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
+		klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
 		return nil
 	}
 
@@ -521,7 +699,7 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 	return nil
 }
 
-func (hc *HarpoonConfig) update(target *api.Target) {
+func (hc *HarpoonConfig) update(target *Target) {
 	for _, t := range hc.Targets {
 		if target.Name == t.Name {
 			t = target
@@ -529,7 +707,7 @@ func (hc *HarpoonConfig) update(target *api.Target) {
 	}
 }
 
-func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
+func (hc *HarpoonConfig) findDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
 	directory := filepath.Base(target.Url)
 	// map of change to path
 	thisMethodChanges := make(map[*object.Change]string)
@@ -544,7 +722,7 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 	// ... retrieve the tree from this method's last fetched commit
 	beforeFetchTree, _, err := getTree(gitRepo, commit)
 	if err != nil {
-		// TODO: if LastCommit has disappeared, need to reset and set initial=true instead of exit
+		// TODO: if lastCommit has disappeared, need to reset and set initial=true instead of exit
 		return thisMethodChanges, nil, fmt.Errorf("error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", err)
 	}
 
@@ -590,8 +768,14 @@ func (hc *HarpoonConfig) findDiff(target *api.Target, method, targetPath string,
 }
 
 // Each engineMethod call now owns the prev and dest variables instead of being shared in mo
-func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions, path string, change *object.Change) error {
+func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, path string, change *object.Change) error {
 	switch mo.Method {
+	case configMethod:
+		// Only here if config has been updated by CheckForConfigUpdates.
+		// If so, update files on disk with fileTransferPodman.
+		// Updated config file is at /opt/mount/config.yaml in harpoon pod
+		// cp updated config /opt/mount/config.yaml in pod to $HOME/.harpoon/config.yaml on host
+		return fileTransferPodman(ctx, mo, defaultConfigPath, defaultHostConfigPath, nil)
 	case rawMethod:
 		prev, err := getChangeString(change)
 		if err != nil {
@@ -606,11 +790,15 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 				prev = &change.To.Name
 			}
 		}
+		nonRootHomeDir := os.Getenv("HOME")
+		if nonRootHomeDir == "" {
+			return fmt.Errorf("Could not determine $HOME for host, must set $HOME on host machine for non-root systemd method")
+		}
 		var dest string
-		if mo.Target.Systemd.Root {
+		if mo.Target.Methods.Systemd.Root {
 			dest = systemdPathRoot
 		} else {
-			dest = filepath.Join(mo.Target.Systemd.NonRootHomeDir, ".config", "systemd", "user")
+			dest = filepath.Join(nonRootHomeDir, ".config", "systemd", "user")
 		}
 		return systemdPodman(ctx, mo, path, dest, prev)
 	case fileTransferMethod:
@@ -620,7 +808,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 				prev = &change.To.Name
 			}
 		}
-		dest := mo.Target.FileTransfer.DestinationDirectory
+		dest := mo.Target.Methods.FileTransfer.DestinationDirectory
 		return fileTransferPodman(ctx, mo, path, dest, prev)
 	case kubeMethod:
 		prev, err := getChangeString(change)
@@ -635,7 +823,7 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *FileMountOptions,
 	}
 }
 
-func (hc *HarpoonConfig) getClone(target *api.Target) error {
+func (hc *HarpoonConfig) getClone(target *Target) error {
 	directory := filepath.Base(target.Url)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
@@ -674,7 +862,7 @@ func (hc *HarpoonConfig) getClone(target *api.Target) error {
 	return nil
 }
 
-func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string) (string, *object.Tree, error) {
+func (hc *HarpoonConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
 	directory := filepath.Base(target.Url)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
@@ -700,27 +888,27 @@ func (hc *HarpoonConfig) getPathOrTree(target *api.Target, subDir, method string
 
 // arrive at resetTarget 1 of 2 ways:
 //      1) initial run of target - will return true if clone or commit fetch fails, to try again next run
-//      2) processing error during run - will attempt to fetch the remote commit and reset to InitialRun true for the
+//      2) processing error during run - will attempt to fetch the remote commit and reset to initialRun true for the
 //         next run, or, if fetching of commit fails, will return true to try again next run
 // resetTarget returns true if the target should be re-cloned next run, and it will set
-func (hc *HarpoonConfig) resetTarget(target *api.Target, method string, initial bool, err error) bool {
+func (hc *HarpoonConfig) resetTarget(target *Target, method string, initial bool, err error) bool {
 	if err != nil {
-		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, method, err)
+		klog.Warningf("Target: %s Method: %s encountered error: %v, resetting...", target.Name, method, err)
 	}
 	commit, err := hc.getGit(target, initial)
 	if err != nil {
-		klog.Warningf("Repo: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
+		klog.Warningf("Target: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
 		return true
 	}
 	if commit == nil {
-		klog.Warningf("Repo: %s, fetched empty commit, will retry next scheduled run", target.Name)
+		klog.Warningf("Target: %s, fetched empty commit, will retry next scheduled run", target.Name)
 		return true
 	}
 
 	return hc.setInitial(target, commit, method)
 }
 
-func (hc *HarpoonConfig) getGit(target *api.Target, initialRun bool) (*object.Commit, error) {
+func (hc *HarpoonConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
 	if initialRun {
 		if err := hc.getClone(target); err != nil {
 			return nil, err
@@ -740,104 +928,67 @@ func (hc *HarpoonConfig) getGit(target *api.Target, initialRun bool) (*object.Co
 }
 
 // setInitial will return true if fetching of commit fails or results in empty commit, to try again next run
-// or, if valid commit is fetched, will set InitialRun true and LastCommit for the method, to process next run
-func (hc *HarpoonConfig) setInitial(target *api.Target, commit *object.Commit, method string) bool {
+// or, if valid commit is fetched, will set initialRun true and lastCommit for the method, to process next run
+func (hc *HarpoonConfig) setInitial(target *Target, commit *object.Commit, method string) bool {
 	retry := false
-	hc.setInitialRun(target, method)
+	hc.setinitialRun(target, method)
 	if commit == nil {
 		retry = true
 	} else {
-		hc.setLastCommit(target, method, commit)
+		hc.setlastCommit(target, method, commit)
 	}
 	hc.update(target)
 	return retry
 }
 
-func (hc *HarpoonConfig) setLastCommit(target *api.Target, method string, commit *object.Commit) {
+func (hc *HarpoonConfig) setlastCommit(target *Target, method string, commit *object.Commit) {
 	switch method {
 	case kubeMethod:
-		target.Kube.LastCommit = commit
+		target.Methods.Kube.lastCommit = commit
 	case rawMethod:
-		target.Raw.LastCommit = commit
+		target.Methods.Raw.lastCommit = commit
 	case systemdMethod:
-		target.Systemd.LastCommit = commit
+		target.Methods.Systemd.lastCommit = commit
 	case fileTransferMethod:
-		target.FileTransfer.LastCommit = commit
+		target.Methods.FileTransfer.lastCommit = commit
 	case ansibleMethod:
-		target.Ansible.LastCommit = commit
+		target.Methods.Ansible.lastCommit = commit
 	}
 }
 
-// setInitialRun is called before the initial processing of a target, or
+// setinitialRun is called before the initial processing of a target, or
 // upon any processing errors for the method, so the method will be retried with next run
-func (hc *HarpoonConfig) setInitialRun(target *api.Target, method string) {
+func (hc *HarpoonConfig) setinitialRun(target *Target, method string) {
 	switch method {
 	case kubeMethod:
-		target.Kube.InitialRun = true
+		target.Methods.Kube.initialRun = true
 	case rawMethod:
-		target.Raw.InitialRun = true
+		target.Methods.Raw.initialRun = true
 	case systemdMethod:
-		target.Systemd.InitialRun = true
+		target.Methods.Systemd.initialRun = true
 	case fileTransferMethod:
-		target.FileTransfer.InitialRun = true
+		target.Methods.FileTransfer.initialRun = true
 	case ansibleMethod:
-		target.Ansible.InitialRun = true
+		target.Methods.Ansible.initialRun = true
 	}
 }
 
-func getChangeString(change *object.Change) (*string, error) {
-	if change != nil {
-		_, to, err := change.Files()
-		if err != nil {
-			return nil, err
-		}
-		if to != nil {
-			s, err := to.Contents()
-			if err != nil {
-				return nil, err
-			}
-			return &s, nil
-		}
+// CheckForConfigUpdates, downloads, & places config file
+// in defaultConfigPath in harpoon container (/opt/mount/config.yaml).
+// This runs with the initial startup as well as with scheduled ConfigTarget runs,
+// if $HARPOON_CONFIG_URL is set.
+func (hc *HarpoonConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) (bool, error) {
+	if envURL == "" {
+		return false, nil
 	}
-	return nil, nil
-}
-
-func checkTag(tags *[]string, name string) bool {
-	if tags == nil {
-		return true
-	}
-	for _, tag := range *tags {
-		if strings.HasSuffix(name, tag) {
-			return true
-		}
-	}
-	return false
-}
-
-func getTree(r *git.Repository, oldCommit *object.Commit) (*object.Tree, *object.Commit, error) {
-	if oldCommit != nil {
-		// ... retrieve the tree from the commit
-		tree, err := oldCommit.Tree()
-		if err != nil {
-			return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-		}
-		return tree, nil, nil
-	}
-	var newCommit *object.Commit
-	ref, err := r.Head()
+	reset, err := downloadUpdateConfigFile(envURL, existsAlready)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving head: %s", err)
+		klog.Info(err)
+		// if initial, we're here because could not read/find local config
+		if initial {
+			klog.Infof("HERERRE ERRRRROR: %v", err)
+			return reset, err
+		}
 	}
-	// ... retrieving the commit object
-	newCommit, err = r.CommitObject(ref.Hash())
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving commit: %s", err)
-	}
-
-	// ... retrieve the tree from the commit
-	tree, err := newCommit.Tree()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-	}
-	return tree, newCommit, nil
+	return reset, nil
 }

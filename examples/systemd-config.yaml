@@ -2,9 +2,10 @@ volume: harpoon-volume # this needs to match the volume name passed to the podma
 targets:
 - name: harpoon
   url: http://github.com/redhat-et/harpoon
-  systemd:
-    targetPath: examples/systemd
-    root: true
-    enable: false
-    schedule: "*/1 * * * *"
+  methods:
+    systemd:
+      targetPath: examples/systemd/httpd.service
+      root: true
+      enable: false
+      schedule: "*/1 * * * *"
   branch: main

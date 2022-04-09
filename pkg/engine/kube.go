@@ -22,7 +22,7 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 )
 
-func kubePodman(ctx context.Context, mo *FileMountOptions, path string, prev *string) error {
+func kubePodman(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
 
 	if path != deleteFile {
 		klog.Infof("Creating podman container from %s using kube method", path)

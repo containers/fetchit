@@ -1,13 +1,12 @@
 targets:
 - name: harpoon
-  # TODO: this should be redhat-et/main
-  url: http://github.com/sallyom/harpoon
-  branch: update-readme
-  fileTransfer:
-    targetPath: examples/filetransfer/hello.txt
-    destinationDirectory: /tmp
-    schedule: "*/1 * * * *"
-  raw:
-    targetPath: examples/raw
-    schedule: "*/1 * * * *"
-
+  url: http://github.com/redhat-et/harpoon
+  branch: main
+  methods:
+    fileTransfer:
+      targetPath: examples/filetransfer/hello.txt
+      destinationDirectory: /tmp
+      schedule: "*/1 * * * *"
+    raw:
+      targetPath: examples/raw
+      schedule: "*/1 * * * *"
