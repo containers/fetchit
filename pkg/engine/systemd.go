@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
@@ -42,11 +43,11 @@ func enableSystemdService(mo *SingleMethodObj, action, dest, service string) err
 	}
 
 	s := specgen.NewSpecGenerator(systemdImage, false)
-	runMount := "/run"
-	runMountb := "/usr/lib"
+	runMounttmp := "/run"
+	runMountsd := "/run/systemd"
 	runMountc := "/sys/fs/cgroup"
 	if !sd.Root {
-		runMount = "/run/user/1000/systemd"
+		runMountsd = "/run/user/1000/systemd"
 		s.User = "1000"
 	}
 	s.Name = "systemd-" + action + "-" + service + "-" + mo.Target.Name
@@ -61,7 +62,7 @@ func enableSystemdService(mo *SingleMethodObj, action, dest, service string) err
 	envMap["SERVICE"] = service
 	envMap["ACTION"] = action
 	s.Env = envMap
-	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}, {Source: runMount, Destination: runMount, Type: "bind", Options: []string{"rw"}}, {Source: runMountb, Destination: runMountb, Type: "bind", Options: []string{"rw"}}, {Source: runMountc, Destination: runMountc, Type: "bind", Options: []string{"rw"}}}
+	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: define.TypeBind, Options: []string{"rw"}}, {Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}}, {Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}}, {Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}}}
 	createResponse, err := createAndStartContainer(mo.Conn, s)
 	if err != nil {
 		return err
