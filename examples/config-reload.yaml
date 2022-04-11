@@ -8,9 +8,9 @@ targets:
   methods:
     configTarget:
       configUrl: https://raw.githubusercontent.com/sallyom/harpoon/config-upload/examples/config-reload.yaml
-      schedule: "*/4 * * * *"
-    filetransfer:
-      targetPath: examples/filetransfer
-      destinationDirectory: /tmp/ft/
+      schedule: "*/2 * * * *"
+    raw:
+      targetPath: examples/raw
       schedule: "*/1 * * * *"
+      pullImage: true
   branch: config-upload
