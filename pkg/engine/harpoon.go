@@ -443,7 +443,6 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 
 	} else {
 		// ... get the files iterator and print the file
-		start := time.Now()
 		ch := make(chan error)
 		subDirTree.Files().ForEach(func(f *object.File) error {
 			go func(ch chan<- error) {
@@ -461,7 +460,6 @@ func (hc *HarpoonConfig) applyInitial(ctx context.Context, mo *FileMountOptions,
 
 		err := subDirTree.Files().ForEach(func(_ *object.File) error {
 			err := <-ch
-			klog.Info(time.Since(start))
 			if err != nil {
 				return err
 			}
@@ -513,10 +511,21 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *FileMou
 		return nil
 	}
 
+	ch := make(chan error)
 	for change, changePath := range changesThisMethod {
-		if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
-			return utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
+		go func(ch chan<- error, changePath string, change *object.Change) {
+			if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
+				ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
+			}
+			ch <- nil
+		}(ch, changePath, change)
+	}
+	for range changesThisMethod {
+		err := <-ch
+		if err != nil {
+			return err
 		}
+		return nil
 	}
 	return nil
 }
