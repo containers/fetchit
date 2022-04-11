@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -116,13 +115,8 @@ func (hc *HarpoonConfig) Restart() {
 	hc.RunTargets()
 }
 
-func isLocalConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
-	if _, err := os.Stat(defaultConfigPath); err != nil {
-		klog.Infof("Local config file not found: %v", err)
-		return nil, false, err
-	}
+func populateConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
 	config := NewHarpoonConfig()
-	// duplicate in this function to avoid reading/unmarshalling twice
 	flagConfigDir := filepath.Dir(defaultConfigPath)
 	flagConfigName := filepath.Base(defaultConfigPath)
 	v.AddConfigPath(flagConfigDir)
@@ -138,10 +132,19 @@ func isLocalConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
 	return config, true, nil
 }
 
+// This location will be checked first. This is from a `-v /path/to/config.yaml:/opt/mount/config.yaml`,
+// If not initial, this may be overwritten with what is currently in HARPOON_CONFIG_URL
+func isLocalConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
+	if _, err := os.Stat(defaultConfigPath); err != nil {
+		klog.Infof("Local config file not found: %v", err)
+		return nil, false, err
+	}
+	return populateConfig(v)
+}
+
 // Initconfig reads in config file and env variables if set.
 func (hc *HarpoonConfig) InitConfig(initial bool) {
 	v := viper.New()
-
 	if hc.configFile != "" {
 		configBytes, err := ioutil.ReadFile(hc.configFile)
 		if err != nil {
@@ -154,38 +157,33 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 	}
 	hc.configFile = defaultConfigPath
 
+	envURL := os.Getenv("HARPOON_CONFIG_URL")
 	config, isLocal, err := isLocalConfig(v)
 	if (initial && !isLocal) || err != nil {
 		// may or may not be from initial startup, CheckForConfigUpdates runs with each processConfig
-		// on initial runs, if config file exists locally, run that first.
-		// If configURL is not set in file, the env var will be picked up with first scheduled processing
-		// env var is set from the configTarget.Url in processConfig, if this is not the initial run.
-		envURL := os.Getenv("HARPOON_CONFIG_URL")
+		// On initial runs, if config file exists locally, config is already populated above.
+		// If configURL is not set yet, the env var will be picked up (if there is one configured)
+		// with first scheduled processing of target.Methods.ConfigTarget.ConfigUrl (if there is one).
 		_, err = hc.CheckForConfigUpdates(envURL, false, true)
 		if err != nil {
-			log.Fatalf("Error locating config from %s and also from %s", defaultConfigPath, envURL)
+			cobra.CheckErr(fmt.Errorf("Error locating config from %s and also from %s", defaultConfigPath, envURL))
 		}
 	}
 
+	// if config is not yet populated, hc.CheckForConfigUpdates has placed the config
+	// downloaded from URL to the defaultconfigPath
 	if !isLocal {
-		// if not initial run, only way to get here is if already determined need for reload
-		flagConfigDir := filepath.Dir(defaultConfigPath)
-		flagConfigName := filepath.Base(defaultConfigPath)
-		v.AddConfigPath(flagConfigDir)
-		v.SetConfigName(flagConfigName)
-		v.SetConfigType("yaml")
-
-		if err := v.ReadInConfig(); err == nil {
-			klog.Infof("Using config file: %s", v.ConfigFileUsed())
-			if err := v.Unmarshal(&config); err != nil {
-				cobra.CheckErr(err)
+		// If not initial run, only way to get here is if already determined need for reload
+		// with an updated config placed in defaultConfigPath.
+		config, exists, err := populateConfig(v)
+		if config == nil || !exists || err != nil {
+			if err != nil {
+				cobra.CheckErr(fmt.Errorf("Could not populate config, tried local %s in harpoon pod and also URL: %s", defaultConfigPath, envURL))
 			}
+			cobra.CheckErr(fmt.Errorf("Error locating config, tried local %s in harpoon pod and also URL %s: %v", defaultConfigPath, envURL, err))
 		}
 	}
 
-	if config == nil {
-		log.Fatalf("Could not locate config, exiting")
-	}
 	if config.Targets == nil {
 		cobra.CheckErr("no harpoon targets found, exiting")
 	}
@@ -202,7 +200,7 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 		// socket := "unix:" + sock_dir + "/podman/podman.sock"
 		conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 		if err != nil || conn == nil {
-			log.Fatalf("error establishing connection to podman.sock: %v", err)
+			cobra.CheckErr(fmt.Errorf("error establishing connection to podman.sock: %v", err))
 		}
 		hc.conn = conn
 	}
@@ -259,6 +257,7 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 		}
 		break
 	}
+
 	if hc.scheduler == nil {
 		hc.scheduler = gocron.NewScheduler(time.UTC)
 	}

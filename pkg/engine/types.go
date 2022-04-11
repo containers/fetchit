@@ -35,9 +35,7 @@ type ConfigFileTarget struct {
 	// Must be valid cron expression
 	// With ConfigFileTarget, harpoon will be restarted with each scheduled run
 	Schedule string `mapstructure:"schedule"`
-	// If not a github repository, this is the url that will be fetched
-	// to load the config file
-	// If this field is populated, HarpoonTarget Branch|SshDirectory|Url will be ignored
+	// URL location of config file, such as a raw github URL
 	ConfigUrl string `mapstructure:"configUrl"`
 	// initialRun is set by harpoon
 	initialRun bool
