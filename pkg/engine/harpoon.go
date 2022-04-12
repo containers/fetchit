@@ -985,7 +985,6 @@ func (hc *HarpoonConfig) CheckForConfigUpdates(envURL string, existsAlready bool
 		klog.Info(err)
 		// if initial, we're here because could not read/find local config
 		if initial {
-			klog.Infof("HERERRE ERRRRROR: %v", err)
 			return reset, err
 		}
 	}
