@@ -2,9 +2,9 @@
 # Note: It takes (default) 5 min for raw urls to be updated in GitHub, so this test will wait for 7 min
 targets:
 - name: harpoon
-  url: http://github.com/sallyom/harpoon
+  url: http://github.com/redhat-et/harpoon
   methods:
     configTarget:
-      configUrl: https://raw.githubusercontent.com/sallyom/harpoon/config-upload/examples/config-reload.yaml
+      configUrl: https://raw.githubusercontent.com/redhat-et/harpoon/main/examples/config-reload.yaml
       schedule: "*/1 * * * *"
 
