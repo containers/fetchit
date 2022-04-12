@@ -4,13 +4,13 @@
 # new targets are fetched & run
 targets:
 - name: harpoon
-  url: http://github.com/sallyom/harpoon
+  url: https://github.com/redhat-et/harpoon
   methods:
     configTarget:
-      configUrl: https://raw.githubusercontent.com/sallyom/harpoon/config-upload/examples/config-reload.yaml
+      configUrl: https://raw.githubusercontent.com/redhat-et/harpoon/main/examples/config-reload.yaml
       schedule: "*/2 * * * *"
     raw:
       targetPath: examples/raw
       schedule: "*/1 * * * *"
       pullImage: true
-  branch: config-upload
+  branch: main
