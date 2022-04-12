@@ -24,5 +24,12 @@ func init() {
 	}
 	for _, cmd := range cmdGroup {
 		harpoonConfig.bindFlags(cmd)
+		if cmd.Flags().Changed("config") {
+			configFile, err := cmd.Flags().GetString("config")
+			if err != nil {
+				cobra.CheckErr(err)
+			}
+			harpoonConfig.configFile = configFile
+		}
 	}
 }

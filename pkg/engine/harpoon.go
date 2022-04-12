@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,29 +144,27 @@ func isLocalConfig(v *viper.Viper) (*HarpoonConfig, bool, error) {
 // Initconfig reads in config file and env variables if set.
 func (hc *HarpoonConfig) InitConfig(initial bool) {
 	v := viper.New()
-	if hc.configFile != "" {
-		configBytes, err := ioutil.ReadFile(hc.configFile)
-		if err != nil {
-			klog.Infof("error processing config file %s, will try to download from HARPOON_CONFIG_URL: %v", hc.configFile, err)
-		} else {
-			if err = os.WriteFile(defaultConfigPath, configBytes, 0600); err != nil {
-				klog.Infof("error processing config file %s, will try to download from HARPOON_CONFIG_URL: %v", hc.configFile, err)
-			}
+	var err error
+	var isLocal, exists bool
+	var config *HarpoonConfig
+	envURL := os.Getenv("HARPOON_CONFIG_URL")
+
+	// user will pass path on local system, but it must be mounted at the defaultConfigPath in harpoon pod
+	// regardless of where the config file is on the host, harpoon will read the configFile from within
+	// the pod at /opt/mount/harpoon-config.yaml
+	if initial && hc.configFile != defaultConfigPath {
+		if _, err := os.Stat(defaultConfigPath); err != nil {
+			cobra.CheckErr(fmt.Errorf("the local config file must be mounted to /opt/mount directory at /opt/mount/config.yaml in the harpoon pod: %v", err))
 		}
 	}
-	hc.configFile = defaultConfigPath
 
-	envURL := os.Getenv("HARPOON_CONFIG_URL")
-	config, isLocal, err := isLocalConfig(v)
+	config, isLocal, err = isLocalConfig(v)
 	if (initial && !isLocal) || err != nil {
-		// may or may not be from initial startup, CheckForConfigUpdates runs with each processConfig
-		// On initial runs, if config file exists locally, config is already populated above.
-		// If configURL is not set yet, the env var will be picked up (if there is one configured)
-		// with first scheduled processing of target.Methods.ConfigTarget.ConfigUrl (if there is one).
-		_, err = hc.CheckForConfigUpdates(envURL, false, true)
-		if err != nil {
-			cobra.CheckErr(fmt.Errorf("Error locating config from %s and also from %s", defaultConfigPath, envURL))
-		}
+		// Only run this from initial startup and only after trying to populate the config from a local file.
+		// because CheckForConfigUpdates also runs with each processConfig, so if !initial this is already done
+		// If configURL is passed in, a config file on disk has priority on the initial run.
+		// It will be considered with first processing of target.Methods.ConfigTarget.ConfigUrl (if there is one).
+		_ = hc.CheckForConfigUpdates(envURL, false, true)
 	}
 
 	// if config is not yet populated, hc.CheckForConfigUpdates has placed the config
@@ -175,7 +172,7 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 	if !isLocal {
 		// If not initial run, only way to get here is if already determined need for reload
 		// with an updated config placed in defaultConfigPath.
-		config, exists, err := populateConfig(v)
+		config, exists, err = populateConfig(v)
 		if config == nil || !exists || err != nil {
 			if err != nil {
 				cobra.CheckErr(fmt.Errorf("Could not populate config, tried local %s in harpoon pod and also URL: %s", defaultConfigPath, envURL))
@@ -184,7 +181,7 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 		}
 	}
 
-	if config.Targets == nil {
+	if config == nil || config.Targets == nil {
 		cobra.CheckErr("no harpoon targets found, exiting")
 	}
 
@@ -379,7 +376,7 @@ func (hc *HarpoonConfig) processConfig(ctx context.Context, target *Target) {
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
-	restart, _ := hc.CheckForConfigUpdates(envURL, true, false)
+	restart := hc.CheckForConfigUpdates(envURL, true, false)
 	if !restart {
 		return
 	}
@@ -985,17 +982,13 @@ func (hc *HarpoonConfig) setinitialRun(target *Target, method string) {
 // in defaultConfigPath in harpoon container (/opt/mount/config.yaml).
 // This runs with the initial startup as well as with scheduled ConfigTarget runs,
 // if $HARPOON_CONFIG_URL is set.
-func (hc *HarpoonConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) (bool, error) {
+func (hc *HarpoonConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
 	if envURL == "" {
-		return false, nil
+		return false
 	}
-	reset, err := downloadUpdateConfigFile(envURL, existsAlready)
+	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial)
 	if err != nil {
 		klog.Info(err)
-		// if initial, we're here because could not read/find local config
-		if initial {
-			return reset, err
-		}
 	}
-	return reset, nil
+	return reset
 }

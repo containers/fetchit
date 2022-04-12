@@ -17,7 +17,7 @@ import (
 )
 
 // downloadUpdateConfig returns true if config was updated in harpoon pod
-func downloadUpdateConfigFile(urlStr string, existsAlready bool) (bool, error) {
+func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool, error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
 		return false, fmt.Errorf("unable to parse config file url %s: %v", urlStr, err)
@@ -35,10 +35,21 @@ func downloadUpdateConfigFile(urlStr string, existsAlready bool) (bool, error) {
 	defer resp.Body.Close()
 	newBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error downloading config from %s: %v", err)
+	}
+	if newBytes == nil && !initial {
+		return false, fmt.Errorf("found empty config at %s, unable to update config", urlStr)
+	}
+	// if initial, this is the last resort, newBytes should be populated
+	// the only way to get here from initial
+	// is if there is no config file on disk, only a HARPOON_CONFIG_URL
+	if initial {
+		if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
+			return false, fmt.Errorf("could not copy contents of %s to path %s: %v", urlStr, defaultConfigPath, err)
+		}
+		return true, nil
 	}
 	currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
-	// This happens when starting up with no local config, only $HARPOON_CONFIG_URL
 	if err != nil {
 		klog.Infof("unable to read current config, will try with new downloaded config file: %v", err)
 		existsAlready = false
