@@ -33,7 +33,7 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ### Harpoon launch options
 Harpoon and can be started manually or launched via systemd. 
 
-Define the parameters in your `config.yaml` to relate to your git repository.
+Define the parameters in your `$HOME/.harpoon/config.yaml` to relate to your git repository.
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
 
 ```
@@ -53,7 +53,7 @@ targets:
 #### Launch using systemd
 Two systemd files are provided to allow for Harpoon to run as a user or as root. The files are differentiated by .root and .user.
 
-Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
+Ensure that there is a config at `$HOME/.harpoon/config.yaml` before attempting to start the service.
 
 NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
@@ -64,7 +64,6 @@ cp systemd/harpoon.root /etc/systemd/system/harpoon.service
 systemctl enable harpoon --now
 ```
 
-For user ensure that the path for the configuration file `/home/harpooner/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
 
 NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
@@ -81,7 +80,7 @@ NOTE: SELinux is temporarily disabled until the work to define the specific SELi
 
 ```
 setenforce 0
-podman run -d --rm --name harpoon -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --rm --name harpoon -v harpoon-volume:/opt -v $HOME/.harpoon:/opt/config -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ```
 
 **NOTE:**

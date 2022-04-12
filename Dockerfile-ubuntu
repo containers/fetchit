@@ -1,0 +1,15 @@
+FROM ubuntu:devel
+LABEL maintainer="brett.dellegrazie@gmail.com"
+
+ENV container=docker LANG=C.UTF-8
+
+# Enable all repositories
+RUN sed -i 's/# deb/deb/g' /etc/apt/sources.list
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+    git podman curl dbus systemd systemd-cron rsyslog iproute2 python-apt-doc python3-apt-dbg python3-apt python-apt-common sudo bash ca-certificates && \
+    apt-get clean && \
+    rm -rf /usr/share/doc/* /usr/share/man/* /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN sed -i 's/^\(module(load="imklog")\)/#\1/' /etc/rsyslog.conf
