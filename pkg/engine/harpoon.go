@@ -42,7 +42,6 @@ const (
 var (
 	defaultConfigPath     = filepath.Join("/opt", "mount", "config.yaml")
 	defaultConfigBackup   = filepath.Join("/opt", "mount", "config-backup.yaml")
-	defaultHostConfigPath = filepath.Join(os.Getenv("HOME"), ".harpoon", "config.yaml")
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -105,10 +104,8 @@ func (o *HarpoonConfig) bindFlags(cmd *cobra.Command) {
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
 func (hc *HarpoonConfig) Restart() {
-	if hc.scheduler == nil {
-		return
-	}
 	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod)
+	hc.scheduler.Clear()
 	hc.InitConfig(false)
 	hc.GetTargets()
 	hc.RunTargets()
@@ -321,7 +318,6 @@ func (hc *HarpoonConfig) RunTargets() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.RemoveByTag(configMethod)
 				s.Cron(schedule).Tag(configMethod).Do(hc.processConfig, ctx, &target)
 			case kubeMethod:
 				ctx, cancel := context.WithCancel(context.Background())
@@ -381,16 +377,6 @@ func (hc *HarpoonConfig) processConfig(ctx context.Context, target *Target) {
 		return
 	}
 	hc.restartHarpoon = restart
-	mo := &SingleMethodObj{
-		Conn:   hc.conn,
-		Method: configMethod,
-		Target: target,
-	}
-	if err := hc.EngineMethod(ctx, mo, defaultConfigPath, nil); err != nil {
-		klog.Warningf("Target: %s error updating config targets, will retry next run: %v", err)
-		return
-	}
-
 	hc.update(target)
 	if hc.restartHarpoon {
 		klog.Info("Updated config processed, restarting with new targets")
@@ -775,12 +761,6 @@ func (hc *HarpoonConfig) findDiff(target *Target, method, targetPath string, com
 // Each engineMethod call now owns the prev and dest variables instead of being shared in mo
 func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, path string, change *object.Change) error {
 	switch mo.Method {
-	case configMethod:
-		// Only here if config has been updated by CheckForConfigUpdates.
-		// If so, update files on disk with fileTransferPodman.
-		// Updated config file is at /opt/mount/config.yaml in harpoon pod
-		// cp updated config /opt/mount/config.yaml in pod to $HOME/.harpoon/config.yaml on host
-		return fileTransferPodman(ctx, mo, defaultConfigPath, defaultHostConfigPath, nil)
 	case rawMethod:
 		prev, err := getChangeString(change)
 		if err != nil {
@@ -983,6 +963,7 @@ func (hc *HarpoonConfig) setinitialRun(target *Target, method string) {
 // This runs with the initial startup as well as with scheduled ConfigTarget runs,
 // if $HARPOON_CONFIG_URL is set.
 func (hc *HarpoonConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
+	// envURL is either set by user or set to match a configUrl in a configTarget
 	if envURL == "" {
 		return false
 	}
