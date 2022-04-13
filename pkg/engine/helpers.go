@@ -37,39 +37,35 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 	if err != nil {
 		return false, fmt.Errorf("error downloading config from %s: %v", err)
 	}
-	if newBytes == nil && !initial {
-		return false, fmt.Errorf("found empty config at %s, unable to update config", urlStr)
+	if newBytes == nil {
+		// if initial, this is the last resort, newBytes should be populated
+		// the only way to get here from initial
+		// is if there is no config file on disk, only a HARPOON_CONFIG_URL
+		return false, fmt.Errorf("found empty config at %s, unable to update or populate config", urlStr)
 	}
-	// if initial, this is the last resort, newBytes should be populated
-	// the only way to get here from initial
-	// is if there is no config file on disk, only a HARPOON_CONFIG_URL
-	if initial {
-		if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
-			return false, fmt.Errorf("could not copy contents of %s to path %s: %v", urlStr, defaultConfigPath, err)
+	if !initial {
+		currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
+		if err != nil {
+			klog.Infof("unable to read current config, will try with new downloaded config file: %v", err)
+			existsAlready = false
+		} else {
+			if bytes.Equal(newBytes, currentConfigBytes) {
+				return false, nil
+			}
 		}
-		return true, nil
-	}
-	currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
-	if err != nil {
-		klog.Infof("unable to read current config, will try with new downloaded config file: %v", err)
-		existsAlready = false
-	} else {
-		if bytes.Equal(newBytes, currentConfigBytes) {
-			return false, nil
-		}
-	}
 
-	if existsAlready {
-		if err := os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600); err != nil {
-			return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
+		if existsAlready {
+			if err := os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600); err != nil {
+				return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
+			}
+			klog.Infof("Current config backup placed at %s", defaultConfigBackup)
 		}
 	}
 	if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
 		return false, fmt.Errorf("unable to write new config contents, reverting to old config: %v", err)
 	}
 
-	klog.Infof("Current config backup placed at %s", defaultConfigBackup)
-	klog.Infof("Config updates found from url: %s, will now reload targets", urlStr)
+	klog.Infof("Config updates found from url: %s, will load new targets", urlStr)
 	return true, nil
 }
 
