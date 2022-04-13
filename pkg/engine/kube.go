@@ -44,7 +44,6 @@ func kubePodman(ctx context.Context, mo *SingleMethodObj, path string, prev *str
 		// Try stopping the pods, don't care if they don't exist
 		err = stopPods(mo.Conn, kubeYaml)
 		if err != nil {
-			klog.Infof("ERR: %s\n", kubeYaml)
 			if !strings.Contains(err.Error(), "no such pod") {
 				return utils.WrapErr(err, "Error stopping pods")
 			}
@@ -60,7 +59,6 @@ func kubePodman(ctx context.Context, mo *SingleMethodObj, path string, prev *str
 }
 
 func stopPods(ctx context.Context, podSpec []byte) error {
-	klog.Info("IN")
 	conn, err := bindings.GetClient(ctx)
 	if err != nil {
 		return utils.WrapErr(err, "Error getting podman connection")
