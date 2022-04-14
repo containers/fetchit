@@ -70,11 +70,12 @@ type SystemdTarget struct {
 	// If false (default) will place unit file in ~/.config/systemd/user/
 	Root bool `mapstructure:"root"`
 	// If true, will enable and start the systemd service
+	// If true, will reload and restart the service with every scheduled run
+	// Implies Enable=true, will override Enable=false
+	Restart bool `mapstructure:"restart"`
+	// If true, will enable and start the systemd service
 	// If false (default), will place unit file in appropriate systemd path
 	Enable bool `mapstructure:"enable"`
-	// If true, service will be restarted with each run
-	// This is convenient to catch image updates with podman autoupdate=true
-	RestartAlways bool `mapstructure:restartAlways"`
 	// Schedule is how often to check for git updates to the unit file
 	// If Enable is true, service is restarted on schedule regardless of whether there is git diff
 	// This is to, for example, launch with updated image using podman autoupdate, if service runs a podman command

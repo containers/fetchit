@@ -40,8 +40,8 @@ const (
 )
 
 var (
-	defaultConfigPath     = filepath.Join("/opt", "mount", "config.yaml")
-	defaultConfigBackup   = filepath.Join("/opt", "mount", "config-backup.yaml")
+	defaultConfigPath   = filepath.Join("/opt", "mount", "config.yaml")
+	defaultConfigBackup = filepath.Join("/opt", "mount", "config-backup.yaml")
 )
 
 // HarpoonConfig requires necessary objects to process targets
@@ -160,7 +160,6 @@ func (hc *HarpoonConfig) InitConfig(initial bool) {
 		// Only run this from initial startup and only after trying to populate the config from a local file.
 		// because CheckForConfigUpdates also runs with each processConfig, so if !initial this is already done
 		// If configURL is passed in, a config file on disk has priority on the initial run.
-		// It will be considered with first processing of target.Methods.ConfigTarget.ConfigUrl (if there is one).
 		_ = hc.CheckForConfigUpdates(envURL, false, true)
 	}
 
@@ -477,6 +476,9 @@ func (hc *HarpoonConfig) processSystemd(ctx context.Context, target *Target) {
 		Target: target,
 	}
 	tag := []string{".service"}
+	if sd.Restart {
+		sd.Enable = true
+	}
 	var path string
 	if initial {
 		retry := hc.resetTarget(target, systemdMethod, true, nil)
@@ -667,6 +669,9 @@ func (hc *HarpoonConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 	hc.update(mo.Target)
 
 	if len(changesThisMethod) == 0 {
+		if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart {
+			return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
+		}
 		klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
 		return nil
 	}
@@ -784,6 +789,9 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 			dest = systemdPathRoot
 		} else {
 			dest = filepath.Join(nonRootHomeDir, ".config", "systemd", "user")
+		}
+		if change != nil {
+			mo.Target.Methods.Systemd.initialRun = true
 		}
 		return systemdPodman(ctx, mo, path, dest, prev)
 	case fileTransferMethod:
