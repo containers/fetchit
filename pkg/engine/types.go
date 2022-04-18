@@ -61,24 +61,24 @@ type RawTarget struct {
 // Each URL may have multiple Systemd unit files
 type SystemdTarget struct {
 	// Where in the git repository to fetch a systemd unit file
-	// If not *.service, unit file will be renamed on host to filename minus extension + ".service"
 	// All '*.service' files will be placed in appropriate systemd path
 	// TargetPath must be a single exact file
-	// To enable multiple unit files, configure additional Systemds
 	TargetPath string `mapstructure:"targetPath"`
 	// If true, will place unit file in /etc/systemd/system/
 	// If false (default) will place unit file in ~/.config/systemd/user/
 	Root bool `mapstructure:"root"`
-	// If true, will enable and start the systemd service
-	// If true, will reload and restart the service with every scheduled run
+	// If true, will enable and start all systemd services from fetched unit files
+	// If true, will reload and restart the services with every scheduled run
 	// Implies Enable=true, will override Enable=false
 	Restart bool `mapstructure:"restart"`
-	// If true, will enable and start the systemd service
-	// If false (default), will place unit file in appropriate systemd path
+	// If true, will enable and start systemd services from fetched unit files
+	// If false (default), will place unit file(s) in appropriate systemd path
 	Enable bool `mapstructure:"enable"`
 	// Schedule is how often to check for git updates to the unit file
-	// If Enable is true, service is restarted on schedule regardless of whether there is git diff
-	// This is to, for example, launch with updated image using podman autoupdate, if service runs a podman command
+	// or how often to restart the services, if Restart=true.
+	// If Restart is true, service is restarted on schedule regardless of whether there is git diff
+	// This is to, for example, launch with updated image using podman autoupdate,
+	// if service runs a podman command
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
 	// initialRun is set by harpoon
