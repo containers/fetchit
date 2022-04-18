@@ -17,17 +17,27 @@ import (
 func systemdPodman(ctx context.Context, mo *SingleMethodObj, path, dest string, prev *string) error {
 	klog.Infof("Deploying systemd file(s) %s", path)
 	sd := mo.Target.Methods.Systemd
-	if err := fileTransferPodman(ctx, mo, path, dest, prev); err != nil {
-		return utils.WrapErr(err, "Error deploying systemd file(s) Target: %s, Path: %s", mo.Target.Name, sd.TargetPath)
+	if mo.Target.Methods.Systemd.initialRun {
+		if err := fileTransferPodman(ctx, mo, path, dest, prev); err != nil {
+			return utils.WrapErr(err, "Error deploying systemd file(s) Target: %s, Path: %s", mo.Target.Name, sd.TargetPath)
+		}
 	}
 	if !sd.Enable {
 		klog.Infof("Target: %s, systemd target successfully processed", mo.Target.Name)
 		return nil
 	}
-	return enableSystemdService(mo, "enable", dest, filepath.Base(path))
+	if (sd.Enable && !sd.Restart) || mo.Target.Methods.Systemd.initialRun {
+		if sd.Enable {
+			return enableRestartSystemdService(mo, "enable", dest, filepath.Base(path))
+		}
+	}
+	if sd.Restart {
+		return enableRestartSystemdService(mo, "restart", dest, filepath.Base(path))
+	}
+	return nil
 }
 
-func enableSystemdService(mo *SingleMethodObj, action, dest, service string) error {
+func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service string) error {
 	klog.Infof("Target: %s, running systemctl %s %s", mo.Target.Name, action, service)
 	sd := mo.Target.Methods.Systemd
 	if err := detectOrFetchImage(mo.Conn, systemdImage, true); err != nil {

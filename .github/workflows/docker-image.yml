@@ -58,7 +58,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate,  systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -105,7 +105,7 @@ jobs:
 
   build-systemd-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate,  systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -448,6 +448,57 @@ jobs:
       - name: ensure httpd.service is running
         run:  sudo systemctl is-active --quiet httpd.service
 
+  systemd-restart-validate:
+    runs-on: ubuntu-latest
+    needs: [ build , build-systemd-amd ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: harpoon-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/harpoon.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+
+      - name: pull systemd amd artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: systemd-image-amd
+          path: /tmp
+
+      - name: Load the systemd image
+        run: sudo podman load -i /tmp/systemd-amd.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
+
+      - name: Start harpoon
+        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-restart.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+
+      - name: Wait for harpoon to deploy
+        run: sleep 4m
+
+      - name: Logs
+        run: sudo podman logs harpoon
+
+      - name: list files
+        run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: ensure systemd containers are gone
+        run: sudo podman ps -a
+
+      - name: ensure httpd.service is running
+        run:  sudo systemctl is-active --quiet httpd.service
+
   ansible-validate:
     runs-on: ubuntu-latest
     needs: [ build, build-ansible-amd ]
@@ -700,7 +751,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -727,7 +778,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
