@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: env
 data:
-  APP_COLOR: red 
+  APP_COLOR: blue
   tree: trunk
 ---
 apiVersion: v1
