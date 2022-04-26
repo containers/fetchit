@@ -10,3 +10,4 @@ _output
 harpoon
 !harpoon/
 config.yaml
+*.env

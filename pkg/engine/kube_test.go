@@ -1,168 +1,149 @@
 package engine
 
 import (
-	"strings"
+	"context"
+	"os"
+	"sort"
 	"testing"
 
-	"gopkg.in/yaml.v3"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/pods"
+	"github.com/joho/godotenv"
 )
 
-func TestValidatePod(t *testing.T) {
-	var pod v1.Pod = v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name: "test1",
-				},
-				{
-					Name: "test2",
-				},
-			},
-		},
+func createSingleMethodObj(conn context.Context, url, branch string) SingleMethodObj {
+	return SingleMethodObj{
+		Conn:   conn,
+		Method: kubeMethod,
+		Target: &Target{},
 	}
-
-	err := validatePod(pod)
-	if err != nil {
-		t.Errorf("expected no error, got %s", err)
-	}
-
-	pod.Spec.Containers[0].Name = pod.ObjectMeta.Name
-
-	err = validatePod(pod)
-	if err == nil {
-		t.Errorf("expected error, got nil")
-	}
-
 }
 
-var invalidYaml = `
-apiVersion: v1
-		kind: Pod
-	metadata`
-
-var notPodYaml = `
-apiVersion: v1
-kind: ConfigMap`
-
-var podYaml = `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test_pod1
-spec:
-  containers:
-  - name: test1
-    image: test1
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test_pod2
-spec:
-  containers:
-  - name: test2
-    image: test2`
-
-var expectedPodList = []v1.Pod{
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test_pod1",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "test1",
-					Image: "test1",
-				},
-			},
-		},
-	}, {
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test_pod2",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "test2",
-					Image: "test2",
-				},
-			},
-		},
-	},
+type testCaseSpec struct {
+	Path             string
+	ExpectedPodNames []string
+	// ExpectedContainerNames []string
+	// ExpectedVolumeNames []string
 }
 
-func comparePodList(t *testing.T, expected []v1.Pod, actual []v1.Pod) {
-	m := make(map[string]int)
-
-	if len(expected) != len(actual) {
-		t.Errorf("expected %d pods, got %d", len(expected), len(actual))
+func removeParallel(conn context.Context, podList []string) error {
+	ch := make(chan error)
+	for _, pod := range podList {
+		go func(ch chan<- error, conn context.Context, pod string) {
+			_, err := pods.Remove(conn, pod, nil)
+			ch <- err
+		}(ch, conn, pod)
 	}
 
-	for _, pod := range expected {
-		pod_bytes, err := yaml.Marshal(pod)
+	for range podList {
+		err := <-ch
 		if err != nil {
-			t.Errorf("error running test: %s", err)
-		}
-		if _, ok := m[string(pod_bytes)]; ok {
-			m[string(pod_bytes)] += 1
-		} else {
-			m[string(pod_bytes)] = 1
+			return err
 		}
 	}
 
-	for _, pod := range actual {
-		pod_bytes, err := yaml.Marshal(pod)
-		if err != nil {
-			t.Errorf("error running test: %s", err)
-		}
-		if _, ok := m[string(pod_bytes)]; !ok {
-			t.Errorf("actual pod not in expected pods: %s", string(pod_bytes))
-		}
-		m[string(pod_bytes)] -= 1
-		if m[string(pod_bytes)] == 0 {
-			delete(m, string(pod_bytes))
-		}
-	}
-
-	if len(m) != 0 {
-		t.Errorf("missing actual pods from expected pods")
-	}
+	return nil
 }
 
-func TestPodFromBytes(t *testing.T) {
-	_, err := podFromBytes([]byte(invalidYaml))
-	if err == nil {
-		t.Error("expected error, got nothing")
-	} else if !strings.Contains(err.Error(), "Error decoding yaml") {
-		t.Errorf("expected error, got %s", err)
+func stopParallel(conn context.Context, podList []string) error {
+	ch := make(chan error)
+	for _, pod := range podList {
+		go func(ch chan<- error, conn context.Context, pod string) {
+			_, err := pods.Stop(conn, pod, nil)
+			ch <- err
+		}(ch, conn, pod)
 	}
 
-	_, err = podFromBytes([]byte(notPodYaml))
+	for range podList {
+		err := <-ch
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func cleanPodman(conn context.Context) error {
+	report, err := pods.List(conn, nil)
 	if err != nil {
-		t.Errorf("expected no error, got %s", err)
+		return err
 	}
 
-	actualPodList, err := podFromBytes([]byte(podYaml))
+	podList := []string{}
+	for _, rep := range report {
+		podList = append(podList, rep.Name)
+	}
+
+	err = stopParallel(conn, podList)
 	if err != nil {
-		t.Errorf("expected no error, got %s", err)
+		return err
 	}
 
-	comparePodList(t, expectedPodList, actualPodList)
+	err = removeParallel(conn, podList)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestKubePodman(t *testing.T) {
+	testCases := []testCaseSpec{
+		{
+			Path: "../../examples/kube/2-example.yaml",
+			ExpectedPodNames: []string{
+				"colors_pod",
+			},
+		},
+	}
+
+	_ = godotenv.Load("../../test.env")
+
+	ctx := context.Background()
+
+	conn, err := bindings.NewConnection(ctx, "unix://run/user/1000/podman/podman.sock")
+	if err != nil {
+		t.Error(err)
+	}
+
+	url := os.Getenv("URL")
+	branch := os.Getenv("BRANCH")
+
+	smo := createSingleMethodObj(conn, url, branch)
+	for _, testCase := range testCases {
+		err := cleanPodman(conn)
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = kubePodman(ctx, &smo, testCase.Path, nil)
+		if err != nil {
+			t.Error(err)
+		}
+
+		report, err := pods.List(conn, nil)
+		if err != nil {
+			t.Error(err)
+		}
+
+		pods := []string{}
+
+		for _, rep := range report {
+			pods = append(pods, rep.Name)
+		}
+
+		if len(pods) != len(testCase.ExpectedPodNames) {
+			t.Errorf("Expected pods %v got %v", testCase.ExpectedPodNames, pods)
+		}
+
+		sort.Strings(pods)
+		sort.Strings(testCase.ExpectedPodNames)
+
+		for index, element := range testCase.ExpectedPodNames {
+			if pods[index] != element {
+				t.Errorf("Expected pods %v got %v", testCase.ExpectedPodNames, pods)
+			}
+		}
+	}
 }
