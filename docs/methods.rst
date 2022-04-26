@@ -7,12 +7,13 @@ The YAML configuration file defines the method to use, how frequently to check t
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   raw:
-      targetPath: examples/raw
-      schedule: "*/5 * * * *"
-      pullImage: true
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       raw:
+         targetPath: examples/raw
+         schedule: "*/5 * * * *"
+         pullImage: true
+     branch: main
 
 A target is a unique value but the methods within each target cannot be repeated. Mutiple targets can be defined.
 
@@ -23,7 +24,7 @@ Various methods are available to lifecycle and manage the container environment 
 
 Ansible
 -------
-The Ansible method allows for an Ansible playbook to be run on the host. A container is created containing the Ansible playbook, and the container will run the playbook. This playbook can be used to install software, configure the host, or perform other tasks.
+The AnsibleTarget method allows for an Ansible playbook to be run on the host. A container is created containing the Ansible playbook, and the container will run the playbook. This playbook can be used to install software, configure the host, or perform other tasks.
 In the examples directory, there is an Ansible playbook that is used to install zsh.
 
 .. code-block:: yaml
@@ -31,30 +32,32 @@ In the examples directory, there is an Ansible playbook that is used to install 
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   ansible: 
-      targetPath: examples/ansible
-      sshDirectory: /root/.ssh
-      schedule: "*/5 * * * *"
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       ansible: 
+         targetPath: examples/ansible
+         sshDirectory: /root/.ssh
+         schedule: "*/5 * * * *"
+     branch: main
 
 The field sshDirectory is unique for this method. This directory should contain the private key used to connect to the host and the public key should be copied into the `.ssh/authorized_keys` file to allow for connectivity. The .ssh directory should be owned by root.
 
 Raw
 ---
-The Raw method will launch containers based upon their definition in a JSON file. This method is the equivalent of using the `podman run` command on the host. Multiple JSON files can be defined within a directory.
+The RawTarget method will launch containers based upon their definition in a JSON file. This method is the equivalent of using the `podman run` command on the host. Multiple JSON files can be defined within a directory.
 
 .. code-block:: yaml
 
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   raw:
-      targetPath: examples/raw
-      schedule: "*/5 * * * *"
-      pullImage: true
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       raw:
+         targetPath: examples/raw
+         schedule: "*/5 * * * *"
+         pullImage: true
+     branch: main
 
 The pullImage field is useful if a container image uses the latest tag. This will ensure that the method will attempt to pull the container image every time.
 
@@ -81,20 +84,32 @@ Volume and host mounts can be provided in the JSON file.
 
 Systemd
 -------
-Systemd is a method that will create a systemd unit file. In the future this method will also start or update the unit. This method is useful for creating services that can be started and stopped.
+SystemdTarget is a method that will place, enable, and restart systemd unit files.
+SystemdTarget can also enable podman-auto-update.service & podman-auto-update.timer on the host.
+With AutoUpdateAll: True, all other fields are ignored. This is because podman auto-update will
+look for image updates with all podman-generated unit files that include the auto-update label.
 
 .. code-block:: yaml
 
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   systemd:
-      targetPath: examples/systemd
-      root: true
-      enable: true
-      schedule: "*/5 * * * *"
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       systemd:
+         targetPath: examples/systemd
+         root: true
+         enable: true
+         schedule: "*/5 * * * *"
+     branch: main
+
+.. code-block:: yaml
+
+   targets:
+   - name: autoupdate
+     methods:
+       systemd:
+         autoUpdateAll: true
 
 File Transfer
 -------------
@@ -116,18 +131,19 @@ The destinationDirectory field is the directory on the host where the files will
 
 Kube Play
 ---------
-The Kube play method will launch a container based upon a Kubernetes pod manifest. This is useful for launching containers to run the same way as they would in a Kubernetes environment.
+The KubeTarget method will launch a container based upon a Kubernetes pod manifest. This is useful for launching containers to run the same way as they would in a Kubernetes environment.
 
 .. code-block:: yaml
 
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   kube: 
-      targetPath: examples/kube
-      schedule: "*/5 * * * *"
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       kube: 
+         targetPath: examples/kube
+         schedule: "*/5 * * * *"
+     branch: main
 
 An example Kube play YAML file will look similiar to the following. This will launch a container as well as the coresponding ConfigMap.
 
