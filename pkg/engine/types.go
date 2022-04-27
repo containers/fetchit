@@ -41,7 +41,7 @@ type ConfigFileTarget struct {
 	initialRun bool
 }
 
-// Raw configures target that deploys pods from json or yaml files
+// RawTarget to deploy pods from json or yaml files
 type RawTarget struct {
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
 	TargetPath string `mapstructure:"targetPath"`
@@ -56,10 +56,16 @@ type RawTarget struct {
 	lastCommit *object.Commit
 }
 
-// Systemd configures target that places and/or enables systemd unit files
-// One unit file per Systemd
-// Each URL may have multiple Systemd unit files
+// SystemdTarget to place and/or enable systemd unit files on host
 type SystemdTarget struct {
+	// AutoUpdateAll will start podman-auto-update.service, podman-auto-update.timer
+	// on the host. With this field true, all other fields are ignored. To place unit files
+	// on host and/or enable individual services, create a separate Target.Methods.Systemd
+	// 'podman auto-update' updates all services running podman with the autoupdate label
+	// see https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html#systemd-unit-and-timer
+	// TODO: update /etc/systemd/system/podman-auto-update.timer.d/override.conf with schedule
+	// By default, podman will auto-update at midnight daily when this service is running
+	AutoUpdateAll bool `mapstructure:"autoUpdateAll"`
 	// Where in the git repository to fetch a systemd unit file
 	// All '*.service' files will be placed in appropriate systemd path
 	// TargetPath must be a single exact file
@@ -75,10 +81,7 @@ type SystemdTarget struct {
 	// If false (default), will place unit file(s) in appropriate systemd path
 	Enable bool `mapstructure:"enable"`
 	// Schedule is how often to check for git updates to the unit file
-	// or how often to restart the services, if Restart=true.
-	// If Restart is true, service is restarted on schedule regardless of whether there is git diff
-	// This is to, for example, launch with updated image using podman autoupdate,
-	// if service runs a podman command
+	// and/or how often to restart services.
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
 	// initialRun is set by harpoon
@@ -87,7 +90,7 @@ type SystemdTarget struct {
 	lastCommit *object.Commit
 }
 
-// FileTransfer configures targets to place files on host system
+// FileTransferTarget to place files on host system
 type FileTransferTarget struct {
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
 	TargetPath string `mapstructure:"targetPath"`
@@ -102,7 +105,7 @@ type FileTransferTarget struct {
 	lastCommit *object.Commit
 }
 
-// Kube configures targets to launch pods using podman kube-play
+// KubeTarget to launch pods using podman kube-play
 type KubeTarget struct {
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
 	TargetPath string `mapstructure:"targetPath"`
@@ -115,7 +118,7 @@ type KubeTarget struct {
 	lastCommit *object.Commit
 }
 
-// Ansible configures targets to place and run ansible playbooks
+// AnsibleTarget to place and run ansible playbooks
 type AnsibleTarget struct {
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
 	TargetPath string `mapstructure:"targetPath"`
