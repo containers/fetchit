@@ -64,7 +64,7 @@ func stopParallel(conn context.Context, podList []string) error {
 	return nil
 }
 
-func cleanPodman(conn context.Context) error {
+func cleanPodmanTests(conn context.Context) error {
 	report, err := pods.List(conn, nil)
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func TestKubePodman(t *testing.T) {
 
 	smo := createSingleMethodObj(conn, url, branch)
 	for _, testCase := range testCases {
-		err := cleanPodman(conn)
+		err := cleanPodmanTests(conn)
 		if err != nil {
 			t.Error(err)
 		}

@@ -1,8 +1,9 @@
 package engine
 
 import (
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"sync"
+
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 type Target struct {
@@ -21,6 +22,7 @@ type Methods struct {
 	Kube         *KubeTarget         `mapstructure:"kube"`
 	Ansible      *AnsibleTarget      `mapstructure:"ansible"`
 	FileTransfer *FileTransferTarget `mapstructure:"fileTransfer"`
+	Clean        *CleanTarget        `mapstructure:"clean"`
 	ConfigTarget *ConfigFileTarget   `mapstructure:"configTarget"`
 }
 
@@ -131,4 +133,16 @@ type AnsibleTarget struct {
 	initialRun bool
 	// lastCommit is set by harpoon
 	lastCommit *object.Commit
+}
+
+// Clean configures targets to run a system prune periodically
+type CleanTarget struct {
+	// Schedule is how often to check for git updates and/or restart the harpoon service
+	// Must be valid cron expression
+	// With ConfigFileTarget, harpoon will be restarted with each scheduled run
+	Schedule string `mapstructure:"schedule"`
+	// URL location of config file, such as a raw github URL
+	Volumes bool `mapstructure:"volumes"`
+	// initialRun is set by harpoon
+	All bool `mapstructure:"all"`
 }

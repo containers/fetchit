@@ -19,4 +19,8 @@ targets:
       targetPath: examples/filetransfer
       destinationDirectory: /tmp/ft
       schedule: "*/1 * * * *"
+    clean:
+      All: true
+      Volumes: false
+      schedule: "*/1 * * * *"
   branch: main

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -35,6 +36,7 @@ const (
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
 	ansibleMethod      = "ansible"
+	cleanMethod        = "clean"
 	deleteFile         = "delete"
 	systemdPathRoot    = "/etc/systemd/system"
 	podmanServicePath  = "/usr/lib/systemd/system"
@@ -290,6 +292,9 @@ func (hc *HarpoonConfig) GetTargets() {
 			target.Methods.Ansible.initialRun = true
 			schedMethods[ansibleMethod] = target.Methods.Ansible.Schedule
 		}
+		if target.Methods.Clean != nil {
+			schedMethods[cleanMethod] = target.Methods.Clean.Schedule
+		}
 		target.methodSchedules = schedMethods
 		hc.update(target)
 	}
@@ -346,8 +351,13 @@ func (hc *HarpoonConfig) RunTargets() {
 			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
+				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				s.Cron(schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target)
+			case cleanMethod:
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				s.Cron(schedule).Tag(cleanMethod).Do(hc.processClean, ctx, &target)
 			default:
 				klog.Warningf("Target: %s Method: %s, unknown method type, ignoring", target.Name, method)
 			}
@@ -605,6 +615,23 @@ func (hc *HarpoonConfig) processKube(ctx context.Context, target *Target) {
 		return
 	}
 	kube.initialRun = false
+	hc.update(target)
+}
+
+func (hc *HarpoonConfig) processClean(ctx context.Context, target *Target) {
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	// Nothing to do with certain file we're just collecting garbage so can call the cleanPodman method straight from here
+	opts := system.PruneOptions{
+		All:     &target.Methods.Clean.All,
+		Volumes: &target.Methods.Clean.Volumes,
+	}
+
+	err := cleanPodman(ctx, hc.conn, opts)
+	if err != nil {
+		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, cleanMethod, err)
+	}
+
 	hc.update(target)
 }
 
