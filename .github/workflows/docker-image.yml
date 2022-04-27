@@ -208,6 +208,45 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
+  fetchit-config-reload-skew-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: move config file to default location
+        run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url-with-skew.yaml /root/.fetchit/config.yaml
+
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        
+      - name: Wait for fetchit to deploy
+        run: sleep 7m
+
+      - name: Logs
+        run: sudo podman logs fetchit
+
+      - name: verify container is running
+        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: sudo podman ps
+
   raw-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
@@ -758,6 +797,51 @@ jobs:
   
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        
+      - name: Wait for fetchit to deploy
+        run: sleep 150s
+        
+      - name: Logs
+        run: sudo podman logs fetchit
+
+      - name: list systemd files
+        run: sudo ls /etc/systemd/system/httpd.service
+
+      - name: list transferred files
+        run: sudo ls /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
+
+      - name: ensure only required containers are running (colors and fetchit)
+        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
+
+      - name: verify raw container is running
+        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+  multi-engine-skew-validate:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Create destination directory
+        run: sudo mkdir /tmp/ft
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+        
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+  
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 150s

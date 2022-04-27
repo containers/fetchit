@@ -11,7 +11,7 @@ type Target struct {
 	Url             string  `mapstructure:"url"`
 	Branch          string  `mapstructure:"branch"`
 	Methods         Methods `mapstructure:"methods"`
-	methodSchedules map[string]string
+	methodSchedules map[string]schedInfo
 	mu              sync.Mutex
 }
 
@@ -32,11 +32,18 @@ type Methods struct {
 // Without this target, fetchit will not watch for config updates.
 // At this time, only 1 FetchitConfigFile target can be passed to fetchit
 // TODO: Collect multiple from multiple FetchitTargets and merge configs into 1 on disk
+type schedInfo struct {
+	Schedule string
+	Skew     *int
+}
+
 type ConfigFileTarget struct {
 	// Schedule is how often to check for git updates and/or restart the fetchit service
 	// Must be valid cron expression
 	// With ConfigFileTarget, fetchit will be restarted with each scheduled run
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// URL location of config file, such as a raw github URL
 	ConfigUrl string `mapstructure:"configUrl"`
 	// initialRun is set by fetchit
@@ -50,6 +57,8 @@ type RawTarget struct {
 	// Schedule is how often to check for git updates to the unit file
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// Pull images configured in target files each time regardless of if it already exists
 	PullImage bool `mapstructure:"pullImage"`
 	// initialRun is set by fetchit
@@ -86,6 +95,8 @@ type SystemdTarget struct {
 	// and/or how often to restart services.
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
 	// lastCommit is set by fetchit
@@ -101,6 +112,8 @@ type FileTransferTarget struct {
 	// Schedule is how often to check for git updates to the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
 	// lastCommit is set by fetchit
@@ -114,6 +127,8 @@ type KubeTarget struct {
 	// Schedule is how often to check for git updates with the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
 	// lastCommit is set by fetchit
@@ -127,6 +142,8 @@ type AnsibleTarget struct {
 	// Schedule is how often to check for git updates with the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// SshDirectory for ansible to connect to host
 	SshDirectory string `mapstructure:"sshDirectory"`
 	// initialRun is set by fetchit
@@ -141,6 +158,8 @@ type CleanTarget struct {
 	// Must be valid cron expression
 	// With ConfigFileTarget, fetchit will be restarted with each scheduled run
 	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// URL location of config file, such as a raw github URL
 	Volumes bool `mapstructure:"volumes"`
 	// initialRun is set by fetchit
