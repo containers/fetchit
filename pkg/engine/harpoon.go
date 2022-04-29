@@ -830,9 +830,9 @@ func (hc *HarpoonConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 				prev = &change.To.Name
 			}
 		}
-		nonRootHomeDir := os.Getenv("USER")
+		nonRootHomeDir := os.Getenv("HOME")
 		if nonRootHomeDir == "" {
-			return fmt.Errorf("Could not determine $USER for host, must set $USER on host machine for non-root systemd method")
+			return fmt.Errorf("Could not determine $HOME for host, must set $HOME on host machine for non-root systemd method")
 		}
 		var dest string
 		if mo.Target.Methods.Systemd.Root {
