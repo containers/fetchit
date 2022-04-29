@@ -88,7 +88,7 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 	s.Name = "systemd-" + act + "-" + service + "-" + mo.Target.Name
 	envMap := make(map[string]string)
 	if !sd.Root {
-		s.User = s.UID
+		s.User = os.Getenv("USER")
 	}
 	envMap["ROOT"] = strconv.FormatBool(sd.Root)
 	envMap["SERVICE"] = service
