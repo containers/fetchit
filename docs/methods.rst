@@ -120,12 +120,13 @@ The File Transfer method will copy files from the container to the host. This me
    volume: harpoon-volume
    targets:
    - name: harpoon
-   url: http://github.com/redhat-et/harpoon
-   filetransfer:
-      targetPath: examples/filetransfer
-      destinationDirectory: /tmp/ft
-      schedule: "*/5 * * * *"
-   branch: main
+     url: http://github.com/redhat-et/harpoon
+     methods:
+       filetransfer:
+         targetPath: examples/filetransfer
+         destinationDirectory: /tmp/ft
+         schedule: "*/5 * * * *"
+     branch: main
 
 The destinationDirectory field is the directory on the host where the files will be copied to.
 
