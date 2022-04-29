@@ -77,9 +77,8 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 	runMountsd := "/run/systemd"
 	runMountc := "/sys/fs/cgroup"
 	if !sd.Root {
-
-		s.User = os.Getenv("USER")
-		runMountsd = "/run/user/" + s.User + "/systemd"
+		runMountsd = "/run/user/1000/systemd"
+		s.User = "1000"
 	}
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
