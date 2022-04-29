@@ -62,23 +62,18 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 		return err
 	}
 
-	// TODO: remove
-	os.Setenv("ROOT", "true")
-	if !sd.Root {
-		//os.Setenv("ROOT", "false")
-		klog.Info("At this time, harpoon non-root user cannot enable systemd service on the host")
-		klog.Infof("To enable this non-root service, run 'systemctl --user enable %s' on host machine", service)
-		klog.Info("To enable service as root, run with Systemd.Root = true")
-		return nil
-	}
-
 	s := specgen.NewSpecGenerator(systemdImage, false)
 	runMounttmp := "/run"
 	runMountsd := "/run/systemd"
 	runMountc := "/sys/fs/cgroup"
 	if !sd.Root {
-		s.User = os.Getenv("USER") 
+		s.User = os.Getenv("USER")
+		sd.Root = false
 		runMountsd = "/run/user/" + s.User + "/systemd"
+	}
+	if sd.Root {
+		s.User = "root"
+		sd.Root = true
 	}
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
