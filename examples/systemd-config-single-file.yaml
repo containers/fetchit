@@ -5,7 +5,7 @@ targets:
   methods:
     systemd:
       targetPath: examples/systemd/httpd.service
-      root: true
+      root: false 
       enable: false
       schedule: "*/1 * * * *"
   branch: main
