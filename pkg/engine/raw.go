@@ -54,25 +54,6 @@ type RawPod struct {
 
 func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
 
-	// Delete previous file's podxz
-	if prev != nil {
-		raw, err := rawPodFromBytes([]byte(*prev))
-		if err != nil {
-			return err
-		}
-
-		err = deleteContainer(mo.Conn, raw.Name)
-		if err != nil {
-			return err
-		}
-
-		klog.Infof("Deleted podman container %s", raw.Name)
-	}
-
-	if path == deleteFile {
-		return nil
-	}
-
 	klog.Infof("Creating podman container from %s", path)
 
 	rawFile, err := ioutil.ReadFile(path)
@@ -90,6 +71,25 @@ func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *stri
 	err = detectOrFetchImage(mo.Conn, raw.Image, mo.Target.Methods.Raw.PullImage)
 	if err != nil {
 		return err
+	}
+
+	// Delete previous file's podxz
+	if prev != nil {
+		raw, err := rawPodFromBytes([]byte(*prev))
+		if err != nil {
+			return err
+		}
+
+		err = deleteContainer(mo.Conn, raw.Name)
+		if err != nil {
+			return err
+		}
+
+		klog.Infof("Deleted podman container %s", raw.Name)
+	}
+
+	if path == deleteFile {
+		return nil
 	}
 
 	err = removeExisting(mo.Conn, raw.Name)
