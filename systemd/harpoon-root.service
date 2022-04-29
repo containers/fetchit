@@ -11,7 +11,7 @@ Restart=always
 TimeoutStopSec=65
 ExecStartPre=/usr/bin/mkdir -p %h/.harpoon
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
-ExecStart=/usr/bin/podman run --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace --label io.containers.autoupdate=registry -d --name harpoon -v harpoon-volume:/opt -v %h/.harpoon:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --env-host quay.io/harpoon/harpoon:latest
+ExecStart=/usr/bin/podman run --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace --label io.containers.autoupdate=registry -d --name harpoon -v harpoon-volume:/opt -v %h/.harpoon:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify
