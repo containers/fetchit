@@ -7,29 +7,29 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start harpooon engine",
-	Long:  `Start harpoon engine`,
+	Long:  `Start fetchit engine`,
 	Run: func(cmd *cobra.Command, args []string) {
-		harpoonConfig.InitConfig(true)
-		harpoonConfig.GetTargets()
-		harpoonConfig.RunTargets()
+		fetchitConfig.InitConfig(true)
+		fetchitConfig.GetTargets()
+		fetchitConfig.RunTargets()
 	},
 }
 
 func init() {
-	harpoonCmd.AddCommand(startCmd)
-	harpoonConfig = NewHarpoonConfig()
+	fetchitCmd.AddCommand(startCmd)
+	fetchitConfig = NewFetchitConfig()
 	cmdGroup := []*cobra.Command{
-		harpoonCmd,
+		fetchitCmd,
 		startCmd,
 	}
 	for _, cmd := range cmdGroup {
-		harpoonConfig.bindFlags(cmd)
+		fetchitConfig.bindFlags(cmd)
 		if cmd.Flags().Changed("config") {
 			configFile, err := cmd.Flags().GetString("config")
 			if err != nil {
 				cobra.CheckErr(err)
 			}
-			harpoonConfig.configFile = configFile
+			fetchitConfig.configFile = configFile
 		}
 	}
 }

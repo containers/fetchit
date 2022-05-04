@@ -4,9 +4,9 @@
    table of contents
 
 
-Harpoon
+Fetchit
 =======
-Harpoon was designed to allow for the hands off management of containers running on system running podman.
+Fetchit was designed to allow for the hands off management of containers running on system running podman.
 
 .. toctree::
    :maxdepth: 2

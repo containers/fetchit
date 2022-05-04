@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/containers/podman/v4/pkg/bindings/system"
-	"github.com/redhat-et/harpoon/pkg/engine/utils"
+	"github.com/redhat-et/fetchit/pkg/engine/utils"
 	"k8s.io/klog/v2"
 )
 

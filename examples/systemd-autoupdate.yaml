@@ -1,12 +1,12 @@
-volume: harpoon-volume # this needs to match the volume name passed to the podman run command
+volume: fetchit-volume # this needs to match the volume name passed to the podman run command
 targets:
 - name: autoupdate
   methods:
     systemd:
       autoUpdateAll: true
 # will update to redhat-et/main after merge
-- name: harpoon
-  url: http://github.com/sallyom/harpoon
+- name: fetchit
+  url: http://github.com/sallyom/fetchit
   methods:
     systemd:
       targetPath: examples/systemd/httpd.service

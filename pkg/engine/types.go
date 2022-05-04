@@ -26,20 +26,20 @@ type Methods struct {
 	ConfigTarget *ConfigFileTarget   `mapstructure:"configTarget"`
 }
 
-// ConfigFileTarget configures a target for dynamic loading of harpoon config updates
+// ConfigFileTarget configures a target for dynamic loading of fetchit config updates
 // $HARPOON_CONFIG_URL environment variable or a local file with a ConfigFileTarget target
-// at ~/.harpoon/config.yaml will inform harpoon to use this target.
-// Without this target, harpoon will not watch for config updates.
-// At this time, only 1 HarpoonConfigFile target can be passed to harpoon
-// TODO: Collect multiple from multiple HarpoonTargets and merge configs into 1 on disk
+// at ~/.fetchit/config.yaml will inform fetchit to use this target.
+// Without this target, fetchit will not watch for config updates.
+// At this time, only 1 FetchitConfigFile target can be passed to fetchit
+// TODO: Collect multiple from multiple FetchitTargets and merge configs into 1 on disk
 type ConfigFileTarget struct {
-	// Schedule is how often to check for git updates and/or restart the harpoon service
+	// Schedule is how often to check for git updates and/or restart the fetchit service
 	// Must be valid cron expression
-	// With ConfigFileTarget, harpoon will be restarted with each scheduled run
+	// With ConfigFileTarget, fetchit will be restarted with each scheduled run
 	Schedule string `mapstructure:"schedule"`
 	// URL location of config file, such as a raw github URL
 	ConfigUrl string `mapstructure:"configUrl"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
 }
 
@@ -52,9 +52,9 @@ type RawTarget struct {
 	Schedule string `mapstructure:"schedule"`
 	// Pull images configured in target files each time regardless of if it already exists
 	PullImage bool `mapstructure:"pullImage"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by harpoon
+	// lastCommit is set by fetchit
 	lastCommit *object.Commit
 }
 
@@ -86,9 +86,9 @@ type SystemdTarget struct {
 	// and/or how often to restart services.
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by harpoon
+	// lastCommit is set by fetchit
 	lastCommit *object.Commit
 }
 
@@ -101,9 +101,9 @@ type FileTransferTarget struct {
 	// Schedule is how often to check for git updates to the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by harpoon
+	// lastCommit is set by fetchit
 	lastCommit *object.Commit
 }
 
@@ -114,9 +114,9 @@ type KubeTarget struct {
 	// Schedule is how often to check for git updates with the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by harpoon
+	// lastCommit is set by fetchit
 	lastCommit *object.Commit
 }
 
@@ -129,20 +129,20 @@ type AnsibleTarget struct {
 	Schedule string `mapstructure:"schedule"`
 	// SshDirectory for ansible to connect to host
 	SshDirectory string `mapstructure:"sshDirectory"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by harpoon
+	// lastCommit is set by fetchit
 	lastCommit *object.Commit
 }
 
 // Clean configures targets to run a system prune periodically
 type CleanTarget struct {
-	// Schedule is how often to check for git updates and/or restart the harpoon service
+	// Schedule is how often to check for git updates and/or restart the fetchit service
 	// Must be valid cron expression
-	// With ConfigFileTarget, harpoon will be restarted with each scheduled run
+	// With ConfigFileTarget, fetchit will be restarted with each scheduled run
 	Schedule string `mapstructure:"schedule"`
 	// URL location of config file, such as a raw github URL
 	Volumes bool `mapstructure:"volumes"`
-	// initialRun is set by harpoon
+	// initialRun is set by fetchit
 	All bool `mapstructure:"all"`
 }

@@ -1,4 +1,4 @@
-package harpoon_doc
+package fetchit_doc
 
 import (
 	_ "github.com/openshift/build-machinery-go"

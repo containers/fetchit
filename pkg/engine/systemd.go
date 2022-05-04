@@ -10,7 +10,7 @@ import (
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/redhat-et/harpoon/pkg/engine/utils"
+	"github.com/redhat-et/fetchit/pkg/engine/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -66,7 +66,7 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 	os.Setenv("ROOT", "true")
 	if !sd.Root {
 		//os.Setenv("ROOT", "false")
-		klog.Info("At this time, harpoon non-root user cannot enable systemd service on the host")
+		klog.Info("At this time, fetchit non-root user cannot enable systemd service on the host")
 		klog.Infof("To enable this non-root service, run 'systemctl --user enable %s' on host machine", service)
 		klog.Info("To enable service as root, run with Systemd.Root = true")
 		return nil

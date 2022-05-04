@@ -1,10 +1,10 @@
-# This is an example configTarget that is used in testing. Harpoon will start with this config then will load targets from ./examples/config-reload.yaml
+# This is an example configTarget that is used in testing. Fetchit will start with this config then will load targets from ./examples/config-reload.yaml
 # Note: It takes (default) 5 min for raw urls to be updated in GitHub, so this test will wait for 7 min
 targets:
-- name: harpoon
-  url: http://github.com/redhat-et/harpoon
+- name: fetchit
+  url: http://github.com/redhat-et/fetchit
   methods:
     configTarget:
-      configUrl: https://raw.githubusercontent.com/redhat-et/harpoon/main/examples/config-reload.yaml
+      configUrl: https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/config-reload.yaml
       schedule: "*/1 * * * *"
 

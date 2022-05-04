@@ -4,10 +4,10 @@ The YAML configuration file defines the method to use, how frequently to check t
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        raw:
          targetPath: examples/raw
@@ -29,10 +29,10 @@ In the examples directory, there is an Ansible playbook that is used to install 
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        ansible: 
          targetPath: examples/ansible
@@ -48,10 +48,10 @@ The RawTarget method will launch containers based upon their definition in a JSO
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        raw:
          targetPath: examples/raw
@@ -91,10 +91,10 @@ look for image updates with all podman-generated unit files that include the aut
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        systemd:
          targetPath: examples/systemd
@@ -117,10 +117,10 @@ The File Transfer method will copy files from the container to the host. This me
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        filetransfer:
          targetPath: examples/filetransfer
@@ -136,10 +136,10 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
 
 .. code-block:: yaml
 
-   volume: harpoon-volume
+   volume: fetchit-volume
    targets:
-   - name: harpoon
-     url: http://github.com/redhat-et/harpoon
+   - name: fetchit
+     url: http://github.com/redhat-et/fetchit
      methods:
        kube: 
          targetPath: examples/kube

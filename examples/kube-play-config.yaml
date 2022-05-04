@@ -1,7 +1,7 @@
 volume: new-volume # this needs to match the volume name passed to the podman run command
 targets:
-- name: harpoon
-  url: http://github.com/redhat-et/harpoon
+- name: fetchit
+  url: http://github.com/redhat-et/fetchit
   methods:
     kube:
       targetPath: examples/kube

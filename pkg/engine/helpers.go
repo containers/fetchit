@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// downloadUpdateConfig returns true if config was updated in harpoon pod
+// downloadUpdateConfig returns true if config was updated in fetchit pod
 func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool, error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {

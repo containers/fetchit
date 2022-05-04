@@ -1,4 +1,4 @@
-module github.com/redhat-et/harpoon
+module github.com/redhat-et/fetchit
 
 go 1.15
 

@@ -1,12 +1,12 @@
-# Harpoon
-The purpose of Harpoon is to allow for GitOps management of podman managed containers.
+# Fetchit
+The purpose of Fetchit is to allow for GitOps management of podman managed containers.
 
 This project is currently under development. For a more detailed explanation of the project visit the docs page.
-https://podman-harpoon.readthedocs.io/
+https://podman-fetchit.readthedocs.io/
 
 
 ##  Running
-Harpoon requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
+Fetchit requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
 
 To enable the socket for $USER:
 
@@ -21,7 +21,7 @@ systemctl enable podman.socket
 ```
 
 
-#### Verify running containers before deploying harpoon.
+#### Verify running containers before deploying fetchit.
 
 ```
 podman ps
@@ -30,16 +30,16 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ```
 
 
-### Harpoon launch options
-Harpoon and can be started manually or launched via systemd. 
+### Fetchit launch options
+Fetchit and can be started manually or launched via systemd. 
 
-Define the parameters in your `$HOME/.harpoon/config.yaml` to relate to your git repository.
+Define the parameters in your `$HOME/.fetchit/config.yaml` to relate to your git repository.
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
 
 ```
 targets:
-- name: harpoon
-  url: http://github.com/redhat-et/harpoon
+- name: fetchit
+  url: http://github.com/redhat-et/fetchit
   branch: main
   fileTransfer:
     targetPath: examples/fileTransfer/hello.txt
@@ -51,17 +51,17 @@ targets:
 ```
 
 #### Launch using systemd
-Two systemd files are provided to allow for Harpoon to run as a user or as root. The files are differentiated by .root and .user.
+Two systemd files are provided to allow for Fetchit to run as a user or as root. The files are differentiated by .root and .user.
 
-Ensure that there is a config at `$HOME/.harpoon/config.yaml` before attempting to start the service.
+Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting to start the service.
 
 NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
 For root
 ```
 setenforce 0
-cp systemd/harpoon.root /etc/systemd/system/harpoon.service
-systemctl enable harpoon --now
+cp systemd/fetchit.root /etc/systemd/system/fetchit.service
+systemctl enable fetchit --now
 ```
 
 
@@ -70,31 +70,31 @@ NOTE: SELinux is temporarily disabled until the work to define the specific SELi
 ```
 mkdir -p ~/.config/systemd/user/
 setenforce 0
-cp systemd/harpoon.user ~/.config/systemd/user/
-systemctl --user enable harpoon --now
+cp systemd/fetchit.user ~/.config/systemd/user/
+systemctl --user enable fetchit --now
 ```
 
-#### Manually launch the harpoon container using a podman volume
+#### Manually launch the fetchit container using a podman volume
 
 NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
 
 ```
 setenforce 0
-podman run -d --rm --name harpoon -v harpoon-volume:/opt -v $HOME/.harpoon:/opt/config -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/config -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
 ```
 
 **NOTE:**
 * If a podman volume is not the preferred storage solution a directory can be used as well.
-An example would be `-v ~/harpoon-volume:/opt` instead of `-v harpoon-volume:/opt`.
+An example would be `-v ~/fetchit-volume:/opt` instead of `-v fetchit-volume:/opt`.
 * For filetransfer, the `destination directory must exist` on the host.
 
 The container will be started and will run in the background. To view the logs:
 
 ```
-podman logs -f harpoon
+podman logs -f fetchit
 
-git clone http://github.com/redhat-et/harpoon main --recursive
-Creating podman container from ./harpoon/examples/raw/example.json
+git clone http://github.com/redhat-et/fetchit main --recursive
+Creating podman container from ./fetchit/examples/raw/example.json
 Trying to pull docker.io/mmumshad/simple-webapp-color:latest...
 Getting image source signatures
 Copying blob sha256:b023afffd10b07f646968c0f1405ac7b611feca6da6fbc2bb8c55f2492bdde07
@@ -125,7 +125,7 @@ Container started....Requeuing
 podman ps
 
 CONTAINER ID  IMAGE                                          COMMAND               CREATED        STATUS            PORTS                   NAMES
-dcc546457aa2  quay.io/harpoon/harpoon:latest                 /usr/local/bin/ha...  3 minutes ago  Up 3 minutes ago                          harpoon
+dcc546457aa2  quay.io/fetchit/fetchit:latest                 /usr/local/bin/ha...  3 minutes ago  Up 3 minutes ago                          fetchit
 392a39209622  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:8080->8080/tcp  colors1
 9e50cd3bdab5  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:9080->8080/tcp  colors2
 ```
@@ -141,5 +141,5 @@ watch ls -al /tmp/hello.txt
 #### Clean up
 
 ```
-podman stop colors1 colors2 harpoon && podman rm colors1 colors2 && podman volume rm harpoon-volume
+podman stop colors1 colors2 fetchit && podman rm colors1 colors2 && podman volume rm fetchit-volume
 ```

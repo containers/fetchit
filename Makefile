@@ -32,8 +32,8 @@ GO_LD_FLAGS := $(GC_FLAGS) -ldflags "-X k8s.io/component-base/version.gitMajor=0
 GO_BUILD_FLAGS :=-tags 'include_gcs include_oss containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs'
 
 # targets "all:" and "build:" defined in vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk
-harpoon: build-containerized-cross-build-linux-amd64
-.PHONY: harpoon
+fetchit: build-containerized-cross-build-linux-amd64
+.PHONY: fetchit
 
 
 OS := $(shell go env GOOS)
@@ -46,7 +46,7 @@ ARCH := $(shell go env GOARCH)
 _build_local:
 	@mkdir -p "$(CROSS_BUILD_BINDIR)/$(GOOS)_$(GOARCH)"
 	+@GOOS=$(GOOS) GOARCH=$(GOARCH) $(MAKE) --no-print-directory build \
-		GO_BUILD_PACKAGES:=./cmd/harpoon \
+		GO_BUILD_PACKAGES:=./cmd/fetchit \
 		GO_BUILD_BINDIR:=$(CROSS_BUILD_BINDIR)/$(GOOS)_$(GOARCH)
 
 cross-build-linux-amd64:
@@ -65,7 +65,7 @@ cross-build: cross-build-linux-amd64 cross-build-linux-arm64
 ###############################
 _build_containerized_amd:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build . --file Dockerfile --tag quay.io/harpoon/harpoon-amd:latest \
+	$(CTR_CMD) build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest \
 		--build-arg ARCH=amd64 \
 		--build-arg MAKE_TARGET="cross-build-linux-amd64" \
 		--platform="linux/amd64"
@@ -74,7 +74,7 @@ _build_containerized_amd:
 
 _build_containerized_arm:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build . --file Dockerfile --tag quay.io/harpoon/harpoon-arm:latest \
+	$(CTR_CMD) build . --file Dockerfile --tag quay.io/fetchit/fetchit-arm:latest \
 		--build-arg ARCH=arm64 \
 		--build-arg MAKE_TARGET="cross-build-linux-arm64" \
 		--platform="linux/arm64"
@@ -99,7 +99,7 @@ build-containerized-cross-build:
 ###############################
 _build_ansible_amd:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/harpoon/harpoon-ansible-amd:latest \
+	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/fetchit/fetchit-ansible-amd:latest \
 		--build-arg ARCH="amd64" \
 		--build-arg MAKE_TARGET="cross-build-linux-amd64" \
 		--platform="linux/amd64"
@@ -108,7 +108,7 @@ _build_ansible_amd:
 
 _build_ansible_arm:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/harpoon/harpoon-ansible-arm:latest \
+	$(CTR_CMD) build -f method_containers/ansible/Dockerfile --tag quay.io/fetchit/fetchit-ansible-arm:latest \
 		--build-arg ARCH="arm64" \
 		--build-arg MAKE_TARGET="cross-build-linux-arm64" \
 		--platform="linux/arm64"
@@ -137,14 +137,14 @@ systemd: build-systemd-cross-build-linux-amd64
 
 _build_systemd_amd:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-amd:latest \
+	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/fetchit/fetchit-systemd-amd:latest \
 		--platform="linux/amd64"
 
 .PHONY: _build_systemd_amd
 
 _build_systemd_arm:
 	@if [ -z '$(CTR_CMD)' ] ; then echo '!! ERROR: containerized builds require podman||docker CLI, none found $$PATH' >&2 && exit 1; fi
-	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/harpoon/harpoon-systemd-arm:latest \
+	$(CTR_CMD) build . --file method_containers/systemd/Dockerfile-systemctl --tag quay.io/fetchit/fetchit-systemd-arm:latest \
 		--platform="linux/arm64"
 
 .PHONY: _build_systemd_arm

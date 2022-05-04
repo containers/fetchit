@@ -13,7 +13,7 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/play"
 	"github.com/containers/podman/v4/pkg/domain/entities"
-	"github.com/redhat-et/harpoon/pkg/engine/utils"
+	"github.com/redhat-et/fetchit/pkg/engine/utils"
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"

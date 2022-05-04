@@ -7,7 +7,7 @@ results/*.txt
 processed_data/*.dat
 vendor
 _output
-harpoon
-!harpoon/
+fetchit
+!fetchit/
 config.yaml
 *.env
