@@ -27,7 +27,7 @@ type Methods struct {
 }
 
 // ConfigFileTarget configures a target for dynamic loading of fetchit config updates
-// $HARPOON_CONFIG_URL environment variable or a local file with a ConfigFileTarget target
+// $FETCHIT_CONFIG_URL environment variable or a local file with a ConfigFileTarget target
 // at ~/.fetchit/config.yaml will inform fetchit to use this target.
 // Without this target, fetchit will not watch for config updates.
 // At this time, only 1 FetchitConfigFile target can be passed to fetchit

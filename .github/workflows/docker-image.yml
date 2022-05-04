@@ -155,7 +155,7 @@ jobs:
         run: sudo mkdir /root/.fetchit
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e HARPOON_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m

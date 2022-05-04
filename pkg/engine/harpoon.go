@@ -132,7 +132,7 @@ func populateConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 }
 
 // This location will be checked first. This is from a `-v /path/to/config.yaml:/opt/mount/config.yaml`,
-// If not initial, this may be overwritten with what is currently in HARPOON_CONFIG_URL
+// If not initial, this may be overwritten with what is currently in FETCHIT_CONFIG_URL
 func isLocalConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 	if _, err := os.Stat(defaultConfigPath); err != nil {
 		klog.Infof("Local config file not found: %v", err)
@@ -147,7 +147,7 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 	var err error
 	var isLocal, exists bool
 	var config *FetchitConfig
-	envURL := os.Getenv("HARPOON_CONFIG_URL")
+	envURL := os.Getenv("FETCHIT_CONFIG_URL")
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
@@ -249,7 +249,7 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 		// ConfigUrl set in config file overrides env variable
 		// If the same, this is no change, if diff then the new config has updated the configUrl
 		if t.Methods.ConfigTarget.ConfigUrl != "" {
-			os.Setenv("HARPOON_CONFIG_URL", t.Methods.ConfigTarget.ConfigUrl)
+			os.Setenv("FETCHIT_CONFIG_URL", t.Methods.ConfigTarget.ConfigUrl)
 		}
 		break
 	}
@@ -374,15 +374,15 @@ func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target) {
 
 	// configUrl in config file will override the environment variable
 	config := target.Methods.ConfigTarget
-	envURL := os.Getenv("HARPOON_CONFIG_URL")
+	envURL := os.Getenv("FETCHIT_CONFIG_URL")
 	// config.Url from target overrides env variable
 	if config.ConfigUrl != "" {
 		envURL = config.ConfigUrl
 	}
-	os.Setenv("HARPOON_CONFIG_URL", envURL)
+	os.Setenv("FETCHIT_CONFIG_URL", envURL)
 	// If ConfigUrl is not populated, warn and leave
 	if envURL == "" {
-		klog.Warningf("Fetchit ConfigFileTarget found, but neither $HARPOON_CONFIG_URL on system nor ConfigTarget.ConfigUrl are set, exiting without updating the config.")
+		klog.Warningf("Fetchit ConfigFileTarget found, but neither $FETCHIT_CONFIG_URL on system nor ConfigTarget.ConfigUrl are set, exiting without updating the config.")
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
@@ -1019,7 +1019,7 @@ func (hc *FetchitConfig) setinitialRun(target *Target, method string) {
 // CheckForConfigUpdates, downloads, & places config file
 // in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
 // This runs with the initial startup as well as with scheduled ConfigTarget runs,
-// if $HARPOON_CONFIG_URL is set.
+// if $FETCHIT_CONFIG_URL is set.
 func (hc *FetchitConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
 	// envURL is either set by user or set to match a configUrl in a configTarget
 	if envURL == "" {
