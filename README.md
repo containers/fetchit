@@ -1,12 +1,12 @@
 # Fetchit
-The purpose of Fetchit is to allow for GitOps management of podman managed containers.
+The purpose of FetchIt is to allow for GitOps management of podman managed containers.
 
 This project is currently under development. For a more detailed explanation of the project visit the docs page.
 https://podman-fetchit.readthedocs.io/
 
 
 ##  Running
-Fetchit requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
+FetchIt requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
 
 To enable the socket for $USER:
 
@@ -30,8 +30,8 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 ```
 
 
-### Fetchit launch options
-Fetchit and can be started manually or launched via systemd. 
+### FetchIt launch options
+FetchIt and can be started manually or launched via systemd. 
 
 Define the parameters in your `$HOME/.fetchit/config.yaml` to relate to your git repository.
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
@@ -51,7 +51,7 @@ targets:
 ```
 
 #### Launch using systemd
-Two systemd files are provided to allow for Fetchit to run as a user or as root. The files are differentiated by .root and .user.
+Two systemd files are provided to allow for FetchIt to run as a user or as root. The files are differentiated by .root and .user.
 
 Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting to start the service.
 
