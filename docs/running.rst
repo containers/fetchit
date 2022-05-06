@@ -66,7 +66,7 @@ Manually
    sudo setenforce 0
    podman run -d --name fetchit -v fetchit-volume:/opt -v ./config.yaml:/opt/config.yaml -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
 
-Fetchit will clone the repository and attempt to remediate those items defined in the config.yaml file. To follow the status.
+FetchIt will clone the repository and attempt to remediate those items defined in the config.yaml file. To follow the status.
 
 .. code-block:: bash
 
