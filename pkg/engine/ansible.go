@@ -18,9 +18,9 @@ func ansiblePodman(ctx context.Context, mo *SingleMethodObj, path string) error 
 	klog.Infof("Deploying Ansible playbook %s\n", path)
 
 	copyFile := ("/opt/" + path)
-	sshImage := "quay.io/harpoon/harpoon-ansible:latest"
+	sshImage := "quay.io/fetchit/fetchit-ansible:latest"
 
-	klog.Infof("Identifying if harpoon-ansible image exists locally")
+	klog.Infof("Identifying if fetchit-ansible image exists locally")
 	if err := detectOrFetchImage(mo.Conn, sshImage, true); err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func ansiblePodman(ctx context.Context, mo *SingleMethodObj, path string) error 
 	// TODO: Remove rcook entries
 	s.Command = []string{"sh", "-c", "/usr/bin/ansible-playbook -e ansible_connection=ssh " + copyFile}
 	s.Mounts = []specs.Mount{{Source: mo.Target.Methods.Ansible.SshDirectory, Destination: "/root/.ssh", Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
 	s.NetNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",

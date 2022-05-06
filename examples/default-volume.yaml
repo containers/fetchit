@@ -1,6 +1,6 @@
 targets:
-- name: harpoon
-  url: http://github.com/redhat-et/harpoon
+- name: fetchit
+  url: http://github.com/redhat-et/fetchit
   methods:
     raw:
       targetPath: examples/raw

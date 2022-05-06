@@ -12,7 +12,7 @@ import (
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/redhat-et/harpoon/pkg/engine/utils"
+	"github.com/redhat-et/fetchit/pkg/engine/utils"
 	"gopkg.in/yaml.v3"
 
 	"k8s.io/klog/v2"
@@ -21,7 +21,7 @@ import (
 const stopped = define.ContainerStateStopped
 
 func generateSpec(method, file, copyFile, dest string, target *Target) *specgen.SpecGenerator {
-	s := specgen.NewSpecGenerator(harpoonImage, false)
+	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + target.Name + "-" + file
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
@@ -30,12 +30,12 @@ func generateSpec(method, file, copyFile, dest string, target *Target) *specgen.
 	}
 	s.Command = []string{"sh", "-c", "cp " + copyFile}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
 	return s
 }
 
 func generateSpecRemove(method, file, pathToRemove, dest string, target *Target) *specgen.SpecGenerator {
-	s := specgen.NewSpecGenerator(harpoonImage, false)
+	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + target.Name + "-" + file
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
@@ -44,7 +44,7 @@ func generateSpecRemove(method, file, pathToRemove, dest string, target *Target)
 	}
 	s.Command = []string{"sh", "-c", "rm " + pathToRemove}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: harpoonVolume, Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
 	return s
 }
 

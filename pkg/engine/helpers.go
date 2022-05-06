@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// downloadUpdateConfig returns true if config was updated in harpoon pod
+// downloadUpdateConfig returns true if config was updated in fetchit pod
 func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool, error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
@@ -40,7 +40,7 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 	if newBytes == nil {
 		// if initial, this is the last resort, newBytes should be populated
 		// the only way to get here from initial
-		// is if there is no config file on disk, only a HARPOON_CONFIG_URL
+		// is if there is no config file on disk, only a FETCHIT_CONFIG_URL
 		return false, fmt.Errorf("found empty config at %s, unable to update or populate config", urlStr)
 	}
 	if !initial {

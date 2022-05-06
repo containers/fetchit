@@ -1,13 +1,13 @@
 # for this test, start with this config, then wait to be sure the
-# targets from .harpoon/config.yaml are populated
+# targets from .fetchit/config.yaml are populated
 # and for follow-up test, push a change to the config and confirm
 # new targets are fetched & run
 targets:
-- name: harpoon
-  url: https://github.com/redhat-et/harpoon
+- name: fetchit
+  url: https://github.com/redhat-et/fetchit
   methods:
     configTarget:
-      configUrl: https://raw.githubusercontent.com/redhat-et/harpoon/main/examples/config-reload.yaml
+      configUrl: https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/config-reload.yaml
       schedule: "*/2 * * * *"
     raw:
       targetPath: examples/raw

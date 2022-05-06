@@ -1,4 +1,4 @@
-name: Harpoon Build and test
+name: Fetchit Build and test
 
 on:
   push:
@@ -25,16 +25,16 @@ jobs:
           sudo podman image trust set -f ./f21541eb.txt registry.access.redhat.com/rhel9-beta
 
       - name: Build the image
-        run: go mod tidy && go mod vendor && docker build . --file Dockerfile --tag quay.io/harpoon/harpoon-amd:latest
+        run: go mod tidy && go mod vendor && docker build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
     
       - name: Export image
-        run: docker save -o /tmp/harpoon.tar quay.io/harpoon/harpoon-amd:latest
+        run: docker save -o /tmp/fetchit.tar quay.io/fetchit/fetchit-amd:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
         with:
-          name: harpoon-image
-          path: /tmp/harpoon.tar
+          name: fetchit-image
+          path: /tmp/fetchit.tar
 
   build-ansible-amd:
     runs-on: ubuntu-latest
@@ -48,7 +48,7 @@ jobs:
         run: docker images
 
       - name: Export image
-        run: podman save -o /tmp/ansible-amd.tar quay.io/harpoon/harpoon-ansible-amd:latest
+        run: podman save -o /tmp/ansible-amd.tar quay.io/fetchit/fetchit-ansible-amd:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
@@ -58,7 +58,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -75,7 +75,7 @@ jobs:
         run: go mod tidy && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
 
       - name: Export image
-        run: podman save -o /tmp/ansible-arm.tar quay.io/harpoon/harpoon-ansible-arm:latest
+        run: podman save -o /tmp/ansible-arm.tar quay.io/fetchit/fetchit-ansible-arm:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
@@ -95,7 +95,7 @@ jobs:
         run: docker images
 
       - name: Export image
-        run: podman save -o /tmp/systemd-amd.tar quay.io/harpoon/harpoon-systemd-amd:latest
+        run: podman save -o /tmp/systemd-amd.tar quay.io/fetchit/fetchit-systemd-amd:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
@@ -105,7 +105,7 @@ jobs:
 
   build-systemd-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -122,7 +122,7 @@ jobs:
         run: go mod tidy && go mod vendor && CTR_CMD=podman make build-systemd-cross-build-linux-arm64
 
       - name: Export image
-        run: podman save -o /tmp/systemd-arm.tar quay.io/harpoon/harpoon-systemd-arm:latest
+        run: podman save -o /tmp/systemd-arm.tar quay.io/fetchit/fetchit-systemd-arm:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
@@ -130,7 +130,7 @@ jobs:
           name: systemd-image-arm
           path: /tmp/systemd-arm.tar
 
-  harpoon-config-target-no-config-validate:
+  fetchit-config-target-no-config-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
@@ -142,26 +142,26 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: create harpoon config directory
-        run: sudo mkdir /root/.harpoon
+      - name: create fetchit config directory
+        run: sudo mkdir /root/.fetchit
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v /root/.harpoon:/opt/mount -e HARPOON_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/harpoon/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -169,7 +169,7 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-  harpoon-config-reload-validate:
+  fetchit-config-reload-validate:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
@@ -181,26 +181,26 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: move config file to default location
-        run: sudo mkdir /root/.harpoon && sudo cp ./examples/config-url.yaml /root/.harpoon/config.yaml
+        run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url.yaml /root/.fetchit/config.yaml
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v /root/.harpoon/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 7m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -220,23 +220,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
         
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -256,23 +256,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
         
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -280,8 +280,8 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: verify harpoon-volume is volume name
-        run: if [[ $(sudo podman volume inspect harpoon-volume) ]] ; then echo "Harpoon successfully used default volume name"; else exit 1; fi
+      - name: verify fetchit-volume is volume name
+        run: if [[ $(sudo podman volume inspect fetchit-volume) ]] ; then echo "Fetchit successfully used default volume name"; else exit 1; fi
 
   filetransfer-validate:
     runs-on: ubuntu-latest
@@ -295,26 +295,26 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: Create destination directory
         run: sudo mkdir /tmp/ft
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /tmp/ft/anotherfile.txt  /tmp/ft/hello.txt
@@ -334,26 +334,26 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: Create destination directory
         run: sudo mkdir -p /tmp/ft/single
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /tmp/ft/single/hello.txt
@@ -373,23 +373,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
         
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /etc/systemd/system/httpd.service
@@ -409,7 +409,7 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the autoupdate timer & service
@@ -419,10 +419,10 @@ jobs:
         run: sudo mkdir /etc/systemd/system/podman-auto-update.timer.d && sudo cp examples/systemd/podman-auto-update.timer.d-override.conf /etc/systemd/system/podman-auto-update.timer.d/override.conf && sudo systemctl daemon-reload
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
         uses: actions/download-artifact@v1
@@ -434,16 +434,16 @@ jobs:
         run: sudo podman load -i /tmp/systemd-amd.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
         run:  sudo systemctl is-active --quiet httpd.service
@@ -472,14 +472,14 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
         uses: actions/download-artifact@v1
@@ -491,16 +491,16 @@ jobs:
         run: sudo podman load -i /tmp/systemd-amd.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-enable.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /etc/systemd/system/httpd.service
@@ -523,14 +523,14 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
         uses: actions/download-artifact@v1
@@ -542,16 +542,16 @@ jobs:
         run: sudo podman load -i /tmp/systemd-amd.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-systemd-amd:latest quay.io/harpoon/harpoon-systemd:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-restart.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-restart.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 4m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /etc/systemd/system/httpd.service
@@ -580,11 +580,11 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
   
       - name: Pull ansible artifact
         uses: actions/download-artifact@v1
@@ -596,19 +596,19 @@ jobs:
         run: sudo podman load -i /tmp/ansible-amd.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-ansible-amd:latest quay.io/harpoon/harpoon-ansible:latest 
+        run: sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest 
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
       
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
       
       - name: list packages
         run: sudo apt list --installed | grep zsh
@@ -625,23 +625,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
  
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
  
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
  
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list files
         run: sudo ls /etc/systemd/system/httpd.service
@@ -661,23 +661,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
         
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify container is running
         run: if [[ $(sudo podman pod ps | grep -v CON= | grep colors_pod | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -697,28 +697,28 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Create unused volume and pull unused image
         run: sudo podman volume create test && sudo podman image pull alpine:latest
 
-      - name: Wait for harpoon to clean these up
+      - name: Wait for fetchit to clean these up
         run: sleep 2m
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: verify volume is deleted
         run: if [[ $(sudo podman volume ls | grep test) ]] ; then exit 1; else echo "Volume correctly removed" 1; fi
@@ -744,26 +744,26 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Create destination directory
         run: sudo mkdir /tmp/ft
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
         
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
   
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 150s
         
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: list systemd files
         run: sudo ls /etc/systemd/system/httpd.service
@@ -771,8 +771,8 @@ jobs:
       - name: list transferred files
         run: sudo ls /tmp/ft/hello.txt /tmp/ft/anotherfile.txt
 
-      - name: ensure only required containers are running (colors and harpoon)
-        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v harpoon | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
+      - name: ensure only required containers are running (colors and fetchit)
+        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
 
       - name: verify raw container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
@@ -811,29 +811,29 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: sudo podman load -i /tmp/harpoon.tar
+        run: sudo podman load -i /tmp/fetchit.tar
 
 
       - name: tag the image
-        run: sudo podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: set values relating to the current env
         run: | 
-          sed -i 's|  url: http://github.com/redhat-et/harpoon|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
-          sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml
+          sed -i 's|  url: http://github.com/redhat-et/fetchit|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
+          sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
 
-      - name: Start harpoon
-        run: sudo podman run -d --name harpoon -v harpoon-volume:/opt -v /home/runner/work/harpoon/harpoon/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon-amd:latest
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: get environment variable
         run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=blue" ]] ; then exit 1; else echo "Environment variable set"; fi
@@ -850,18 +850,18 @@ jobs:
             git commit -m "color changes" -a
             git push -f
 
-      - name: Wait for harpoon to deploy
+      - name: Wait for fetchit to deploy
         run: sleep 2m
 
       - name: Logs
-        run: sudo podman logs harpoon
+        run: sudo podman logs fetchit
 
       - name: get environment variable
         run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=pink" ]] ; then exit 1; else echo "Environment variable set"; fi
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -876,19 +876,19 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the image
-        run: docker load -i /tmp/harpoon.tar
+        run: docker load -i /tmp/fetchit.tar
 
       - name: push image
-        run: docker push quay.io/harpoon/harpoon-amd:latest
+        run: docker push quay.io/fetchit/fetchit-amd:latest
 
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, harpoon-config-target-no-config-validate, harpoon-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -906,13 +906,13 @@ jobs:
         run: go mod tidy && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
 
       - name: Export image
-        run: podman save -o /tmp/harpoon-arm.tar quay.io/harpoon/harpoon-arm:latest
+        run: podman save -o /tmp/fetchit-arm.tar quay.io/fetchit/fetchit-arm:latest
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
         with:
-          name: harpoon-arm-image
-          path: /tmp/harpoon-arm.tar
+          name: fetchit-arm-image
+          path: /tmp/fetchit-arm.tar
 
   push-manifest-list-to-registry:
     runs-on: ubuntu-latest
@@ -924,23 +924,23 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the amd image
-        run: podman load -i /tmp/harpoon.tar
+        run: podman load -i /tmp/fetchit.tar
 
       - name: pull arm artifact
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-arm-image
+          name: fetchit-arm-image
           path: /tmp
 
       - name: Load the arm image
-        run: podman load -i /tmp/harpoon-arm.tar
+        run: podman load -i /tmp/fetchit-arm.tar
 
       - name: create manifest
-        run: podman manifest create quay.io/harpoon/harpoon:latest
+        run: podman manifest create quay.io/fetchit/fetchit:latest
 
       - name: Login to Quay
         uses: docker/login-action@v1
@@ -954,9 +954,9 @@ jobs:
 
       - name: add images and push manifest list
         run: |
-          podman manifest add --arch arm64 quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-arm:latest
-          podman manifest add quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon:latest docker://quay.io/harpoon/harpoon:latest --format=docker
+          podman manifest add --arch arm64 quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit-arm:latest
+          podman manifest add quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit-amd:latest
+          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest --format=docker
 
   publish-binary-to-github:
     runs-on: ubuntu-latest
@@ -968,27 +968,27 @@ jobs:
       - name: pull arm image
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-arm-image
+          name: fetchit-arm-image
           path: /tmp
 
       - name: Load the arm image
-        run: podman load -i /tmp/harpoon-arm.tar
+        run: podman load -i /tmp/fetchit-arm.tar
 
       - name: Pull amd image
         uses: actions/download-artifact@v1
         with:
-          name: harpoon-image
+          name: fetchit-image
           path: /tmp
 
       - name: Load the amd image
-        run: podman load -i /tmp/harpoon.tar
+        run: podman load -i /tmp/fetchit.tar
 
       - name: move binary
         run: |
           arm=$(podman images | grep arm | awk '{print $3}')
           amd=$(podman images | grep amd | awk '{print $3}')
-          podman cp $(podman create --rm $arm):/usr/local/bin/harpoon ./harpoon-arm
-          podman cp $(podman create --rm $amd):/usr/local/bin/harpoon ./harpoon-amd
+          podman cp $(podman create --rm $arm):/usr/local/bin/fetchit ./fetchit-arm
+          podman cp $(podman create --rm $amd):/usr/local/bin/fetchit ./fetchit-amd
 
       - name: push binary
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -998,8 +998,8 @@ jobs:
           prerelease: true
           title: "Latest Build"
           files: |
-            harpoon-arm
-            harpoon-amd
+            fetchit-arm
+            fetchit-amd
 
   create-ansible-manifest:
     runs-on: ubuntu-latest
@@ -1037,13 +1037,13 @@ jobs:
         run: podman login --authfile ~/.docker/config.json quay.io
         
       - name: create manifest
-        run: podman manifest create quay.io/harpoon/harpoon-ansible:latest
+        run: podman manifest create quay.io/fetchit/fetchit-ansible:latest
 
       - name: add images to manifest list
         run: |
-          podman manifest add --arch arm64 quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible-arm:latest
-          podman manifest add quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon-ansible:latest docker://quay.io/harpoon/harpoon-ansible:latest --format=docker
+          podman manifest add --arch arm64 quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible-arm:latest
+          podman manifest add quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible-amd:latest
+          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest --format=docker
 
   create-systemd-manifest:
     runs-on: ubuntu-latest
@@ -1081,10 +1081,10 @@ jobs:
         run: podman login --authfile ~/.docker/config.json quay.io
 
       - name: create manifest
-        run: podman manifest create quay.io/harpoon/harpoon-systemd:latest
+        run: podman manifest create quay.io/fetchit/fetchit-systemd:latest
 
       - name: add images to manifest list
         run: |
-          podman manifest add --arch arm64 quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd-arm:latest
-          podman manifest add quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/harpoon/harpoon-systemd:latest docker://quay.io/harpoon/harpoon-systemd:latest --format=docker
+          podman manifest add --arch arm64 quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd-arm:latest
+          podman manifest add quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd-amd:latest
+          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd:latest --format=docker
