@@ -80,7 +80,7 @@ NOTE: SELinux is temporarily disabled until the work to define the specific SELi
 
 ```
 setenforce 0
-podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/config -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
+podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/mount -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
 ```
 
 **NOTE:**
