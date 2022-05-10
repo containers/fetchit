@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +65,7 @@ func NewFetchitConfig() *FetchitConfig {
 	return &FetchitConfig{
 		Targets: []*Target{
 			{
-				methodSchedules: make(map[string]string),
+				methodSchedules: make(map[string]schedInfo),
 			},
 		},
 	}
@@ -264,36 +265,60 @@ func (hc *FetchitConfig) GetTargets() {
 	for _, target := range hc.Targets {
 		target.mu.Lock()
 		defer target.mu.Unlock()
-		schedMethods := make(map[string]string)
+		schedMethods := make(map[string]schedInfo)
 		if target.Methods.ConfigTarget != nil {
-			schedMethods[configMethod] = target.Methods.ConfigTarget.Schedule
+			schedMethods[configMethod] = schedInfo{
+				target.Methods.ConfigTarget.Schedule,
+				target.Methods.ConfigTarget.Skew,
+			}
 		}
 		if target.Methods.Raw != nil {
 			target.Methods.Raw.initialRun = true
-			schedMethods[rawMethod] = target.Methods.Raw.Schedule
+			schedMethods[rawMethod] = schedInfo{
+				target.Methods.Raw.Schedule,
+				target.Methods.Raw.Skew,
+			}
 		}
 		if target.Methods.Kube != nil {
 			target.Methods.Kube.initialRun = true
-			schedMethods[kubeMethod] = target.Methods.Kube.Schedule
+			schedMethods[kubeMethod] = schedInfo{
+				target.Methods.Kube.Schedule,
+				target.Methods.Kube.Skew,
+			}
 		}
 		if target.Methods.Systemd != nil {
 			target.Methods.Systemd.initialRun = true
-			schedMethods[systemdMethod] = target.Methods.Systemd.Schedule
+			schedMethods[systemdMethod] = schedInfo{
+				target.Methods.Systemd.Schedule,
+				target.Methods.Systemd.Skew,
+			}
 			// podman auto-update service is enabled on initialRun regardless of schedule
 			if target.Methods.Systemd.Schedule == "" && target.Methods.Systemd.AutoUpdateAll {
-				schedMethods[systemdMethod] = "*/1 * * * *"
+				schedMethods[systemdMethod] = schedInfo{
+					"*/1 * * * *",
+					target.Methods.Systemd.Skew,
+				}
 			}
 		}
 		if target.Methods.FileTransfer != nil {
 			target.Methods.FileTransfer.initialRun = true
-			schedMethods[fileTransferMethod] = target.Methods.FileTransfer.Schedule
+			schedMethods[fileTransferMethod] = schedInfo{
+				target.Methods.FileTransfer.Schedule,
+				target.Methods.FileTransfer.Skew,
+			}
 		}
 		if target.Methods.Ansible != nil {
 			target.Methods.Ansible.initialRun = true
-			schedMethods[ansibleMethod] = target.Methods.Ansible.Schedule
+			schedMethods[ansibleMethod] = schedInfo{
+				target.Methods.Ansible.Schedule,
+				target.Methods.Ansible.Skew,
+			}
 		}
 		if target.Methods.Clean != nil {
-			schedMethods[cleanMethod] = target.Methods.Clean.Schedule
+			schedMethods[cleanMethod] = schedInfo{
+				target.Methods.Clean.Schedule,
+				target.Methods.Clean.Skew,
+			}
 		}
 		target.methodSchedules = schedMethods
 		hc.update(target)
@@ -302,7 +327,7 @@ func (hc *FetchitConfig) GetTargets() {
 
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (hc *FetchitConfig) RunTargets() {
-	allTargets := make(map[string]map[string]string)
+	allTargets := make(map[string]map[string]schedInfo)
 	for _, target := range hc.Targets {
 		if target.Url != "" {
 			if err := hc.getClone(target); err != nil {
@@ -322,42 +347,46 @@ func (hc *FetchitConfig) RunTargets() {
 		}
 
 		for method, schedule := range schedMethods {
+			skew := 0
+			if schedule.Skew != nil {
+				skew = rand.Intn(*schedule.Skew)
+			}
 			switch method {
 			case configMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(configMethod).Do(hc.processConfig, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(configMethod).Do(hc.processConfig, ctx, &target, skew)
 			case kubeMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(kubeMethod).Do(hc.processKube, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(kubeMethod).Do(hc.processKube, ctx, &target, skew)
 			case rawMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(rawMethod).Do(hc.processRaw, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(rawMethod).Do(hc.processRaw, ctx, &target, skew)
 			case systemdMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(systemdMethod).Do(hc.processSystemd, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(systemdMethod).Do(hc.processSystemd, ctx, &target, skew)
 			case fileTransferMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(fileTransferMethod).Do(hc.processFileTransfer, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(fileTransferMethod).Do(hc.processFileTransfer, ctx, &target, skew)
 			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target, skew)
 			case cleanMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
-				s.Cron(schedule).Tag(cleanMethod).Do(hc.processClean, ctx, &target)
+				s.Cron(schedule.Schedule).Tag(cleanMethod).Do(hc.processClean, ctx, &target, skew)
 			default:
 				klog.Warningf("Target: %s Method: %s, unknown method type, ignoring", target.Name, method)
 			}
@@ -368,7 +397,8 @@ func (hc *FetchitConfig) RunTargets() {
 	select {}
 }
 
-func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -398,7 +428,8 @@ func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target) {
 	}
 }
 
-func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -438,7 +469,8 @@ func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target) {
 	hc.update(target)
 }
 
-func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -478,7 +510,8 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target) {
 	hc.update(target)
 }
 
-func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -539,7 +572,8 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target) {
 	hc.update(target)
 }
 
-func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -578,7 +612,8 @@ func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target
 	hc.update(target)
 }
 
-func (hc *FetchitConfig) processKube(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -618,7 +653,8 @@ func (hc *FetchitConfig) processKube(ctx context.Context, target *Target) {
 	hc.update(target)
 }
 
-func (hc *FetchitConfig) processClean(ctx context.Context, target *Target) {
+func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 	// Nothing to do with certain file we're just collecting garbage so can call the cleanPodman method straight from here
