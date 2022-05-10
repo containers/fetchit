@@ -63,22 +63,24 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 	}
 
 	// TODO: remove
-	os.Setenv("ROOT", "true")
-	if !sd.Root {
-		//os.Setenv("ROOT", "false")
-		klog.Info("At this time, fetchit non-root user cannot enable systemd service on the host")
-		klog.Infof("To enable this non-root service, run 'systemctl --user enable %s' on host machine", service)
-		klog.Info("To enable service as root, run with Systemd.Root = true")
-		return nil
+	if sd.Root {
+		os.Setenv("ROOT", "true")
+	} else {
+		os.Setenv("ROOT", "false")
 	}
-
 	s := specgen.NewSpecGenerator(systemdImage, false)
 	runMounttmp := "/run"
 	runMountsd := "/run/systemd"
 	runMountc := "/sys/fs/cgroup"
+	xdg := ""
 	if !sd.Root {
-		runMountsd = "/run/user/1000/systemd"
-		s.User = "1000"
+		// need to document this for non-root usage
+		// can't use user.Current because always root in fetchit container
+		xdg = os.Getenv("XDG_RUNTIME_DIR")
+		if xdg == "" {
+			xdg = "/run/user/1000"
+		}
+		runMountsd = xdg + "/systemd"
 	}
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
@@ -95,6 +97,10 @@ func enableRestartSystemdService(mo *SingleMethodObj, action, dest, service stri
 	envMap["ROOT"] = strconv.FormatBool(sd.Root)
 	envMap["SERVICE"] = service
 	envMap["ACTION"] = act
+	envMap["HOME"] = os.Getenv("HOME")
+	if !sd.Root {
+		envMap["XDG_RUNTIME_DIR"] = xdg
+	}
 	s.Env = envMap
 	createResponse, err := createAndStartContainer(mo.Conn, s)
 	if err != nil {
