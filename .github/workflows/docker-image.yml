@@ -58,7 +58,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -105,7 +105,7 @@ jobs:
 
   build-systemd-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -485,7 +485,7 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service
+        run:  sudo systemctl is-active --quiet httpd.service || exit 1
 
       - name: Pull test httpd image
         run: sudo podman pull quay.io/sallyom/httpd-ex:latest
@@ -548,7 +548,63 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service
+        run:  sudo systemctl is-active --quiet httpd.service || exit 1
+
+  systemd-user-enable-validate:
+    runs-on: ubuntu-latest
+    needs: [ build , build-systemd-amd ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: enable podman.socket
+        run: |
+          set -x
+          loginctl enable-linger runner
+          sleep 1
+          ls -al /run/user/$UID
+          XDG_RUNTIME_DIR=/run/user/$UID systemctl --user enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Load the image
+        run: podman load -i /tmp/fetchit.tar
+
+      - name: tag the image
+        run: podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: pull systemd amd artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: systemd-image-amd
+          path: /tmp
+
+      - name: Load the systemd image
+        run: podman load -i /tmp/systemd-amd.tar
+
+      - name: tag the image
+        run: podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
+
+      - name: Start fetchit
+        run: podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable-user.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" quay.io/fetchit/fetchit-amd:latest
+
+      - name: Wait for fetchit to deploy
+        run: sleep 2m
+
+      - name: Logs
+        run: podman logs fetchit
+
+      - name: list files
+        run: ls ~/.config/systemd/user/httpd.service
+
+      - name: ensure systemd containers are gone
+        run: podman ps -a
+
+      - name: ensure httpd.service is running
+        run:  XDG_RUNTIME_DIR=/run/user/$UID systemctl --user is-active --quiet httpd.service || exit 1
 
   systemd-restart-validate:
     runs-on: ubuntu-latest
@@ -599,7 +655,7 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service
+        run:  sudo systemctl is-active --quiet httpd.service || exit 1
 
   ansible-validate:
     runs-on: ubuntu-latest
@@ -945,7 +1001,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -972,7 +1028,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1131,7 +1187,7 @@ jobs:
 
   create-systemd-manifest:
     runs-on: ubuntu-latest
-    needs: [ systemd-validate, systemd-enable-validate, systemd-autoupdate-validate, build-systemd-arm ]
+    needs: [ systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, build-systemd-arm ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
