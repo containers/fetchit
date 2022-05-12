@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 
+	pathPackage "path"
+
 	"github.com/containers/podman/v4/pkg/bindings/images"
 
 	"k8s.io/klog/v2"
@@ -14,9 +16,9 @@ import (
 func imageLoad(ctx context.Context, conn context.Context, path string) error {
 
 	klog.Infof("Loading image from %s", path)
-	// Create placeholder
-	// TODO: FIX IMAGE NAME TO BE UNIQUE
-	imageFile, err := os.Create("/tmp/image.tar")
+	// Create placeholder file to be populated by the image
+	image := (pathPackage.Base(path))
+	imageFile, err := os.Create(pathPackage.Join("/tmp", image))
 	if err != nil {
 		klog.Error("Failed creating base file")
 		return err
