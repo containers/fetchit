@@ -37,6 +37,7 @@ const (
 	kubeMethod         = "kube"
 	fileTransferMethod = "filetransfer"
 	ansibleMethod      = "ansible"
+	imageMethod        = "image"
 	cleanMethod        = "clean"
 	deleteFile         = "delete"
 	systemdPathRoot    = "/etc/systemd/system"
@@ -108,7 +109,7 @@ func (o *FetchitConfig) bindFlags(cmd *cobra.Command) {
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
 func (hc *FetchitConfig) Restart() {
-	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod)
+	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod, imageMethod)
 	hc.scheduler.Clear()
 	hc.InitConfig(false)
 	hc.GetTargets()
@@ -227,6 +228,11 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 					t.Methods.Ansible.lastCommit = config.Targets[i].Methods.Ansible.lastCommit
 				}
 			}
+			if t.Methods.Image != nil {
+				if config.Targets[i].Methods.Image != nil {
+					t.Methods.Image.lastCommit = config.Targets[i].Methods.Image.lastCommit
+				}
+			}
 			if t.Methods.FileTransfer != nil {
 				if config.Targets[i].Methods.FileTransfer != nil {
 					t.Methods.FileTransfer.lastCommit = config.Targets[i].Methods.FileTransfer.lastCommit
@@ -314,6 +320,13 @@ func (hc *FetchitConfig) GetTargets() {
 				target.Methods.Ansible.Skew,
 			}
 		}
+		if target.Methods.Image != nil {
+			target.Methods.Image.initialRun = true
+			schedMethods[imageMethod] = schedInfo{
+				target.Methods.Image.Schedule,
+				target.Methods.Image.Skew,
+			}
+		}
 		if target.Methods.Clean != nil {
 			schedMethods[cleanMethod] = schedInfo{
 				target.Methods.Clean.Schedule,
@@ -382,6 +395,11 @@ func (hc *FetchitConfig) RunTargets() {
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target, skew)
+			case imageMethod:
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				s.Cron(schedule.Schedule).Tag(imageMethod).Do(hc.processImage, ctx, &target, skew)
 			case cleanMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -507,6 +525,47 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 		return
 	}
 	ans.initialRun = false
+	hc.update(target)
+}
+
+func (hc *FetchitConfig) processImage(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	img := target.Methods.Image
+	initial := img.initialRun
+	tag := []string{"yaml", "yml"}
+	var targetFile = ""
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
+		Method: imageMethod,
+		Target: target,
+	}
+	var path string
+	if initial {
+		retry := hc.resetTarget(target, imageMethod, true, nil)
+		if retry {
+			return
+		}
+		fileName, subDirTree, err := hc.getPathOrTree(target, img.TargetPath, imageMethod)
+		if err != nil {
+			_ = hc.resetTarget(target, imageMethod, false, err)
+			return
+		}
+		targetFile, err = hc.applyInitial(ctx, mo, fileName, img.TargetPath, &tag, subDirTree)
+		if err != nil {
+			_ = hc.resetTarget(target, imageMethod, false, err)
+			return
+		}
+		path = targetFile
+	}
+
+	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
+		img.initialRun = hc.resetTarget(target, imageMethod, false, err)
+		return
+	}
+	img.initialRun = false
 	hc.update(target)
 }
 
@@ -733,6 +792,9 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 	case ansibleMethod:
 		lc = mo.Target.Methods.Ansible.lastCommit
 		targetPath = mo.Target.Methods.Ansible.TargetPath
+	case imageMethod:
+		lc = mo.Target.Methods.Image.lastCommit
+		targetPath = mo.Target.Methods.Image.TargetPath
 	case fileTransferMethod:
 		lc = mo.Target.Methods.FileTransfer.lastCommit
 		targetPath = mo.Target.Methods.FileTransfer.TargetPath
@@ -858,6 +920,12 @@ func (hc *FetchitConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 			return err
 		}
 		return rawPodman(ctx, mo, path, prev)
+	case imageMethod:
+		prev, err := getChangeString(change)
+		if err != nil {
+			return err
+		}
+		return imageLoader(ctx, mo, path, prev)
 	case systemdMethod:
 		// TODO: add logic for non-root services
 		var prev *string = nil
@@ -1032,6 +1100,8 @@ func (hc *FetchitConfig) setlastCommit(target *Target, method string, commit *ob
 		target.Methods.FileTransfer.lastCommit = commit
 	case ansibleMethod:
 		target.Methods.Ansible.lastCommit = commit
+	case imageMethod:
+		target.Methods.Image.lastCommit = commit
 	}
 }
 
@@ -1049,6 +1119,8 @@ func (hc *FetchitConfig) setinitialRun(target *Target, method string) {
 		target.Methods.FileTransfer.initialRun = true
 	case ansibleMethod:
 		target.Methods.Ansible.initialRun = true
+	case imageMethod:
+		target.Methods.Image.initialRun = true
 	}
 }
 

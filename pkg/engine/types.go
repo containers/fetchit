@@ -21,6 +21,7 @@ type Methods struct {
 	Systemd      *SystemdTarget      `mapstructure:"systemd"`
 	Kube         *KubeTarget         `mapstructure:"kube"`
 	Ansible      *AnsibleTarget      `mapstructure:"ansible"`
+	Image        *ImageTarget        `mapstructure:"image"`
 	FileTransfer *FileTransferTarget `mapstructure:"fileTransfer"`
 	Clean        *CleanTarget        `mapstructure:"clean"`
 	ConfigTarget *ConfigFileTarget   `mapstructure:"configTarget"`
@@ -146,6 +147,21 @@ type AnsibleTarget struct {
 	Skew *int `mapstructure:"skew"`
 	// SshDirectory for ansible to connect to host
 	SshDirectory string `mapstructure:"sshDirectory"`
+	// initialRun is set by fetchit
+	initialRun bool
+	// lastCommit is set by fetchit
+	lastCommit *object.Commit
+}
+
+// ImageTarget to place and load images from URL
+type ImageTarget struct {
+	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
+	TargetPath string `mapstructure:"targetPath"`
+	// Schedule is how often to check for git updates with the target files
+	// Must be valid cron expression
+	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
 	// lastCommit is set by fetchit
