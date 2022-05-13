@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -13,20 +14,35 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func imageLoad(ctx context.Context, conn context.Context, path string) error {
+type ImageLoad struct {
+	URL string `json:"URL" yaml:"URL"`
+}
+
+func imageLoader(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
 
 	klog.Infof("Loading image from %s", path)
+	// Parse the file to find out image location
+	imageFile, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	load, err := imageFromBytes(imageFile)
+	if err != nil {
+		return err
+	}
+
 	// Create placeholder file to be populated by the image
-	image := (pathPackage.Base(path))
-	imageFile, err := os.Create(pathPackage.Join("/tmp", image))
+	imageName := (pathPackage.Base(load.URL))
+	localImage, err := os.Create(pathPackage.Join("/tmp", imageName))
 	if err != nil {
 		klog.Error("Failed creating base file")
 		return err
 	}
-	defer imageFile.Close()
+	defer localImage.Close()
 
 	// Place the data into the placeholder file
-	data, err := http.Get(path)
+	data, err := http.Get(load.URL)
 	if err != nil {
 		klog.Error("Failed getting data from %s", path)
 		return err
@@ -40,24 +56,24 @@ func imageLoad(ctx context.Context, conn context.Context, path string) error {
 	}
 
 	// Writer the body to file
-	_, err = io.Copy(imageFile, data.Body)
+	_, err = io.Copy(localImage, data.Body)
 	if err != nil {
 		return err
 	}
 
 	// Load the image that is to be imported
-	loadableImage, err := os.Open(imageFile.Name())
+	loadableImage, err := os.Open(localImage.Name())
 	if err != nil {
 		klog.Error("Could not locate image file to load")
 	}
 
 	// Load image from path on the system using podman load
-	load, err := images.Load(conn, loadableImage)
+	imported, err := images.Load(mo.Conn, loadableImage)
 	if err != nil {
-		klog.Error("Could not load image")
+		return err
 	}
 
-	klog.Infof("Image %s loaded....Requeuing", load.Names[0])
+	klog.Infof("Image %s loaded....Requeuing", imported.Names[0])
 	defer loadableImage.Close()
 
 	return nil

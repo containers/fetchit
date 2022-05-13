@@ -181,6 +181,23 @@ func rawPodFromBytes(b []byte) (*RawPod, error) {
 	return &raw, nil
 }
 
+func imageFromBytes(b []byte) (*ImageLoad, error) {
+	b = bytes.TrimSpace(b)
+	load := ImageLoad{}
+	if b[0] == '{' {
+		err := json.Unmarshal(b, &load)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal json")
+		}
+	} else {
+		err := yaml.Unmarshal(b, &load)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal yaml")
+		}
+	}
+	return &load, nil
+}
+
 // Using this might not be necessary
 func removeExisting(conn context.Context, podName string) error {
 	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
