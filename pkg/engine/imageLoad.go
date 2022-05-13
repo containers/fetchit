@@ -76,5 +76,7 @@ func imageLoader(ctx context.Context, mo *SingleMethodObj, path string, prev *st
 	klog.Infof("Image %s loaded....Requeuing", imported.Names[0])
 	defer loadableImage.Close()
 
+	// Remove the image file
+	err = os.Remove(localImage.Name())
 	return nil
 }
