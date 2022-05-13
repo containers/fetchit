@@ -586,7 +586,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit --network=host -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit --network=host -v ./examples/image-load.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
