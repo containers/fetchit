@@ -577,7 +577,7 @@ jobs:
           sudo podman image rm quay.io/notreal/httpd:latest
       
       - name: start httpd and serve the httpd.tar image
-        run: sudo podman run -d --name httpd -p 8080:8080 -v /tmp/httpd.tar:/var/www/html/ registry.access.redhat.com/ubi8/httpd-24
+        run: sudo podman run -d --name httpd -p 8080:8080 -v /tmp/image:/var/www/html registry.access.redhat.com/ubi8/httpd-24
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
