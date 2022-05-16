@@ -1,11 +1,15 @@
 package engine
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
+	stdHttp "net/http"
 	"os"
 	"path/filepath"
+
 	"strings"
 	"time"
 
@@ -342,9 +346,16 @@ func (hc *FetchitConfig) GetTargets() {
 func (hc *FetchitConfig) RunTargets() {
 	allTargets := make(map[string]map[string]schedInfo)
 	for _, target := range hc.Targets {
-		if target.Url != "" {
+		// TODO: Add logic to do x based on if extension is .git or .zip, .tar, etc
+		if target.Url != "" && !target.Disconnected {
 			if err := hc.getClone(target); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", target.Name, err)
+			}
+		} else if target.Url != "" && target.Disconnected {
+			// If disconnected, we need to pull in the data copying the assets from tar into the
+			// volume
+			if err := hc.getDisconnected(target); err != nil {
+				klog.Warningf("Target: %s, cannot populate data from the provided URL: %v, will retry next scheduled run", target.Name, err)
 			}
 		}
 		allTargets[target.Name] = target.methodSchedules
@@ -1009,6 +1020,69 @@ func (hc *FetchitConfig) getClone(target *Target) error {
 	return nil
 }
 
+func (hc *FetchitConfig) getDisconnected(target *Target) error {
+	// Populate the disconnected directory based off of the zip file from the URL
+	archive := filepath.Base(target.Url)
+	absPath, err := filepath.Abs(target.Name)
+	if err != nil {
+		fmt.Errorf("error getting absolute path for %s: %v", target.Name, err)
+	}
+
+	// Pull the zip file from the URL
+	resp, err := stdHttp.Get(target.Url)
+	if err != nil {
+		fmt.Errorf("cannot access URL: %s", err)
+	}
+
+	defer resp.Body.Close()
+
+	// Create the destination file
+	os.MkdirAll(absPath, 0755)
+
+	outFile, err := os.Create(absPath + "/" + archive)
+
+	// Write the body to file
+	io.Copy(outFile, resp.Body)
+
+	// Unzip the file
+	r, err := zip.OpenReader(outFile.Name())
+	if err != nil {
+		fmt.Errorf("error opening zip file: %s", err)
+	}
+	for _, f := range r.File {
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		fpath := filepath.Join(absPath, f.Name)
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, f.Mode())
+		} else {
+			var fdir string
+			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+				fdir = fpath[:lastIndex]
+			}
+
+			os.MkdirAll(fdir, f.Mode())
+			f, err := os.OpenFile(
+				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	err = os.Remove(outFile.Name())
+	return nil
+}
+
 func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
 	directory := filepath.Base(target.Url)
 	gitRepo, err := git.PlainOpen(directory)
@@ -1057,8 +1131,16 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 
 func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
 	if initialRun {
-		if err := hc.getClone(target); err != nil {
-			return nil, err
+		if !target.Disconnected {
+			if err := hc.getClone(target); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		if target.Disconnected {
+			if err := hc.getDisconnected(target); err != nil {
+				return nil, err
+			}
 		}
 	}
 	directory := filepath.Base(target.Url)

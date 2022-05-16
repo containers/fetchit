@@ -9,6 +9,7 @@ import (
 type Target struct {
 	Name            string  `mapstructure:"name"`
 	Url             string  `mapstructure:"url"`
+	Disconnected    bool    `mapstructure:"disconnected"`
 	Branch          string  `mapstructure:"branch"`
 	Methods         Methods `mapstructure:"methods"`
 	methodSchedules map[string]schedInfo
