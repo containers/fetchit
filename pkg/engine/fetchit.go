@@ -1023,15 +1023,16 @@ func (hc *FetchitConfig) getClone(target *Target) error {
 func (hc *FetchitConfig) getDisconnected(target *Target) error {
 	// Populate the disconnected directory based off of the zip file from the URL
 	archive := filepath.Base(target.Url)
+	baseDir := "/opt/"
 	absPath, err := filepath.Abs(target.Name)
 	if err != nil {
-		fmt.Errorf("error getting absolute path for %s: %v", target.Name, err)
+		klog.Infof("error getting absolute path for %s: %v", target.Name, err)
 	}
 
 	// Pull the zip file from the URL
 	resp, err := stdHttp.Get(target.Url)
 	if err != nil {
-		fmt.Errorf("cannot access URL: %s", err)
+		klog.Infof("cannot access URL: %s", err)
 	}
 
 	defer resp.Body.Close()
@@ -1047,7 +1048,7 @@ func (hc *FetchitConfig) getDisconnected(target *Target) error {
 	// Unzip the file
 	r, err := zip.OpenReader(outFile.Name())
 	if err != nil {
-		fmt.Errorf("error opening zip file: %s", err)
+		klog.Infof("error opening zip file: %s", err)
 	}
 	for _, f := range r.File {
 		rc, err := f.Open()
@@ -1056,7 +1057,7 @@ func (hc *FetchitConfig) getDisconnected(target *Target) error {
 		}
 		defer rc.Close()
 
-		fpath := filepath.Join(absPath, f.Name)
+		fpath := filepath.Join(baseDir, f.Name)
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(fpath, f.Mode())
 		} else {
@@ -1117,6 +1118,7 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 		klog.Warningf("Target: %s Method: %s encountered error: %v, resetting...", target.Name, method, err)
 	}
 	commit, err := hc.getGit(target, initial)
+	klog.Infof("The disconnected bool is %t", target.Disconnected)
 	if err != nil {
 		klog.Warningf("Target: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
 		return true
@@ -1130,14 +1132,17 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 }
 
 func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
+	klog.Info("Processing the initial run and the initialrun value is %t", initialRun)
 	if initialRun {
 		if !target.Disconnected {
+			klog.Infof("This is not a disconnected target, will attempt to clone")
 			if err := hc.getClone(target); err != nil {
 				return nil, err
 			}
 		}
 	} else {
 		if target.Disconnected {
+			klog.Infof("This is a disconnected target, will attempt to get disconnected")
 			if err := hc.getDisconnected(target); err != nil {
 				return nil, err
 			}
@@ -1154,6 +1159,7 @@ func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit
 		return nil, err
 	}
 	return commit, nil
+
 }
 
 // setInitial will return true if fetching of commit fails or results in empty commit, to try again next run
