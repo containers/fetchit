@@ -742,7 +742,7 @@ func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew 
 }
 
 func (hc *FetchitConfig) applyInitial(ctx context.Context, mo *SingleMethodObj, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
-	directory := filepath.Base(mo.Target.Url)
+	directory := filepath.Base(mo.Target.Name)
 	if fileName != "" {
 		found := false
 		if checkTag(tag, fileName) {
@@ -819,39 +819,45 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 	if path != "" {
 		tp = path
 	}
-	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
-	if err != nil {
-		return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
-	}
-
-	hc.setlastCommit(mo.Target, mo.Method, newCommit)
-	hc.update(mo.Target)
-
-	if len(changesThisMethod) == 0 {
-		if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
-			return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
-		}
-		klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
-		return nil
-	}
-
-	ch := make(chan error)
-	for change, changePath := range changesThisMethod {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
-				ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changesThisMethod {
-		err := <-ch
+	if !mo.Target.Disconnected {
+		changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
 		if err != nil {
-			return err
+			return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
 		}
-		return nil
+
+		hc.setlastCommit(mo.Target, mo.Method, newCommit)
+		hc.update(mo.Target)
+
+		if len(changesThisMethod) == 0 {
+			if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
+				return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
+			}
+			klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
+			return nil
+		}
+
+		ch := make(chan error)
+		for change, changePath := range changesThisMethod {
+			go func(ch chan<- error, changePath string, change *object.Change) {
+				if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
+					ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
+				}
+				ch <- nil
+			}(ch, changePath, change)
+		}
+		for range changesThisMethod {
+			err := <-ch
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	} else if mo.Target.Disconnected {
+		klog.Info("this is disconnected.....im not sure how to proceed")
 	}
+
 	return nil
+
 }
 
 func (hc *FetchitConfig) update(target *Target) {
@@ -1085,7 +1091,7 @@ func (hc *FetchitConfig) getDisconnected(target *Target) error {
 }
 
 func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.Name)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		return "", nil, err
@@ -1119,6 +1125,7 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 	}
 	commit, err := hc.getGit(target, initial)
 	klog.Infof("The disconnected bool is %t", target.Disconnected)
+	klog.Infof("The commit id is %s", commit)
 	if err != nil {
 		klog.Warningf("Target: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
 		return true
@@ -1132,7 +1139,7 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 }
 
 func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
-	klog.Info("Processing the initial run and the initialrun value is %t", initialRun)
+	klog.Info("Processing the initial run and the initialrun value is ", initialRun)
 	if initialRun {
 		if !target.Disconnected {
 			klog.Infof("This is not a disconnected target, will attempt to clone")
@@ -1148,7 +1155,7 @@ func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit
 			}
 		}
 	}
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.Name)
 	gitRepo, err := git.PlainOpen(directory)
 	if err != nil {
 		return nil, err
