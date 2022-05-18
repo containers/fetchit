@@ -155,7 +155,7 @@ jobs:
         run: sudo mkdir /root/.fetchit
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -194,7 +194,7 @@ jobs:
         run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url.yaml /root/.fetchit/config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 7m
@@ -233,7 +233,7 @@ jobs:
         run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url-with-skew.yaml /root/.fetchit/config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 7m
@@ -269,7 +269,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -305,7 +305,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -347,7 +347,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -386,7 +386,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -422,7 +422,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -476,7 +476,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -533,7 +533,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -589,7 +589,7 @@ jobs:
         run: podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
       - name: Start fetchit
-        run: podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable-user.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" quay.io/fetchit/fetchit-amd:latest
+        run: podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-enable-user.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -640,7 +640,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-restart.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-restart.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 4m
@@ -697,7 +697,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -730,7 +730,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
  
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -766,7 +766,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -802,7 +802,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 2m
@@ -852,7 +852,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
   
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 150s
@@ -897,7 +897,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
   
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 150s
@@ -967,7 +967,7 @@ jobs:
           sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
         run: sleep 2m
