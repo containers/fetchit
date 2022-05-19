@@ -1,7 +1,7 @@
 volume: raw-volume # this needs to match the volume name passed to the podman run command
 targets:
 - name: fetchit
-  url: http://localhost:8080/fetchit.zip
+  url: http://localhost:9090/fetchit.zip
   disconnected: true
   methods:
     raw:

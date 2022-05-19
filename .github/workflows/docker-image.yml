@@ -609,7 +609,7 @@ jobs:
           path: /tmp
 
       - name: start httpd
-        run: sudo podman run -d --name httpd -p 8080:8080 registry.access.redhat.com/ubi8/httpd-24
+        run: sudo podman run -d --name httpd -p 9090:8080 registry.access.redhat.com/ubi8/httpd-24
 
       - name: create zip file and podman cp
         run: |
