@@ -18,12 +18,6 @@ jobs:
       - name: Install required packages
         run: sudo apt install curl
       
-      - name: Enable ubi9-beta images
-        run:  |
-          curl -O https://www.redhat.com/security/data/f21541eb.txt \
-          sudo podman image trust set -f ./f21541eb.txt registry.access.redhat.com/ubi9-beta \
-          sudo podman image trust set -f ./f21541eb.txt registry.access.redhat.com/rhel9-beta
-
       - name: Build the image
         run: go mod tidy && go mod vendor && docker build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
     
