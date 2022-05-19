@@ -596,6 +596,8 @@ jobs:
     needs: [ build ]
     steps:
       - uses: actions/checkout@v2
+        with:
+          path: fetchit
         
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -603,7 +605,7 @@ jobs:
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
-          name: fetchit
+          name: fetchit-image
           path: /tmp
 
       - name: start httpd
@@ -611,7 +613,6 @@ jobs:
 
       - name: create zip file and podman cp
         run: |
-          cd /tmp
           zip -r fetchit.zip fetchit
           podman cp fetchit.zip httpd:/var/www/html/
 
@@ -629,7 +630,7 @@ jobs:
         
       - name: Logs
         run: sudo podman logs fetchit
-        
+
       - name: verify container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
