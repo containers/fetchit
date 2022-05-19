@@ -614,7 +614,7 @@ jobs:
       - name: create zip file and podman cp
         run: |
           zip -r fetchit.zip fetchit
-          podman cp fetchit.zip httpd:/var/www/html/
+          sudo podman cp fetchit.zip httpd:/var/www/html/
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
