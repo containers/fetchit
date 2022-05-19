@@ -820,7 +820,7 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 		tp = path
 	}
 	if !mo.Target.Disconnected {
-		changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
+		changesThisMethod, newCommit, err := hc.findGitDiff(mo.Target, mo.Method, tp, lc)
 		if err != nil {
 			return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
 		}
@@ -853,7 +853,38 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 			return nil
 		}
 	} else if mo.Target.Disconnected {
-		klog.Info("this is disconnected.....im not sure how to proceed")
+		changesThisMethod, newCommit, err := hc.findDisconDiff(mo.Target, mo.Method, tp, lc)
+		if err != nil {
+			return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
+		}
+
+		hc.setlastCommit(mo.Target, mo.Method, newCommit)
+		hc.update(mo.Target)
+
+		if len(changesThisMethod) == 0 {
+			if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
+				return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
+			}
+			klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
+			return nil
+		}
+
+		ch := make(chan error)
+		for change, changePath := range changesThisMethod {
+			go func(ch chan<- error, changePath string, change *object.Change) {
+				if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
+					ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
+				}
+				ch <- nil
+			}(ch, changePath, change)
+		}
+		for range changesThisMethod {
+			err := <-ch
+			if err != nil {
+				return err
+			}
+			return nil
+		}
 	}
 
 	return nil
@@ -868,7 +899,46 @@ func (hc *FetchitConfig) update(target *Target) {
 	}
 }
 
-func (hc *FetchitConfig) findDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
+func (hc *FetchitConfig) findDisconDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
+	directory := filepath.Base(target.Name)
+	// map of change to path
+	thisMethodChanges := make(map[*object.Change]string)
+	gitRepo, err := git.PlainOpen(directory)
+	if err != nil {
+		return thisMethodChanges, nil, fmt.Errorf("error while opening the repository: %v", err)
+	}
+
+	// ... retrieve the tree from this method's last fetched commit
+	beforeFetchTree, _, err := getTree(gitRepo, commit)
+	if err != nil {
+		// TODO: if lastCommit has disappeared, need to reset and set initial=true instead of exit
+		return thisMethodChanges, nil, fmt.Errorf("error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", err)
+	}
+	hc.getDisconnected(target)
+
+	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
+	if err != nil {
+		return thisMethodChanges, nil, err
+	}
+
+	changes, err := afterFetchTree.Diff(beforeFetchTree)
+	if err != nil {
+		return thisMethodChanges, nil, fmt.Errorf("%s: error while generating diff: %s", directory, err)
+	}
+	// the change logic is backwards "From" is actually "To"
+	for _, change := range changes {
+		if strings.Contains(change.From.Name, targetPath) {
+			path := directory + "/" + change.From.Name
+			thisMethodChanges[change] = path
+		} else if strings.Contains(change.To.Name, targetPath) {
+			thisMethodChanges[change] = deleteFile
+		}
+	}
+
+	return thisMethodChanges, newestCommit, nil
+}
+
+func (hc *FetchitConfig) findGitDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
 	directory := filepath.Base(target.Url)
 	// map of change to path
 	thisMethodChanges := make(map[*object.Change]string)
@@ -1124,8 +1194,6 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 		klog.Warningf("Target: %s Method: %s encountered error: %v, resetting...", target.Name, method, err)
 	}
 	commit, err := hc.getGit(target, initial)
-	klog.Infof("The disconnected bool is %t", target.Disconnected)
-	klog.Infof("The commit id is %s", commit)
 	if err != nil {
 		klog.Warningf("Target: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
 		return true
@@ -1139,17 +1207,14 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 }
 
 func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
-	klog.Info("Processing the initial run and the initialrun value is ", initialRun)
 	if initialRun {
 		if !target.Disconnected {
-			klog.Infof("This is not a disconnected target, will attempt to clone")
 			if err := hc.getClone(target); err != nil {
 				return nil, err
 			}
 		}
 	} else {
 		if target.Disconnected {
-			klog.Infof("This is a disconnected target, will attempt to get disconnected")
 			if err := hc.getDisconnected(target); err != nil {
 				return nil, err
 			}
