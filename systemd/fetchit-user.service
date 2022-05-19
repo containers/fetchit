@@ -11,7 +11,7 @@ Restart=always
 TimeoutStopSec=65
 ExecStartPre=/usr/bin/mkdir -p %h/.fetchit
 ExecStartPre=/bin/rm -f %t/%n.ctr-id
-ExecStart=/usr/bin/podman run --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace --label io.containers.autoupdate=registry -d --name fetchit -v fetchit-volume:/opt -v %h/.fetchit:/opt/mount -v /run/user/%U/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/%U" -e HOME=%h quay.io/fetchit/fetchit:latest
+ExecStart=/usr/bin/podman run --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --security-opt label=disable --sdnotify=conmon --replace --label io.containers.autoupdate=registry -d --name fetchit -v fetchit-volume:/opt -v %h/.fetchit:/opt/mount -v /run/user/%U/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/%U" -e HOME=%h quay.io/fetchit/fetchit:latest
 ExecStop=/usr/bin/podman stop --ignore --cidfile=%t/%n.ctr-id
 ExecStopPost=/usr/bin/podman rm -f --ignore --cidfile=%t/%n.ctr-id
 Type=notify

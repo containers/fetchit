@@ -55,32 +55,27 @@ Two systemd files are provided to allow for FetchIt to run as a user or as root.
 
 Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting to start the service.
 
-NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
-
 For root
 ```
-setenforce 0
 cp systemd/fetchit.root /etc/systemd/system/fetchit.service
 systemctl enable fetchit --now
 ```
 
-
-NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
-
 ```
 mkdir -p ~/.config/systemd/user/
-setenforce 0
 cp systemd/fetchit.user ~/.config/systemd/user/
 systemctl --user enable fetchit --now
 ```
 
 #### Manually launch the fetchit container using a podman volume
 
-NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
-
 ```
-setenforce 0
-podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/mount -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
+podman run -d --rm --name fetchit \
+    -v fetchit-volume:/opt \
+    -v $HOME/.fetchit:/opt/mount \
+    -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock \
+    --security-opt label=disable \
+    quay.io/fetchit/fetchit:latest
 ```
 
 **NOTE:**
