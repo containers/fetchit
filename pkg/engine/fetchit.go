@@ -1108,7 +1108,8 @@ func (hc *FetchitConfig) getDisconnected(target *Target) error {
 	// Pull the zip file from the URL
 	resp, err := stdHttp.Get(target.Url)
 	if err != nil {
-		klog.Infof("cannot access URL: %s", err)
+		klog.Infof("Cannot access URL: %s", err)
+		return err
 	}
 
 	defer resp.Body.Close()
@@ -1213,11 +1214,9 @@ func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit
 				return nil, err
 			}
 		}
-	} else {
-		if target.Disconnected {
-			if err := hc.getDisconnected(target); err != nil {
-				return nil, err
-			}
+	} else if target.Disconnected {
+		if err := hc.getDisconnected(target); err != nil {
+			return nil, err
 		}
 	}
 	directory := filepath.Base(target.Name)
