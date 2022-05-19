@@ -36,24 +36,18 @@ The two systemd files are differentiated by .root and .user.
 
 Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
 
-NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
-
 For root
 
 .. code-block:: bash
    
-   sudo setenforce 0
    cp systemd/fetchit.root /etc/systemd/system/fetchit.service
    systemctl enable fetchit --now
 
 
 For user ensure that the path for the configuration file `/home/fetchiter/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
 
-NOTE: SELinux is temporarily disabled until the work to define the specific SELinux rules are completed.
-
 .. code-block:: bash
    
-   sudo setenforce 0
    mkdir -p ~/.config/systemd/user/
    cp systemd/fetchit.user ~/.config/systemd/user/
    systemctl --user enable fetchit --now
@@ -63,8 +57,12 @@ Manually
 
 .. code-block:: bash
    
-   sudo setenforce 0
-   podman run -d --name fetchit -v fetchit-volume:/opt -v ./config.yaml:/opt/config.yaml -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
+   podman run -d --name fetchit \
+     -v fetchit-volume:/opt \
+     -v ./config.yaml:/opt/config.yaml \
+     -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock \
+     --security-opt label=disable \
+     quay.io/fetchit/fetchit:latest
 
 FetchIt will clone the repository and attempt to remediate those items defined in the config.yaml file. To follow the status.
 
