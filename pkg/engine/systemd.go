@@ -22,6 +22,7 @@ const (
 func systemdPodman(ctx context.Context, mo *SingleMethodObj, path, dest string, prev *string) error {
 	klog.Infof("Deploying systemd file(s) %s", path)
 	sd := mo.Target.Methods.Systemd
+	klog.Info("%s", mo.Target.Url)
 	if sd.AutoUpdateAll {
 		if !mo.Target.Methods.Systemd.initialRun {
 			return nil

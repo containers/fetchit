@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"k8s.io/klog/v2"
@@ -96,32 +95,4 @@ func checkTag(tags *[]string, name string) bool {
 		}
 	}
 	return false
-}
-
-func getTree(r *git.Repository, oldCommit *object.Commit) (*object.Tree, *object.Commit, error) {
-	if oldCommit != nil {
-		// ... retrieve the tree from the commit
-		tree, err := oldCommit.Tree()
-		if err != nil {
-			return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-		}
-		return tree, nil, nil
-	}
-	var newCommit *object.Commit
-	ref, err := r.Head()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving head: %s", err)
-	}
-	// ... retrieving the commit object
-	newCommit, err = r.CommitObject(ref.Hash())
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving commit: %s", err)
-	}
-
-	// ... retrieve the tree from the commit
-	tree, err := newCommit.Tree()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-	}
-	return tree, newCommit, nil
 }

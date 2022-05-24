@@ -12,11 +12,7 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-co-op/gocron"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -59,6 +55,7 @@ type FetchitConfig struct {
 	scheduler      *gocron.Scheduler
 	configFile     string
 	restartFetchit bool
+	gm             *GitManager
 }
 
 func NewFetchitConfig() *FetchitConfig {
@@ -68,6 +65,7 @@ func NewFetchitConfig() *FetchitConfig {
 				methodSchedules: make(map[string]schedInfo),
 			},
 		},
+		gm: newGitManager(),
 	}
 }
 
@@ -206,39 +204,7 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 		cobra.CheckErr(err)
 	}
 
-	beforeTargets := len(hc.Targets)
 	hc.Targets = config.Targets
-	if beforeTargets > 0 {
-		// replace lastCommit - to avoid re-running same jobs, since the scheduler finished all jobs
-		// with the last commit before arriving here
-		for i, t := range hc.Targets {
-			if t.Methods.Raw != nil {
-				if config.Targets[i].Methods.Raw != nil {
-					t.Methods.Raw.lastCommit = config.Targets[i].Methods.Raw.lastCommit
-				}
-			}
-			if t.Methods.Kube != nil {
-				if config.Targets[i].Methods.Kube != nil {
-					t.Methods.Kube.lastCommit = config.Targets[i].Methods.Kube.lastCommit
-				}
-			}
-			if t.Methods.Ansible != nil {
-				if config.Targets[i].Methods.Ansible != nil {
-					t.Methods.Ansible.lastCommit = config.Targets[i].Methods.Ansible.lastCommit
-				}
-			}
-			if t.Methods.FileTransfer != nil {
-				if config.Targets[i].Methods.FileTransfer != nil {
-					t.Methods.FileTransfer.lastCommit = config.Targets[i].Methods.FileTransfer.lastCommit
-				}
-			}
-			if t.Methods.Systemd != nil {
-				if config.Targets[i].Methods.Systemd != nil {
-					t.Methods.Systemd.lastCommit = config.Targets[i].Methods.Systemd.lastCommit
-				}
-			}
-		}
-	}
 
 	// look for a ConfigFileTarget, only find the first
 	// TODO: add logic to merge multiple configs
@@ -330,7 +296,7 @@ func (hc *FetchitConfig) RunTargets() {
 	allTargets := make(map[string]map[string]schedInfo)
 	for _, target := range hc.Targets {
 		if target.Url != "" {
-			if err := hc.getClone(target); err != nil {
+			if err := hc.gm.AddTarget(target.Name, target.Url, target.Branch, hc.PAT); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", target.Name, err)
 			}
 		}
@@ -721,40 +687,45 @@ func (hc *FetchitConfig) applyInitial(ctx context.Context, mo *SingleMethodObj, 
 }
 
 func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleMethodObj, path string) error {
-	var lc *object.Commit
 	var targetPath string
 	switch mo.Method {
 	case rawMethod:
-		lc = mo.Target.Methods.Raw.lastCommit
 		targetPath = mo.Target.Methods.Raw.TargetPath
 	case kubeMethod:
-		lc = mo.Target.Methods.Kube.lastCommit
 		targetPath = mo.Target.Methods.Kube.TargetPath
 	case ansibleMethod:
-		lc = mo.Target.Methods.Ansible.lastCommit
 		targetPath = mo.Target.Methods.Ansible.TargetPath
 	case fileTransferMethod:
-		lc = mo.Target.Methods.FileTransfer.lastCommit
 		targetPath = mo.Target.Methods.FileTransfer.TargetPath
 	case systemdMethod:
-		lc = mo.Target.Methods.Systemd.lastCommit
 		targetPath = mo.Target.Methods.Systemd.TargetPath
 	default:
 		return fmt.Errorf("unknown method: %s", mo.Method)
 	}
+
 	tp := targetPath
 	if path != "" {
 		tp = path
 	}
-	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
+
+	working, err := hc.gm.GetCurrentWorkingCommit(mo.Target.Name, mo.Method)
 	if err != nil {
-		return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
+		return err
 	}
 
-	hc.setlastCommit(mo.Target, mo.Method, newCommit)
+	latest, err := hc.gm.GetLatestCommit(mo.Target.Name)
+	if err != nil {
+		return err
+	}
+
+	changes, err := hc.gm.GetDiff(mo.Target.Name, working, latest)
+	if err != nil {
+		return err
+	}
+
 	hc.update(mo.Target)
 
-	if len(changesThisMethod) == 0 {
+	if changes.Len() == 0 {
 		if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
 			return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
 		}
@@ -762,22 +733,25 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 		return nil
 	}
 
+	directory := filepath.Base(mo.Target.Url)
+	changeMap := translateChanges(changes, tp, directory)
+
 	ch := make(chan error)
-	for change, changePath := range changesThisMethod {
+	for change, changePath := range changeMap {
 		go func(ch chan<- error, changePath string, change *object.Change) {
 			if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
-				ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
+				ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, latest.String())
 			}
 			ch <- nil
 		}(ch, changePath, change)
 	}
-	for range changesThisMethod {
+	for range changeMap {
 		err := <-ch
 		if err != nil {
 			return err
 		}
-		return nil
 	}
+	hc.gm.SetCurrentWorkingCommit(mo.Target.Name, mo.Method, latest)
 	return nil
 }
 
@@ -789,64 +763,17 @@ func (hc *FetchitConfig) update(target *Target) {
 	}
 }
 
-func (hc *FetchitConfig) findDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
-	directory := filepath.Base(target.Url)
-	// map of change to path
-	thisMethodChanges := make(map[*object.Change]string)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error while opening the repository: %v", err)
-	}
-	w, err := gitRepo.Worktree()
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error while opening the worktree: %v", err)
-	}
-	// ... retrieve the tree from this method's last fetched commit
-	beforeFetchTree, _, err := getTree(gitRepo, commit)
-	if err != nil {
-		// TODO: if lastCommit has disappeared, need to reset and set initial=true instead of exit
-		return thisMethodChanges, nil, fmt.Errorf("error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", err)
-	}
-
-	// Fetch the latest changes from the origin remote and merge into the current branch
-	ref := fmt.Sprintf("refs/heads/%s", target.Branch)
-	refName := plumbing.ReferenceName(ref)
-	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.Branch, target.Branch))
-	if err = gitRepo.Fetch(&git.FetchOptions{
-		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
-		Force:    true,
-	}); err != nil && err != git.NoErrAlreadyUpToDate {
-		return nil, commit, err
-	}
-
-	// force checkout to latest fetched branch
-	if err := w.Checkout(&git.CheckoutOptions{
-		Branch: refName,
-		Force:  true,
-	}); err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error checking out latest branch %s: %v", ref, err)
-	}
-
-	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
-	if err != nil {
-		return thisMethodChanges, nil, err
-	}
-
-	changes, err := afterFetchTree.Diff(beforeFetchTree)
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("%s: error while generating diff: %s", directory, err)
-	}
-	// the change logic is backwards "From" is actually "To"
-	for _, change := range changes {
+func translateChanges(changes *object.Changes, targetPath, directory string) map[*object.Change]string {
+	changesMap := make(map[*object.Change]string)
+	for _, change := range *changes {
 		if strings.Contains(change.From.Name, targetPath) {
 			path := directory + "/" + change.From.Name
-			thisMethodChanges[change] = path
+			changesMap[change] = path
 		} else if strings.Contains(change.To.Name, targetPath) {
-			thisMethodChanges[change] = deleteFile
+			changesMap[change] = deleteFile
 		}
 	}
-
-	return thisMethodChanges, newestCommit, nil
+	return changesMap
 }
 
 // Each engineMethod call now owns the prev and dest variables instead of being shared in mo
@@ -902,52 +829,18 @@ func (hc *FetchitConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 	}
 }
 
-func (hc *FetchitConfig) getClone(target *Target) error {
-	directory := filepath.Base(target.Url)
-	absPath, err := filepath.Abs(directory)
-	if err != nil {
-		return err
-	}
-	var exists bool
-	if _, err := os.Stat(directory); err == nil {
-		exists = true
-		// if directory/.git does not exist, fail quickly
-		if _, err := os.Stat(directory + "/.git"); err != nil {
-			return fmt.Errorf("%s exists but is not a git repository", directory)
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	if !exists {
-		klog.Infof("git clone %s %s --recursive", target.Url, target.Branch)
-		var user string
-		if hc.PAT != "" {
-			user = "fetchit"
-		}
-		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
-			Auth: &http.BasicAuth{
-				Username: user, // the value of this field should not matter when using a PAT
-				Password: hc.PAT,
-			},
-			URL:           target.Url,
-			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.Branch)),
-			SingleBranch:  true,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
+	latestHash, err := hc.gm.GetLatestCommit(target.Name)
 	if err != nil {
 		return "", nil, err
 	}
-	tree, _, err := getTree(gitRepo, nil)
+
+	commit, err := hc.gm.GetCommit(target.Name, latestHash)
+	if err != nil {
+		return "", nil, err
+	}
+
+	tree, err := commit.Tree()
 	if err != nil {
 		return "", nil, err
 	}
@@ -989,20 +882,21 @@ func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool
 
 func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
 	if initialRun {
-		if err := hc.getClone(target); err != nil {
+		if err := hc.gm.AddTarget(target.Name, target.Url, target.Branch, hc.PAT); err != nil {
 			return nil, err
 		}
 	}
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
+
+	latestHash, err := hc.gm.GetLatestCommit(target.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	_, commit, err := getTree(gitRepo, nil)
+	commit, err := hc.gm.GetCommit(target.Name, latestHash)
 	if err != nil {
 		return nil, err
 	}
+
 	return commit, nil
 }
 
@@ -1014,25 +908,10 @@ func (hc *FetchitConfig) setInitial(target *Target, commit *object.Commit, metho
 	if commit == nil {
 		retry = true
 	} else {
-		hc.setlastCommit(target, method, commit)
+		hc.gm.SetCurrentWorkingCommit(target.Name, method, commit.Hash)
 	}
 	hc.update(target)
 	return retry
-}
-
-func (hc *FetchitConfig) setlastCommit(target *Target, method string, commit *object.Commit) {
-	switch method {
-	case kubeMethod:
-		target.Methods.Kube.lastCommit = commit
-	case rawMethod:
-		target.Methods.Raw.lastCommit = commit
-	case systemdMethod:
-		target.Methods.Systemd.lastCommit = commit
-	case fileTransferMethod:
-		target.Methods.FileTransfer.lastCommit = commit
-	case ansibleMethod:
-		target.Methods.Ansible.lastCommit = commit
-	}
 }
 
 // setinitialRun is called before the initial processing of a target, or
