@@ -12,6 +12,7 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-co-op/gocron"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -412,7 +413,7 @@ func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target, skew in
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, raw.TargetPath, rawMethod)
+		fileName, subDirTree, latest, err := hc.getPathOrTree(target, raw.TargetPath, rawMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, rawMethod, false, err)
 			return
@@ -423,6 +424,7 @@ func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target, skew in
 			return
 		}
 		path = targetFile
+		hc.gm.SetCurrentWorkingCommit(target.Name, mo.Method, latest)
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
@@ -452,7 +454,7 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, ans.TargetPath, ansibleMethod)
+		fileName, subDirTree, latest, err := hc.getPathOrTree(target, ans.TargetPath, ansibleMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, ansibleMethod, false, err)
 			return
@@ -463,6 +465,7 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 			return
 		}
 		path = targetFile
+		hc.gm.SetCurrentWorkingCommit(target.Name, mo.Method, latest)
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
@@ -512,7 +515,7 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, sd.TargetPath, systemdMethod)
+		fileName, subDirTree, latest, err := hc.getPathOrTree(target, sd.TargetPath, systemdMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, systemdMethod, false, err)
 			return
@@ -523,6 +526,7 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 			return
 		}
 		path = targetFile
+		hc.gm.SetCurrentWorkingCommit(target.Name, mo.Method, latest)
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
@@ -551,7 +555,7 @@ func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, ft.TargetPath, fileTransferMethod)
+		fileName, subDirTree, latest, err := hc.getPathOrTree(target, ft.TargetPath, fileTransferMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, fileTransferMethod, false, err)
 			return
@@ -562,6 +566,7 @@ func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target
 			return
 		}
 		path = targetFile
+		hc.gm.SetCurrentWorkingCommit(target.Name, mo.Method, latest)
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
@@ -591,7 +596,7 @@ func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew i
 		if retry {
 			return
 		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, kube.TargetPath, kubeMethod)
+		fileName, subDirTree, latest, err := hc.getPathOrTree(target, kube.TargetPath, kubeMethod)
 		if err != nil {
 			_ = hc.resetTarget(target, kubeMethod, false, err)
 			return
@@ -602,6 +607,7 @@ func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew i
 			return
 		}
 		path = targetFile
+		hc.gm.SetCurrentWorkingCommit(target.Name, mo.Method, latest)
 	}
 
 	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
@@ -810,20 +816,20 @@ func (hc *FetchitConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 	}
 }
 
-func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
+func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, plumbing.Hash, error) {
 	latestHash, err := hc.gm.GetLatestCommit(target.Name)
 	if err != nil {
-		return "", nil, err
+		return "", nil, plumbing.Hash{}, err
 	}
 
 	commit, err := hc.gm.GetCommit(target.Name, latestHash)
 	if err != nil {
-		return "", nil, err
+		return "", nil, plumbing.Hash{}, err
 	}
 
 	tree, err := commit.Tree()
 	if err != nil {
-		return "", nil, err
+		return "", nil, plumbing.Hash{}, err
 	}
 
 	subDirTree, err := tree.Tree(subDir)
@@ -832,11 +838,11 @@ func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (s
 			// check if exact filepath
 			file, err := tree.File(subDir)
 			if err == nil {
-				return file.Name, nil, nil
+				return file.Name, nil, plumbing.Hash{}, nil
 			}
 		}
 	}
-	return "", subDirTree, err
+	return "", subDirTree, commit.Hash, err
 }
 
 // arrive at resetTarget 1 of 2 ways:
