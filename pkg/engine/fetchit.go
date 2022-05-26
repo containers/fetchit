@@ -287,7 +287,6 @@ func (hc *FetchitConfig) GetTargets() {
 			}
 		}
 		target.methodSchedules = schedMethods
-		hc.update(target)
 	}
 }
 
@@ -387,7 +386,6 @@ func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target, skew
 		return
 	}
 	hc.restartFetchit = restart
-	hc.update(target)
 	if hc.restartFetchit {
 		klog.Info("Updated config processed, restarting with new targets")
 		fetchitConfig.Restart()
@@ -432,7 +430,6 @@ func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target, skew in
 		return
 	}
 	raw.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, skew int) {
@@ -473,7 +470,6 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 		return
 	}
 	ans.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, skew int) {
@@ -510,7 +506,6 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 				klog.Infof("Failed to start podman-auto-update.service: %v", err)
 			}
 			sd.initialRun = false
-			hc.update(target)
 			return
 		}
 		retry := hc.resetTarget(target, systemdMethod, true, nil)
@@ -535,7 +530,6 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 		return
 	}
 	sd.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target, skew int) {
@@ -575,7 +569,6 @@ func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target
 		return
 	}
 	ft.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew int) {
@@ -616,7 +609,6 @@ func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew i
 		return
 	}
 	kube.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew int) {
@@ -634,7 +626,6 @@ func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew 
 		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, cleanMethod, err)
 	}
 
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) applyInitial(ctx context.Context, mo *SingleMethodObj, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
@@ -723,8 +714,6 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 		return err
 	}
 
-	hc.update(mo.Target)
-
 	if changes.Len() == 0 {
 		if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
 			return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
@@ -753,14 +742,6 @@ func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleM
 	}
 	hc.gm.SetCurrentWorkingCommit(mo.Target.Name, mo.Method, latest)
 	return nil
-}
-
-func (hc *FetchitConfig) update(target *Target) {
-	for _, t := range hc.Targets {
-		if target.Name == t.Name {
-			t = target
-		}
-	}
 }
 
 func translateChanges(changes *object.Changes, targetPath, directory string) map[*object.Change]string {
@@ -910,7 +891,6 @@ func (hc *FetchitConfig) setInitial(target *Target, commit *object.Commit, metho
 	} else {
 		hc.gm.SetCurrentWorkingCommit(target.Name, method, commit.Hash)
 	}
-	hc.update(target)
 	return retry
 }
 
