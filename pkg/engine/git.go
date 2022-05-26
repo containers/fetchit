@@ -42,13 +42,17 @@ func (gm *GitManager) AddTarget(targetName, url, branch, authToken string) error
 		if err != nil {
 			return err
 		}
-		gm.repos[targetName] = TargetRepo{repo, make(map[string]plumbing.Hash)}
+		if _, ok := gm.repos[targetName]; !ok {
+			gm.repos[targetName] = TargetRepo{repo, make(map[string]plumbing.Hash)}
+		}
 	} else {
 		repo, err := git.PlainOpen(absPath)
 		if err != nil {
 			return err
 		}
-		gm.repos[targetName] = TargetRepo{repo, make(map[string]plumbing.Hash)}
+		if _, ok := gm.repos[targetName]; !ok {
+			gm.repos[targetName] = TargetRepo{repo, make(map[string]plumbing.Hash)}
+		}
 	}
 	return nil
 }
@@ -136,10 +140,10 @@ func (gm *GitManager) GetDiff(targetName string, hashBefore, hashAfter plumbing.
 }
 
 func (gm *GitManager) GetCurrentWorkingCommit(targetName, method string) (plumbing.Hash, error) {
-	if hash, ok := gm.repos[targetName].methodMap[method]; ok != true {
-		return plumbing.Hash{}, fmt.Errorf("Unable last working commit does not exist for method %s, for target %s", method, targetName)
-	} else {
+	if hash, ok := gm.repos[targetName].methodMap[method]; ok {
 		return hash, nil
+	} else {
+		return plumbing.Hash{}, fmt.Errorf("Unable to get working commit: does not exist for method %s, for target %s", method, targetName)
 	}
 }
 
