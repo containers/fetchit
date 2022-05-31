@@ -130,6 +130,8 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 	s.Mounts = convertMounts(raw.Mounts)
 	s.PortMappings = convertPorts(raw.Ports)
 	s.Volumes = convertVolumes(raw.Volumes)
+	s.CapAdd = []string(raw.CapAdd)
+	s.CapDrop = []string(raw.CapDrop)
 	s.RestartPolicy = "always"
 	return s
 }

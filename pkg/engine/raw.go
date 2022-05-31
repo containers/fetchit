@@ -19,6 +19,8 @@ import (
     "HostPort":      8080,
     "Range":         0,
     "Protocol":      ""}]
+"CapAdd": []
+"CapDrop": []
 }
 */
 
@@ -50,6 +52,8 @@ type RawPod struct {
 	Ports   []port            `json:"Ports" yaml:"Ports"`
 	Mounts  []mount           `json:"Mounts" yaml:"Mounts"`
 	Volumes []namedVolume     `json:"Volumes" yaml:"Volumes"`
+	CapAdd  []string          `json:"CapAdd" yaml:"CapAdd"`
+	CapDrop []string          `json:"CapDrop" yaml:"CapDrop"`
 }
 
 func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
