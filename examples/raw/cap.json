@@ -8,7 +8,7 @@
     "Ports": [{
         "host_ip":        "",
         "container_port": 8080,
-        "host_port":      8080,
+        "host_port":      7070,
         "range":         0,
         "protocol":      ""}]
 }
