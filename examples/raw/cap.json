@@ -4,7 +4,7 @@
     "Env": {"APP_COLOR": "blue", "tree": "trunk"},
     "Mounts": [],
     "Volumes": [],
-    "CapAdd": [NET_ADMIN]
+    "CapAdd": ["NET_ADMIN"]
     "Ports": [{
         "host_ip":        "",
         "container_port": 8080,
