@@ -8,5 +8,5 @@ targets:
       destinationDirectory: /tmp
       schedule: "*/1 * * * *"
     raw:
-      targetPath: examples/raw
+      targetPath: examples/raw/
       schedule: "*/1 * * * *"

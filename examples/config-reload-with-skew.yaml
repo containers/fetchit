@@ -10,7 +10,7 @@ targets:
       configUrl: https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/config-reload-with-skew.yaml
       schedule: "*/2 * * * *"
     raw:
-      targetPath: examples/raw
+      targetPath: examples/raw/
       schedule: "*/1 * * * *"
       pullImage: true
       skew: 5000

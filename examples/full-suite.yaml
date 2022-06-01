@@ -4,7 +4,7 @@ targets:
   url: http://github.com/redhat-et/fetchit
   methods:
     raw:
-      targetPath: examples/raw
+      targetPath: examples/raw/
       schedule: "*/1 * * * *"
     systemd:
       targetPath: examples/systemd/httpd.service
@@ -12,11 +12,11 @@ targets:
       enable: false
       schedule: "*/1 * * * *"
     ansible:
-      targetPath: examples/ansible
+      targetPath: examples/ansible/
       sshDirectory: /root/.ssh
       schedule: "*/1 * * * *"
     filetransfer:
-      targetPath: examples/filetransfer
+      targetPath: examples/filetransfer/
       destinationDirectory: /tmp/ft
       schedule: "*/1 * * * *"
     clean:
