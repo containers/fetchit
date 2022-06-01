@@ -4,7 +4,7 @@ targets:
   url: http://github.com/redhat-et/fetchit
   methods:
     ansible:
-      targetPath: examples/ansible
+      targetPath: examples/ansible/
       sshDirectory: /root/.ssh
       schedule: "*/1 * * * *"
   branch: main
