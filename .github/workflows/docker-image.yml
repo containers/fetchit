@@ -915,7 +915,7 @@ jobs:
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
 
       - name: verify raw container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   make-change-to-repo:
     runs-on: ubuntu-latest
