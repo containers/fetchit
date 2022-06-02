@@ -178,7 +178,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do;    c=`sudo podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -374,7 +374,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do;    c=`sudo podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -545,7 +545,9 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service || exit 1
+        run: |
+           sysd=inactive
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
 
       - name: Pull test httpd image
         run: sudo podman pull quay.io/sallyom/httpd-ex:latest
@@ -605,7 +607,9 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service || exit 1
+        run: |
+           sysd=inactive
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
 
   systemd-user-enable-validate:
     runs-on: ubuntu-latest
@@ -712,7 +716,9 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run:  sudo systemctl is-active --quiet httpd.service || exit 1
+        run: |
+           sysd=inactive
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
 
   ansible-validate:
     runs-on: ubuntu-latest
@@ -933,7 +939,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do;    c=`sudo podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -995,7 +1001,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do;    c=`sudo podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1066,7 +1072,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do;    c=`sudo podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
