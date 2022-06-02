@@ -1,25 +1,35 @@
 Configuration
 =============
-The YAML configuration file defines the method to use, how frequently to check the repository, and various configuration values that relate to that method.
+The YAML configuration file defines targets and the method to use, how frequently to check the repository,
+and various configuration values that relate to that method.
+
+A target is a unique value that holds methods. Mutiple targets can be defined. Methods that can be configured per
+target include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Clean`, and `ConfigTarget`.
+
+Dynamic Configuration Reload
+=============
+
+There are a few ways currently to trigger FetchIt to reload its targets without requiring a restart. The first is to
+pass the environment variable `$FETCHIT_CONFIG_URL` to the `podman run` command running the FetchIt image.
+The second is to include a ConfigTarget in the FetchIt config file. If neither of these exist, a restart of the FetchIt
+pod is required to reload targets. The following fields are required with the ConfigTarget:
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targets:
-   - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+   - name: config
      methods:
-       raw:
-         targetPath: examples/raw
+       configTarget:
          schedule: "*/5 * * * *"
-         pullImage: true
-     branch: main
+         configUrl: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
 
-A target is a unique value but the methods within each target cannot be repeated. Mutiple targets can be defined.
+Changes pushed to the ConfigUrl will trigger a reloading of FetchIt targets. It's recommended to include the ConfigTarget
+in the FetchIt config to enable updates to targets without requiring a restart.
 
 Methods
 =======
-Various methods are available to lifecycle and manage the container environment on a host. Funcionality also exists to allow for files or directories of files to be deployed to the container host to be used by containers.
+Various methods are available to lifecycle and manage the container environment on a host. Funcionality also exists to
+allow for files or directories of files to be deployed to the container host to be used by containers.
 
 
 Ansible
