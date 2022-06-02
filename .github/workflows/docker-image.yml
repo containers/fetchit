@@ -178,7 +178,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -321,7 +321,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -374,7 +374,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -933,7 +933,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -995,7 +995,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1066,13 +1066,13 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+          until [ $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
 
       - name: get environment variable
-        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=blue" ]] ; then exit 1; else echo "Environment variable set"; fi
+        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) = "APP_COLOR=blue" ]] ; then exit 1; else echo "Environment variable set"; fi
 
       - name: update variable
         run: |
@@ -1093,7 +1093,7 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: get environment variable
-        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) != "APP_COLOR=pink" ]] ; then exit 1; else echo "Environment variable set"; fi
+        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) = "APP_COLOR=pink" ]] ; then exit 1; else echo "Environment variable set"; fi
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
