@@ -753,7 +753,7 @@ jobs:
         run: sudo podman logs fetchit
       
       - name: list packages
-        run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh); done'
+        run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh | wc -l); done'
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
