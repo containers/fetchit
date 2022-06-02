@@ -177,8 +177,9 @@ jobs:
 
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
+
       - name: Logs
         run: sudo podman logs fetchit
 
@@ -319,8 +320,8 @@ jobs:
         
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -372,8 +373,8 @@ jobs:
         
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -931,8 +932,8 @@ jobs:
 
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -993,8 +994,8 @@ jobs:
 
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1064,8 +1065,8 @@ jobs:
 
       - name: identify colors container
         run: |
-          colors=0
-          timeout 150 bash -c -- "until [ $colors -eq 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
+          c=0
+          until [ ! $c -eq 2 ]; do    echo $c;    c=`podman ps | grep colors | wc -l`; done
 
       - name: Logs
         run: sudo podman logs fetchit
