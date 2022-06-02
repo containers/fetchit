@@ -859,19 +859,16 @@ jobs:
         run: sudo podman image ls
 
       - name: wait until image is removed
-        run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | wc -l); done'
+        run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | grep -v REPOSITORY | wc -l); done'
 
       - name: Logs
         run: sudo podman logs fetchit
 
+      - name: verify volume is deleted
+        run: if [[ $(sudo podman volume ls | grep test) ]] ; then exit 1; else echo "Volume correctly removed" 1; fi
+
       - name: verify image is deleted
         run: if [[ $(sudo podman image ls | grep alpine) ]] ; then exit 1; else echo "Image correctly removed" 1; fi
-
-      - name: Print the current volumes
-        run: sudo podman volume ls
-
-      - name: Print the current images
-        run: sudo podman image ls
 
   multi-engine-validate:
     runs-on: ubuntu-latest
