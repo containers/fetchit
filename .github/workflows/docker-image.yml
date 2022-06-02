@@ -903,6 +903,18 @@ jobs:
           name: fetchit-image
           path: /tmp
 
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
       - name: Create destination directory
         run: sudo mkdir /tmp/ft
 
@@ -959,6 +971,18 @@ jobs:
         with:
           name: fetchit-image
           path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
 
       - name: Create destination directory
         run: sudo mkdir /tmp/ft
