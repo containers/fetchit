@@ -178,7 +178,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -321,7 +321,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -374,7 +374,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -455,7 +455,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
-        run: timeout 150 bash -c -- "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+        run: timeout 150 bash -c -- "until [ -f /tmp/ft/single/hello.txt ]; do sleep 2; done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -538,16 +538,13 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for fetchit to deploy
-        run: sleep 2m
-
       - name: Logs
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
         run: |
            sysd=inactive
-           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done"
 
       - name: Pull test httpd image
         run: sudo podman pull quay.io/sallyom/httpd-ex:latest
@@ -609,7 +606,7 @@ jobs:
       - name: ensure httpd.service is running
         run: |
            sysd=inactive
-           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done"
 
   systemd-user-enable-validate:
     runs-on: ubuntu-latest
@@ -665,7 +662,10 @@ jobs:
         run: podman ps -a
 
       - name: ensure httpd.service is running
-        run:  XDG_RUNTIME_DIR=/run/user/$UID systemctl --user is-active --quiet httpd.service || exit 1
+        run: |  
+           XDG_RUNTIME_DIR=/run/user/$UID 
+           sysd=inactive
+           timeout 150 bash -c -- "until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
 
   systemd-restart-validate:
     runs-on: ubuntu-latest
@@ -761,15 +761,14 @@ jobs:
         
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-
-      - name: Wait for fetchit to deploy
-        run: sleep 2m
-      
+    
       - name: Logs
         run: sudo podman logs fetchit
       
       - name: list packages
-        run: sudo apt list --installed | grep zsh
+        run: |
+          zsh=0
+          timeout 150 bash -c -- "until [ $zsh -gt "1" ]; do zsh=$(sudo apt list --installed | grep zsh); done"
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
@@ -832,7 +831,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
-        run: sleep 2m
+        run: sleep 1m
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -867,14 +866,23 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for fetchit to deploy
-        run: sleep 2m
+      - name: identify fetchit container
+        run: |
+          c=0
+          timeout 150 bash -c -- "until [ $c -eq 1 ]; do    c=`sudo podman ps | grep fetchit | wc -l`; done"
 
       - name: Create unused volume and pull unused image
         run: sudo podman volume create test && sudo podman image pull alpine:latest
 
-      - name: Wait for fetchit to clean these up
-        run: sleep 2m
+      - name: wait until image is removed
+        run: |
+          i=1
+          timeout 150 bash -c -- "until [ $i -eq 0 ]; do    i=`sudo podman image ls alpine | wc -l`; done"
+
+      - name: wait until volume is removed
+        run: |
+          v=1
+          timeout 150 bash -c -- "until [ $v -eq 0 ]; do    v=`sudo podman volume ls| grep test | wc -l`; done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -939,7 +947,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -1001,7 +1009,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1072,7 +1080,7 @@ jobs:
       - name: identify colors container
         run: |
           c=0
-          until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done
+          timeout 150 bash -c -- "until [ $c -eq 2 ]; do    c=`sudo podman ps | grep colors | wc -l`; done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -1093,7 +1101,10 @@ jobs:
             git push -f
 
       - name: Wait for fetchit to deploy
-        run: sleep 2m
+        run: |
+          env_color=blue
+          timeout 150 bash -c -- "until [ $env_color = "pink" ]; do env_color=$(sudo podman exec colors1 env | grep APP_COLOR); done"
+
 
       - name: Logs
         run: sudo podman logs fetchit
