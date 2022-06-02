@@ -536,7 +536,7 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
-        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
+        run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
       - name: Pull test httpd image
         run: sudo podman pull quay.io/sallyom/httpd-ex:latest
@@ -596,7 +596,7 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
+        run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   systemd-user-enable-validate:
     runs-on: ubuntu-latest
@@ -654,7 +654,7 @@ jobs:
       - name: ensure httpd.service is running
         run: |  
            XDG_RUNTIME_DIR=/run/user/$UID 
-           timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(systemctl is-active httpd.service --user); done'
+           timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl is-active httpd.service --user); done'
 
   systemd-restart-validate:
     runs-on: ubuntu-latest
@@ -705,7 +705,7 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done
+        run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   ansible-validate:
     runs-on: ubuntu-latest
@@ -857,11 +857,17 @@ jobs:
       - name: Create unused volume and pull unused image
         run: sudo podman volume create test && sudo podman image pull alpine:latest
 
+      - name: wait until image is available
+        run: timeout 150 bash -c -- 'i=1 ; until [ $i -eq 1 ]; do i=$(sudo podman image ls alpine | wc -l); done'
+
+      - name: wait until volume is available
+        run: timeout 150 bash -c -- 'v=0 ; until [ $v -eq 1 ]; do v=$(sudo podman volume ls test | wc -l); done'
+
       - name: wait until image is removed
         run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | wc -l); done'
 
       - name: wait until volume is removed
-        run: timeout 150 bash -c -- 'v=0 ; until [ $v -eq 0 ]; do v=$(sudo podman image ls alpine | wc -l); done'
+        run: timeout 150 bash -c -- 'v=0 ; until [ $v -eq 0 ]; do v=$(sudo podman volume ls test | wc -l); done'
 
       - name: Logs
         run: sudo podman logs fetchit
