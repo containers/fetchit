@@ -12,6 +12,6 @@ targets:
     raw:
       targetPath: examples/raw
       schedule: "*/1 * * * *"
-      pullImage: true
+      pullImage: false
       skew: 5000
   branch: main

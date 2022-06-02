@@ -6,5 +6,5 @@ targets:
     raw:
       targetPath: examples/raw
       schedule: "*/1 * * * *"
-      pullImage: true
+      pullImage: false
   branch: main
