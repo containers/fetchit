@@ -837,6 +837,12 @@ jobs:
           name: fetchit-image
           path: /tmp
 
+      - name: Create unused volume
+        run: sudo podman volume create test
+        
+      - name: Pull an image
+        run: sudo podman image pull alpine:latest
+
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
 
@@ -860,7 +866,10 @@ jobs:
 
       - name: wait until image is removed
         run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | grep -v REPOSITORY | wc -l); done'
-
+  
+      - name: Wait for fetchit to clean these up
+        run: sleep 30s 
+        
       - name: Logs
         run: sudo podman logs fetchit
 
