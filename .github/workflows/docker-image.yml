@@ -87,7 +87,7 @@ jobs:
         run: podman save -o /tmp/colors.tar docker.io/mmumshad/simple-webapp-color:latest
 
       - name: save the container as an artifact
-        uses: actions/upload-artifact
+        uses: actions/upload-artifact@v1
         with:
           name: colors
           path: /tmp/colors.tar
@@ -1043,7 +1043,7 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/colors.tar
-        
+
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
