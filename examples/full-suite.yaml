@@ -6,6 +6,7 @@ targets:
     raw:
       targetPath: examples/raw
       schedule: "*/1 * * * *"
+      pullImage: false
     systemd:
       targetPath: examples/systemd/httpd.service
       root: true
