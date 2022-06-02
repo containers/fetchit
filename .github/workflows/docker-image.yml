@@ -536,9 +536,7 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
-        run: |
-           sysd=inactive
-           timeout 150 bash -c "until [ $sysd = \"active\" ]; do sysd=$(sudo systemctl is-active httpd.service); done"
+        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
       - name: Pull test httpd image
         run: sudo podman pull quay.io/sallyom/httpd-ex:latest
@@ -598,9 +596,7 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run: |
-           sysd=inactive
-           timeout 150 bash -c "until [ $sysd = \"active\" ]; do sysd=$(sudo systemctl is-active httpd.service); done"
+        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   systemd-user-enable-validate:
     runs-on: ubuntu-latest
@@ -658,8 +654,7 @@ jobs:
       - name: ensure httpd.service is running
         run: |  
            XDG_RUNTIME_DIR=/run/user/$UID 
-           sysd=inactive
-           timeout 150 bash -c "until [ $sysd = \"active\" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
+           timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(systemctl is-active httpd.service --user); done'
 
   systemd-restart-validate:
     runs-on: ubuntu-latest
@@ -710,9 +705,7 @@ jobs:
         run: sudo podman ps -a
 
       - name: ensure httpd.service is running
-        run: |
-           sysd=inactive
-           timeout 150 bash -c "until [ $sysd = \"active\" ]; do sysd=$(sudo systemctl is-active httpd.service --user); done"
+        run: timeout 150 bash -c -- 'sysd=0 ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done
 
   ansible-validate:
     runs-on: ubuntu-latest
@@ -760,7 +753,7 @@ jobs:
         run: sudo podman logs fetchit
       
       - name: list packages
-        run: timeout 150 bash -c -- 'z=0 ; until [ $z -gt 1 ]; do z=$(sudo apt list --installed | grep zsh); done'
+        run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh); done'
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
