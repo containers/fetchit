@@ -855,12 +855,6 @@ jobs:
       - name: identify fetchit container
         run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
 
-      - name: Create unused volume
-        run: sudo podman volume create test
-        
-      - name: Pull an image
-        run: sudo podman image pull alpine:latest
-
       - name: Print the current images
         run: sudo podman image ls
 
@@ -869,7 +863,7 @@ jobs:
   
       - name: Wait for fetchit to clean these up
         run: sleep 30s 
-        
+
       - name: Logs
         run: sudo podman logs fetchit
 
