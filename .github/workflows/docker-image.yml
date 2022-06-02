@@ -760,7 +760,7 @@ jobs:
         run: sudo podman logs fetchit
       
       - name: list packages
-        run: timeout 150 bash -c -- 'zsh=0 ; until [ $zsh -eq 1 ]; do zsh=$(sudo apt list --installed | grep zsh); done'
+        run: timeout 150 bash -c -- 'z=0 ; until [ $z -gt 1 ]; do z=$(sudo apt list --installed | grep zsh); done'
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
@@ -859,7 +859,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: identify fetchit container
-        run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 2 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
+        run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
 
       - name: Create unused volume and pull unused image
         run: sudo podman volume create test && sudo podman image pull alpine:latest
