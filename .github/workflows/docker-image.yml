@@ -223,8 +223,8 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for fetchit to deploy
-        run: sleep 7m
+      - name: identify colors container
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -271,8 +271,8 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
-      - name: Wait for fetchit to deploy
-        run: sleep 7m
+      - name: identify colors container
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -852,8 +852,11 @@ jobs:
       - name: identify fetchit container
         run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
 
-      - name: Create unused volume and pull unused image
-        run: sudo podman volume create test && sudo podman image pull alpine:latest
+      - name: Create unused volume
+        run: sudo podman volume create test
+        
+      - name: Pull an image
+        run: sudo podman image pull alpine:latest
 
       - name: Print the current volumes
         run: sudo podman volume ls
