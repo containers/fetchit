@@ -176,7 +176,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for colors to deploy
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -317,7 +317,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for colors to deploy
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -368,7 +368,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for colors to deploy
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -925,7 +925,7 @@ jobs:
         run: timeout 150 bash -c -- "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
 
       - name: identify colors container
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
 
       - name: Logs
         run: sudo podman logs fetchit
@@ -973,7 +973,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for colors to deploy
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
         
       - name: Logs
         run: sudo podman logs fetchit
@@ -988,7 +988,7 @@ jobs:
         run: timeout 150 bash -c -- "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
 
       - name: identify colors container
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1057,7 +1057,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for colors to deploy
-        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=`podman ps | grep colors | wc -l`; done"
+        run: timeout 150 bash -c -- "until [ $colors = 2 ]; do colors=$(podman ps | grep colors | wc -l); done"
 
       - name: Logs
         run: sudo podman logs fetchit
