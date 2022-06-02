@@ -14,10 +14,10 @@ To enable the socket for $USER:
 systemctl --user enable podman.socket --now
 ```
 
-To enable the socker for root:
+To enable the socket for root:
 
 ```
-systemctl enable podman.socket
+systemctl enable podman.socket --now
 ```
 
 
