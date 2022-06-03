@@ -2,8 +2,6 @@ package engine
 
 import (
 	"sync"
-
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 type Target struct {
@@ -63,8 +61,6 @@ type RawTarget struct {
 	PullImage bool `mapstructure:"pullImage"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
 
 // SystemdTarget to place and/or enable systemd unit files on host
@@ -99,8 +95,6 @@ type SystemdTarget struct {
 	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
 
 // FileTransferTarget to place files on host system
@@ -116,8 +110,6 @@ type FileTransferTarget struct {
 	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
 
 // KubeTarget to launch pods using podman kube-play
@@ -131,8 +123,6 @@ type KubeTarget struct {
 	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
 
 // AnsibleTarget to place and run ansible playbooks
@@ -148,8 +138,6 @@ type AnsibleTarget struct {
 	SshDirectory string `mapstructure:"sshDirectory"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
 
 // Clean configures targets to run a system prune periodically
