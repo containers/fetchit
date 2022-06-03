@@ -6,7 +6,7 @@ targets:
       autoUpdateAll: true
 # will update to redhat-et/main after merge
 - name: fetchit
-  url: http://github.com/sallyom/harpoon
+  url: http://github.com/containers/fetchit
   methods:
     systemd:
       targetPath: examples/systemd/httpd.service

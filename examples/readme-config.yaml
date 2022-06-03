@@ -1,6 +1,6 @@
 targets:
 - name: fetchit
-  url: http://github.com/redhat-et/fetchit
+  url: http://github.com/containers/fetchit
   branch: main
   methods:
     fileTransfer:

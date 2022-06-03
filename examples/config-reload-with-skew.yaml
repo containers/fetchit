@@ -7,7 +7,7 @@ targets:
   url: https://github.com/redhat-et/fetchit
   methods:
     configTarget:
-      configUrl: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload-with-skew.yaml
+      configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload-with-skew.yaml
       schedule: "*/2 * * * *"
     raw:
       targetPath: examples/raw/
