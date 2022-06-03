@@ -158,14 +158,10 @@ type CleanTarget struct {
 // ImageTarget to place and load images from URL
 type ImageTarget struct {
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
-	TargetPath string `mapstructure:"targetPath"`
+	Url string `mapstructure:"url"`
 	// Schedule is how often to check for git updates with the target files
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
 	// Number of seconds to skew the schedule by
 	Skew *int `mapstructure:"skew"`
-	// initialRun is set by fetchit
-	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }

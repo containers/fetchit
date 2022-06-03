@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -18,22 +17,11 @@ type ImageLoad struct {
 	URL string `json:"URL" yaml:"URL"`
 }
 
-func imageLoader(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
+func imageLoader(ctx context.Context, conn context.Context, mo *SingleMethodObj) error {
 
-	klog.Infof("Loading image from %s", path)
-	// Parse the file to find out image location
-	imageFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	load, err := imageFromBytes(imageFile)
-	if err != nil {
-		return err
-	}
-
+	klog.Infof("Loading image from %s", mo.Target.Methods.Image.Url)
 	// Create placeholder file to be populated by the image
-	imageName := (pathPackage.Base(load.URL))
+	imageName := (pathPackage.Base(mo.Target.Methods.Image.Url))
 	localImage, err := os.Create(pathPackage.Join("/tmp", imageName))
 	if err != nil {
 		klog.Error("Failed creating base file")
@@ -42,16 +30,16 @@ func imageLoader(ctx context.Context, mo *SingleMethodObj, path string, prev *st
 	defer localImage.Close()
 
 	// Place the data into the placeholder file
-	data, err := http.Get(load.URL)
+	data, err := http.Get(mo.Target.Methods.Image.Url)
 	if err != nil {
-		klog.Error("Failed getting data from %s", path)
+		klog.Error("Failed getting data from ", mo.Target.Methods.Image.Url)
 		return err
 	}
 	defer data.Body.Close()
 
 	// Fail early if http error code is not 200
 	if data.StatusCode != http.StatusOK {
-		klog.Error("Failed getting data from %s", path)
+		klog.Error("Failed getting data from ", mo.Target.Methods.Image.Url)
 		return err
 	}
 

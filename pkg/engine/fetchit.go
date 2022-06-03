@@ -285,7 +285,6 @@ func (hc *FetchitConfig) GetTargets() {
 			}
 		}
 		if target.Methods.Image != nil {
-			target.Methods.Image.initialRun = true
 			schedMethods[imageMethod] = schedInfo{
 				target.Methods.Image.Schedule,
 				target.Methods.Image.Skew,
@@ -509,52 +508,20 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 }
 
 func (hc *FetchitConfig) processImage(ctx context.Context, target *Target, skew int) {
-	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target.mu.Lock()
-	defer target.mu.Unlock()
-
-	img := target.Methods.Image
-	initial := img.initialRun
-	tag := []string{"tar"}
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: imageMethod,
 		Target: target,
 	}
-	if initial {
-		err := hc.getClone(target)
-		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
-			return
-		}
-	}
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target.mu.Lock()
+	defer target.mu.Unlock()
 
-	latest, err := hc.GetLatest(mo.Target)
+	err := imageLoader(ctx, hc.conn, mo)
 	if err != nil {
-		klog.Errorf("Failed to get latest commit: %v", err)
-		return
+		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, imageMethod, err)
 	}
 
-	current, err := hc.GetCurrent(mo.Target, mo.Method)
-	if err != nil {
-		klog.Errorf("Failed to get current commit: %v", err)
-		return
-	}
-
-	if latest != current {
-		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Image.TargetPath, &tag)
-		if err != nil {
-			klog.Errorf("Failed to apply changes: %v", err)
-			return
-		}
-
-		hc.UpdateCurrent(ctx, target, mo.Method, latest)
-		klog.Infof("Moved image from %s to %s for target %s", current, latest, target.Name)
-	} else {
-		klog.Infof("No changes applied to target %s this run, image currently at %s", target.Name, current)
-	}
-
-	img.initialRun = false
 }
 
 func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, skew int) {
@@ -789,12 +756,6 @@ func (hc *FetchitConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 		return kubePodman(ctx, mo, path, prev)
 	case ansibleMethod:
 		return ansiblePodman(ctx, mo, path)
-	case imageMethod:
-		prev, err := getChangeString(change)
-		if err != nil {
-			return err
-		}
-		return imageLoader(ctx, mo, path, prev)
 	default:
 		return fmt.Errorf("unsupported method: %s", mo.Method)
 	}
@@ -853,8 +814,6 @@ func (hc *FetchitConfig) setinitialRun(target *Target, method string) {
 		target.Methods.FileTransfer.initialRun = true
 	case ansibleMethod:
 		target.Methods.Ansible.initialRun = true
-	case imageMethod:
-		target.Methods.Image.initialRun = true
 	}
 }
 

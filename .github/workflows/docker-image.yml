@@ -1013,7 +1013,7 @@ jobs:
 
   loader-validate:
     runs-on: ubuntu-latest
-    needs: [ build ]
+    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1026,10 +1026,17 @@ jobs:
           name: fetchit-image
           path: /tmp
 
-      - name: Pull httpd image and tag with a new name
-        run: | 
-          sudo podman pull registry.access.redhat.com/ubi8/httpd-24
-          sudo podman tag registry.access.redhat.com/ubi8/httpd-24:latest quay.io/notreal/httpd:latest
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: Tag with a new name
+        run: sudo podman tag docker.io/mmumshad/simple-webapp-color:latest quay.io/notreal/httpd:latest
 
       - name: archive the image
         run: |
@@ -1049,8 +1056,11 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit --network=host -v ./examples/image-load.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: wait until image is removed
-        run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls quay.io/notreal/httpd:latest | grep -v REPOSITORY | wc -l); done'
+      - name: wait until image exists
+        run: timeout 150 bash -c -- 'i=1 ; until [ $i -eq 1 ]; do i=$(sudo podman image ls quay.io/notreal/httpd:latest | grep -v REPOSITORY | wc -l); done'
+
+      - name: identify local container
+        run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep notreal | wc -l); done'
 
       - name: Logs
         run: sudo podman logs fetchit
