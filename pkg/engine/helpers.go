@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"k8s.io/klog/v2"
@@ -71,12 +69,12 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 
 func getChangeString(change *object.Change) (*string, error) {
 	if change != nil {
-		_, to, err := change.Files()
+		from, _, err := change.Files()
 		if err != nil {
 			return nil, err
 		}
-		if to != nil {
-			s, err := to.Contents()
+		if from != nil {
+			s, err := from.Contents()
 			if err != nil {
 				return nil, err
 			}
@@ -84,44 +82,4 @@ func getChangeString(change *object.Change) (*string, error) {
 		}
 	}
 	return nil, nil
-}
-
-func checkTag(tags *[]string, name string) bool {
-	if tags == nil {
-		return true
-	}
-	for _, tag := range *tags {
-		if strings.HasSuffix(name, tag) {
-			return true
-		}
-	}
-	return false
-}
-
-func getTree(r *git.Repository, oldCommit *object.Commit) (*object.Tree, *object.Commit, error) {
-	if oldCommit != nil {
-		// ... retrieve the tree from the commit
-		tree, err := oldCommit.Tree()
-		if err != nil {
-			return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-		}
-		return tree, nil, nil
-	}
-	var newCommit *object.Commit
-	ref, err := r.Head()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving head: %s", err)
-	}
-	// ... retrieving the commit object
-	newCommit, err = r.CommitObject(ref.Hash())
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving commit: %s", err)
-	}
-
-	// ... retrieve the tree from the commit
-	tree, err := newCommit.Tree()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error when retrieving tree: %s", err)
-	}
-	return tree, newCommit, nil
 }

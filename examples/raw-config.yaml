@@ -4,7 +4,7 @@ targets:
   url: https://github.com/containers/fetchit
   methods:
     raw:
-      targetPath: examples/raw
+      targetPath: examples/raw/
       schedule: "*/1 * * * *"
       pullImage: false
   branch: main

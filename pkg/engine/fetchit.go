@@ -6,21 +6,17 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/redhat-et/fetchit/pkg/engine/utils"
 
 	"k8s.io/klog/v2"
 )
@@ -321,7 +317,6 @@ func (hc *FetchitConfig) GetTargets() {
 			}
 		}
 		target.methodSchedules = schedMethods
-		hc.update(target)
 	}
 }
 
@@ -357,42 +352,48 @@ func (hc *FetchitConfig) RunTargets() {
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(configMethod).Do(hc.processConfig, ctx, &target, skew)
+				s.StartImmediately()
 			case kubeMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(kubeMethod).Do(hc.processKube, ctx, &target, skew)
+				s.StartImmediately()
 			case rawMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(rawMethod).Do(hc.processRaw, ctx, &target, skew)
+				s.StartImmediately()
 			case systemdMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(systemdMethod).Do(hc.processSystemd, ctx, &target, skew)
+				s.StartImmediately()
 			case fileTransferMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Target: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(fileTransferMethod).Do(hc.processFileTransfer, ctx, &target, skew)
+				s.StartImmediately()
 			case ansibleMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(ansibleMethod).Do(hc.processAnsible, ctx, &target, skew)
+				s.StartImmediately()
 			case cleanMethod:
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(cleanMethod).Do(hc.processClean, ctx, &target, skew)
+				s.StartImmediately()
 			default:
 				klog.Warningf("Target: %s Method: %s, unknown method type, ignoring", target.Name, method)
 			}
 		}
 	}
-	s.StartImmediately()
 	s.StartAsync()
 	select {}
 }
@@ -421,7 +422,6 @@ func (hc *FetchitConfig) processConfig(ctx context.Context, target *Target, skew
 		return
 	}
 	hc.restartFetchit = restart
-	hc.update(target)
 	if hc.restartFetchit {
 		klog.Info("Updated config processed, restarting with new targets")
 		fetchitConfig.Restart()
@@ -436,37 +436,46 @@ func (hc *FetchitConfig) processRaw(ctx context.Context, target *Target, skew in
 	raw := target.Methods.Raw
 	initial := raw.initialRun
 	tag := []string{".json", ".yaml", ".yml"}
-	var targetFile string
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: rawMethod,
 		Target: target,
 	}
-	var path string
+
 	if initial {
-		retry := hc.resetTarget(target, rawMethod, true, nil)
-		if retry {
-			return
-		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, raw.TargetPath, rawMethod)
+		err := hc.getClone(target)
 		if err != nil {
-			_ = hc.resetTarget(target, rawMethod, false, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, raw.TargetPath, &tag, subDirTree)
-		if err != nil {
-			_ = hc.resetTarget(target, rawMethod, false, err)
-			return
-		}
-		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		raw.initialRun = hc.resetTarget(target, rawMethod, false, err)
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
 		return
 	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Raw.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved raw from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, raw currently at %s", target.Name, current)
+	}
+
 	raw.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, skew int) {
@@ -477,37 +486,45 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 	ans := target.Methods.Ansible
 	initial := ans.initialRun
 	tag := []string{"yaml", "yml"}
-	var targetFile = ""
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: ansibleMethod,
 		Target: target,
 	}
-	var path string
 	if initial {
-		retry := hc.resetTarget(target, ansibleMethod, true, nil)
-		if retry {
-			return
-		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, ans.TargetPath, ansibleMethod)
+		err := hc.getClone(target)
 		if err != nil {
-			_ = hc.resetTarget(target, ansibleMethod, false, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, ans.TargetPath, &tag, subDirTree)
-		if err != nil {
-			_ = hc.resetTarget(target, ansibleMethod, false, err)
-			return
-		}
-		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		ans.initialRun = hc.resetTarget(target, ansibleMethod, false, err)
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
 		return
 	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Ansible.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved ansible from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, ansible currently at %s", target.Name, current)
+	}
+
 	ans.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, skew int) {
@@ -527,7 +544,6 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 		sd.Restart = false
 	}
 	initial := sd.initialRun
-	var targetFile string
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: systemdMethod,
@@ -537,39 +553,47 @@ func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, ske
 	if sd.Restart {
 		sd.Enable = true
 	}
-	var path string
 	if initial {
 		if sd.AutoUpdateAll {
 			if err := hc.EngineMethod(ctx, mo, "", nil); err != nil {
 				klog.Infof("Failed to start podman-auto-update.service: %v", err)
 			}
 			sd.initialRun = false
-			hc.update(target)
 			return
 		}
-		retry := hc.resetTarget(target, systemdMethod, true, nil)
-		if retry {
-			return
-		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, sd.TargetPath, systemdMethod)
+		err := hc.getClone(target)
 		if err != nil {
-			_ = hc.resetTarget(target, systemdMethod, false, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, sd.TargetPath, &tag, subDirTree)
-		if err != nil {
-			_ = hc.resetTarget(target, systemdMethod, false, err)
-			return
-		}
-		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		sd.initialRun = hc.resetTarget(target, systemdMethod, false, err)
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
 		return
 	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Systemd.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved systemd from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, systemd currently at %s", target.Name, current)
+	}
+
 	sd.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target, skew int) {
@@ -579,37 +603,45 @@ func (hc *FetchitConfig) processFileTransfer(ctx context.Context, target *Target
 
 	ft := target.Methods.FileTransfer
 	initial := ft.initialRun
-	var targetFile string
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: fileTransferMethod,
 		Target: target,
 	}
-	var path string
 	if initial {
-		retry := hc.resetTarget(target, fileTransferMethod, true, nil)
-		if retry {
-			return
-		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, ft.TargetPath, fileTransferMethod)
+		err := hc.getClone(target)
 		if err != nil {
-			_ = hc.resetTarget(target, fileTransferMethod, false, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, ft.TargetPath, nil, subDirTree)
-		if err != nil {
-			_ = hc.resetTarget(target, fileTransferMethod, false, err)
-			return
-		}
-		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		ft.initialRun = hc.resetTarget(target, fileTransferMethod, false, err)
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
 		return
 	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.FileTransfer.TargetPath, nil)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved filetransfer from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, filetransfer currently at %s", target.Name, current)
+	}
+
 	ft.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew int) {
@@ -620,37 +652,46 @@ func (hc *FetchitConfig) processKube(ctx context.Context, target *Target, skew i
 	kube := target.Methods.Kube
 	initial := kube.initialRun
 	tag := []string{"yaml", "yml"}
-	var targetFile string
 	mo := &SingleMethodObj{
 		Conn:   hc.conn,
 		Method: kubeMethod,
 		Target: target,
 	}
-	var path string
+
 	if initial {
-		retry := hc.resetTarget(target, kubeMethod, true, nil)
-		if retry {
-			return
-		}
-		fileName, subDirTree, err := hc.getPathOrTree(target, kube.TargetPath, kubeMethod)
+		err := hc.getClone(target)
 		if err != nil {
-			_ = hc.resetTarget(target, kubeMethod, false, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
 			return
 		}
-		targetFile, err = hc.applyInitial(ctx, mo, fileName, kube.TargetPath, &tag, subDirTree)
-		if err != nil {
-			_ = hc.resetTarget(target, kubeMethod, false, err)
-			return
-		}
-		path = targetFile
 	}
 
-	if err := hc.getChangesAndRunEngine(ctx, mo, path); err != nil {
-		kube.initialRun = hc.resetTarget(target, kubeMethod, false, err)
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
 		return
 	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Kube.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved kube from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, kube currently at %s", target.Name, current)
+	}
+
 	kube.initialRun = false
-	hc.update(target)
 }
 
 func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew int) {
@@ -668,185 +709,6 @@ func (hc *FetchitConfig) processClean(ctx context.Context, target *Target, skew 
 		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, cleanMethod, err)
 	}
 
-	hc.update(target)
-}
-
-func (hc *FetchitConfig) applyInitial(ctx context.Context, mo *SingleMethodObj, fileName, tp string, tag *[]string, subDirTree *object.Tree) (string, error) {
-	directory := filepath.Base(mo.Target.Url)
-	if fileName != "" {
-		found := false
-		if checkTag(tag, fileName) {
-			found = true
-			path := filepath.Join(directory, fileName)
-			if err := hc.EngineMethod(ctx, mo, path, nil); err != nil {
-				return fileName, utils.WrapErr(err, "error running engine with method %s, for file %s",
-					mo.Method, fileName)
-			}
-		}
-		if !found {
-			err := fmt.Errorf("%s target file must be of type %v", mo.Method, tag)
-			return fileName, utils.WrapErr(err, "error running engine with method %s, for file %s",
-				mo.Method, fileName)
-		}
-
-	} else {
-		// ... get the files iterator and print the file
-		ch := make(chan error)
-		subDirTree.Files().ForEach(func(f *object.File) error {
-			go func(ch chan<- error) {
-				if checkTag(tag, f.Name) {
-					path := filepath.Join(directory, tp, f.Name)
-					if err := hc.EngineMethod(ctx, mo, path, nil); err != nil {
-						ch <- utils.WrapErr(err, "error running engine with method %s, for file %s",
-							mo.Method, path)
-					}
-				}
-				ch <- nil
-			}(ch)
-			return nil
-		})
-
-		err := subDirTree.Files().ForEach(func(_ *object.File) error {
-			err := <-ch
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			return fileName, err
-		}
-	}
-	return fileName, nil
-}
-
-func (hc *FetchitConfig) getChangesAndRunEngine(ctx context.Context, mo *SingleMethodObj, path string) error {
-	var lc *object.Commit
-	var targetPath string
-	switch mo.Method {
-	case rawMethod:
-		lc = mo.Target.Methods.Raw.lastCommit
-		targetPath = mo.Target.Methods.Raw.TargetPath
-	case kubeMethod:
-		lc = mo.Target.Methods.Kube.lastCommit
-		targetPath = mo.Target.Methods.Kube.TargetPath
-	case ansibleMethod:
-		lc = mo.Target.Methods.Ansible.lastCommit
-		targetPath = mo.Target.Methods.Ansible.TargetPath
-	case fileTransferMethod:
-		lc = mo.Target.Methods.FileTransfer.lastCommit
-		targetPath = mo.Target.Methods.FileTransfer.TargetPath
-	case systemdMethod:
-		lc = mo.Target.Methods.Systemd.lastCommit
-		targetPath = mo.Target.Methods.Systemd.TargetPath
-	default:
-		return fmt.Errorf("unknown method: %s", mo.Method)
-	}
-	tp := targetPath
-	if path != "" {
-		tp = path
-	}
-	changesThisMethod, newCommit, err := hc.findDiff(mo.Target, mo.Method, tp, lc)
-	if err != nil {
-		return utils.WrapErr(err, "error method: %s commit: %s", mo.Method, lc.Hash.String())
-	}
-
-	hc.setlastCommit(mo.Target, mo.Method, newCommit)
-	hc.update(mo.Target)
-
-	if len(changesThisMethod) == 0 {
-		if mo.Method == systemdMethod && mo.Target.Methods.Systemd.Restart && !mo.Target.Methods.Systemd.initialRun {
-			return hc.EngineMethod(ctx, mo, filepath.Base(mo.Target.Methods.Systemd.TargetPath), nil)
-		}
-		klog.Infof("Target: %s, Method: %s: Nothing to pull.....Requeuing", mo.Target.Name, mo.Method)
-		return nil
-	}
-
-	ch := make(chan error)
-	for change, changePath := range changesThisMethod {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := hc.EngineMethod(ctx, mo, changePath, change); err != nil {
-				ch <- utils.WrapErr(err, "error method: %s path: %s, commit: %s", mo.Method, changePath, newCommit.Hash.String())
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changesThisMethod {
-		err := <-ch
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return nil
-}
-
-func (hc *FetchitConfig) update(target *Target) {
-	for _, t := range hc.Targets {
-		if target.Name == t.Name {
-			t = target
-		}
-	}
-}
-
-func (hc *FetchitConfig) findDiff(target *Target, method, targetPath string, commit *object.Commit) (map[*object.Change]string, *object.Commit, error) {
-	directory := filepath.Base(target.Url)
-	// map of change to path
-	thisMethodChanges := make(map[*object.Change]string)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error while opening the repository: %v", err)
-	}
-	w, err := gitRepo.Worktree()
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error while opening the worktree: %v", err)
-	}
-	// ... retrieve the tree from this method's last fetched commit
-	beforeFetchTree, _, err := getTree(gitRepo, commit)
-	if err != nil {
-		// TODO: if lastCommit has disappeared, need to reset and set initial=true instead of exit
-		return thisMethodChanges, nil, fmt.Errorf("error checking out last known commit, has branch been force-pushed, commit no longer exists?: %v", err)
-	}
-
-	// Fetch the latest changes from the origin remote and merge into the current branch
-	ref := fmt.Sprintf("refs/heads/%s", target.Branch)
-	refName := plumbing.ReferenceName(ref)
-	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.Branch, target.Branch))
-	if err = gitRepo.Fetch(&git.FetchOptions{
-		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
-		Force:    true,
-	}); err != nil && err != git.NoErrAlreadyUpToDate {
-		return nil, commit, err
-	}
-
-	// force checkout to latest fetched branch
-	if err := w.Checkout(&git.CheckoutOptions{
-		Branch: refName,
-		Force:  true,
-	}); err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("error checking out latest branch %s: %v", ref, err)
-	}
-
-	afterFetchTree, newestCommit, err := getTree(gitRepo, nil)
-	if err != nil {
-		return thisMethodChanges, nil, err
-	}
-
-	changes, err := afterFetchTree.Diff(beforeFetchTree)
-	if err != nil {
-		return thisMethodChanges, nil, fmt.Errorf("%s: error while generating diff: %s", directory, err)
-	}
-	// the change logic is backwards "From" is actually "To"
-	for _, change := range changes {
-		if strings.Contains(change.From.Name, targetPath) {
-			path := directory + "/" + change.From.Name
-			thisMethodChanges[change] = path
-		} else if strings.Contains(change.To.Name, targetPath) {
-			thisMethodChanges[change] = deleteFile
-		}
-	}
-
-	return thisMethodChanges, newestCommit, nil
 }
 
 // Each engineMethod call now owns the prev and dest variables instead of being shared in mo
@@ -939,100 +801,6 @@ func (hc *FetchitConfig) getClone(target *Target) error {
 		}
 	}
 	return nil
-}
-
-func (hc *FetchitConfig) getPathOrTree(target *Target, subDir, method string) (string, *object.Tree, error) {
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		return "", nil, err
-	}
-	tree, _, err := getTree(gitRepo, nil)
-	if err != nil {
-		return "", nil, err
-	}
-
-	subDirTree, err := tree.Tree(subDir)
-	if err != nil {
-		if err == object.ErrDirectoryNotFound {
-			// check if exact filepath
-			file, err := tree.File(subDir)
-			if err == nil {
-				return file.Name, nil, nil
-			}
-		}
-	}
-	return "", subDirTree, err
-}
-
-// arrive at resetTarget 1 of 2 ways:
-//      1) initial run of target - will return true if clone or commit fetch fails, to try again next run
-//      2) processing error during run - will attempt to fetch the remote commit and reset to initialRun true for the
-//         next run, or, if fetching of commit fails, will return true to try again next run
-// resetTarget returns true if the target should be re-cloned next run, and it will set
-func (hc *FetchitConfig) resetTarget(target *Target, method string, initial bool, err error) bool {
-	if err != nil {
-		klog.Warningf("Target: %s Method: %s encountered error: %v, resetting...", target.Name, method, err)
-	}
-	commit, err := hc.getGit(target, initial)
-	if err != nil {
-		klog.Warningf("Target: %s error getting next commit, will try again next scheduled run: %v", target.Name, err)
-		return true
-	}
-	if commit == nil {
-		klog.Warningf("Target: %s, fetched empty commit, will retry next scheduled run", target.Name)
-		return true
-	}
-
-	return hc.setInitial(target, commit, method)
-}
-
-func (hc *FetchitConfig) getGit(target *Target, initialRun bool) (*object.Commit, error) {
-	if initialRun {
-		if err := hc.getClone(target); err != nil {
-			return nil, err
-		}
-	}
-	directory := filepath.Base(target.Url)
-	gitRepo, err := git.PlainOpen(directory)
-	if err != nil {
-		return nil, err
-	}
-
-	_, commit, err := getTree(gitRepo, nil)
-	if err != nil {
-		return nil, err
-	}
-	return commit, nil
-}
-
-// setInitial will return true if fetching of commit fails or results in empty commit, to try again next run
-// or, if valid commit is fetched, will set initialRun true and lastCommit for the method, to process next run
-func (hc *FetchitConfig) setInitial(target *Target, commit *object.Commit, method string) bool {
-	retry := false
-	hc.setinitialRun(target, method)
-	if commit == nil {
-		retry = true
-	} else {
-		hc.setlastCommit(target, method, commit)
-	}
-	hc.update(target)
-	return retry
-}
-
-func (hc *FetchitConfig) setlastCommit(target *Target, method string, commit *object.Commit) {
-	switch method {
-	case kubeMethod:
-		target.Methods.Kube.lastCommit = commit
-	case rawMethod:
-		target.Methods.Raw.lastCommit = commit
-	case systemdMethod:
-		target.Methods.Systemd.lastCommit = commit
-	case fileTransferMethod:
-		target.Methods.FileTransfer.lastCommit = commit
-	case ansibleMethod:
-		target.Methods.Ansible.lastCommit = commit
-	}
 }
 
 // setinitialRun is called before the initial processing of a target, or
