@@ -203,45 +203,7 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 		cobra.CheckErr(err)
 	}
 
-	beforeTargets := len(hc.Targets)
 	hc.Targets = config.Targets
-	if beforeTargets > 0 {
-		// replace lastCommit - to avoid re-running same jobs, since the scheduler finished all jobs
-		// with the last commit before arriving here
-		for i, t := range hc.Targets {
-			if t.Methods.Raw != nil {
-				if config.Targets[i].Methods.Raw != nil {
-					t.Methods.Raw.lastCommit = config.Targets[i].Methods.Raw.lastCommit
-				}
-			}
-			if t.Methods.Kube != nil {
-				if config.Targets[i].Methods.Kube != nil {
-					t.Methods.Kube.lastCommit = config.Targets[i].Methods.Kube.lastCommit
-				}
-			}
-			if t.Methods.Ansible != nil {
-				if config.Targets[i].Methods.Ansible != nil {
-					t.Methods.Ansible.lastCommit = config.Targets[i].Methods.Ansible.lastCommit
-				}
-			}
-			if t.Methods.FileTransfer != nil {
-				if config.Targets[i].Methods.FileTransfer != nil {
-					t.Methods.FileTransfer.lastCommit = config.Targets[i].Methods.FileTransfer.lastCommit
-				}
-			}
-			if t.Methods.Systemd != nil {
-				if config.Targets[i].Methods.Systemd != nil {
-					t.Methods.Systemd.lastCommit = config.Targets[i].Methods.Systemd.lastCommit
-				}
-			}
-			if t.Methods.Image != nil {
-				if config.Targets[i].Methods.Image != nil {
-					t.Methods.Image.lastCommit = config.Targets[i].Methods.Image.lastCommit
-				}
-			}
-		}
-	}
-
 	// look for a ConfigFileTarget, only find the first
 	// TODO: add logic to merge multiple configs
 	for _, t := range hc.Targets {
