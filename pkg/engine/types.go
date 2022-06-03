@@ -166,6 +166,4 @@ type ImageTarget struct {
 	Skew *int `mapstructure:"skew"`
 	// initialRun is set by fetchit
 	initialRun bool
-	// lastCommit is set by fetchit
-	lastCommit *object.Commit
 }
