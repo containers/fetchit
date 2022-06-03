@@ -22,6 +22,7 @@ type Methods struct {
 	Kube         *KubeTarget         `mapstructure:"kube"`
 	Ansible      *AnsibleTarget      `mapstructure:"ansible"`
 	FileTransfer *FileTransferTarget `mapstructure:"fileTransfer"`
+	Image        *ImageTarget        `mapstructure:image`
 	Clean        *CleanTarget        `mapstructure:"clean"`
 	ConfigTarget *ConfigFileTarget   `mapstructure:"configTarget"`
 }
@@ -164,4 +165,19 @@ type CleanTarget struct {
 	Volumes bool `mapstructure:"volumes"`
 	// initialRun is set by fetchit
 	All bool `mapstructure:"all"`
+}
+
+// ImageTarget to place and load images from URL
+type ImageTarget struct {
+	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
+	TargetPath string `mapstructure:"targetPath"`
+	// Schedule is how often to check for git updates with the target files
+	// Must be valid cron expression
+	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
+	// initialRun is set by fetchit
+	initialRun bool
+	// lastCommit is set by fetchit
+	lastCommit *object.Commit
 }

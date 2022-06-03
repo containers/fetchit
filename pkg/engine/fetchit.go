@@ -31,6 +31,7 @@ const (
 	rawMethod          = "raw"
 	systemdMethod      = "systemd"
 	kubeMethod         = "kube"
+	imageMethod        = "image"
 	fileTransferMethod = "filetransfer"
 	ansibleMethod      = "ansible"
 	cleanMethod        = "clean"
@@ -104,7 +105,7 @@ func (o *FetchitConfig) bindFlags(cmd *cobra.Command) {
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
 func (hc *FetchitConfig) Restart() {
-	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod)
+	hc.scheduler.RemoveByTags(kubeMethod, ansibleMethod, fileTransferMethod, systemdMethod, rawMethod, imageMethod)
 	hc.scheduler.Clear()
 	hc.InitConfig(false)
 	hc.GetTargets()
@@ -233,6 +234,11 @@ func (hc *FetchitConfig) InitConfig(initial bool) {
 					t.Methods.Systemd.lastCommit = config.Targets[i].Methods.Systemd.lastCommit
 				}
 			}
+			if t.Methods.Image != nil {
+				if config.Targets[i].Methods.Image != nil {
+					t.Methods.Image.lastCommit = config.Targets[i].Methods.Image.lastCommit
+				}
+			}
 		}
 	}
 
@@ -316,6 +322,13 @@ func (hc *FetchitConfig) GetTargets() {
 				target.Methods.Clean.Skew,
 			}
 		}
+		if target.Methods.Image != nil {
+			target.Methods.Image.initialRun = true
+			schedMethods[imageMethod] = schedInfo{
+				target.Methods.Image.Schedule,
+				target.Methods.Image.Skew,
+			}
+		}
 		target.methodSchedules = schedMethods
 	}
 }
@@ -388,6 +401,12 @@ func (hc *FetchitConfig) RunTargets() {
 				defer cancel()
 				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
 				s.Cron(schedule.Schedule).Tag(cleanMethod).Do(hc.processClean, ctx, &target, skew)
+				s.StartImmediately()
+			case imageMethod:
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				klog.Infof("Processing Repo: %s Method: %s", target.Name, method)
+				s.Cron(schedule.Schedule).Tag(imageMethod).Do(hc.processImage, ctx, &target, skew)
 				s.StartImmediately()
 			default:
 				klog.Warningf("Target: %s Method: %s, unknown method type, ignoring", target.Name, method)
@@ -525,6 +544,55 @@ func (hc *FetchitConfig) processAnsible(ctx context.Context, target *Target, ske
 	}
 
 	ans.initialRun = false
+}
+
+func (hc *FetchitConfig) processImage(ctx context.Context, target *Target, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	img := target.Methods.Image
+	initial := img.initialRun
+	tag := []string{"tar"}
+	mo := &SingleMethodObj{
+		Conn:   hc.conn,
+		Method: imageMethod,
+		Target: target,
+	}
+	if initial {
+		err := hc.getClone(target)
+		if err != nil {
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			return
+		}
+	}
+
+	latest, err := hc.GetLatest(mo.Target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
+		return
+	}
+
+	current, err := hc.GetCurrent(mo.Target, mo.Method)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = hc.Apply(ctx, mo, current, latest, mo.Target.Methods.Image.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		hc.UpdateCurrent(ctx, target, mo.Method, latest)
+		klog.Infof("Moved image from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, image currently at %s", target.Name, current)
+	}
+
+	img.initialRun = false
 }
 
 func (hc *FetchitConfig) processSystemd(ctx context.Context, target *Target, skew int) {
@@ -759,6 +827,12 @@ func (hc *FetchitConfig) EngineMethod(ctx context.Context, mo *SingleMethodObj, 
 		return kubePodman(ctx, mo, path, prev)
 	case ansibleMethod:
 		return ansiblePodman(ctx, mo, path)
+	case imageMethod:
+		prev, err := getChangeString(change)
+		if err != nil {
+			return err
+		}
+		return imageLoader(ctx, mo, path, prev)
 	default:
 		return fmt.Errorf("unsupported method: %s", mo.Method)
 	}
@@ -817,6 +891,8 @@ func (hc *FetchitConfig) setinitialRun(target *Target, method string) {
 		target.Methods.FileTransfer.initialRun = true
 	case ansibleMethod:
 		target.Methods.Ansible.initialRun = true
+	case imageMethod:
+		target.Methods.Image.initialRun = true
 	}
 }
 

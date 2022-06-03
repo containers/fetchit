@@ -1,0 +1,10 @@
+volume: fetchit-volume # this needs to match the volume name passed to the podman run command
+targets:
+- name: fetchit
+  url: https://github.com/cooktheryan/fetchit
+  methods:
+    image:
+      targetPath: examples/imageLoad
+      schedule: "*/1 * * * *"
+  branch: image
+
