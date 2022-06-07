@@ -2,15 +2,15 @@
 # targets from .fetchit/config.yaml are populated
 # and for follow-up test, push a change to the config and confirm
 # new targets are fetched & run
+configTarget:
+  configURL: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload.yaml
+  schedule: "*/2 * * * *"
 targets:
 - name: fetchit
   url: https://github.com/containers/fetchit
-  methods:
-    configTarget:
-      configUrl: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload.yaml
-      schedule: "*/2 * * * *"
-    raw:
-      targetPath: examples/raw/
-      schedule: "*/1 * * * *"
-      pullImage: false
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw/
+    schedule: "*/1 * * * *"
+    pullImage: false
   branch: main

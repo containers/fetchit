@@ -2,11 +2,12 @@ targets:
 - name: fetchit
   url: http://github.com/containers/fetchit
   branch: main
-  methods:
-    fileTransfer:
-      targetPath: examples/filetransfer/hello.txt
-      destinationDirectory: /tmp
-      schedule: "*/1 * * * *"
-    raw:
-      targetPath: examples/raw/
-      schedule: "*/1 * * * *"
+  fileTransfer:
+  - name: ft-ex
+    targetPath: examples/filetransfer/hello.txt
+    destinationDirectory: /tmp
+    schedule: "*/1 * * * *"
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw/
+    schedule: "*/1 * * * *"

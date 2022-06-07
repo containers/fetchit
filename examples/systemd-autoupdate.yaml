@@ -1,16 +1,15 @@
 volume: fetchit-volume # this needs to match the volume name passed to the podman run command
 targets:
 - name: autoupdate
-  methods:
-    systemd:
-      autoUpdateAll: true
-# will update to containers/main after merge
+  systemd:
+  - name: autoupdate-ex
+    autoUpdateAll: true
 - name: fetchit
-  url: http://github.com/sallyom/harpoon
-  methods:
-    systemd:
-      targetPath: examples/systemd/httpd.service
-      root: true
-      enable: true
-      schedule: "*/5 * * * *"
-  branch: podman-auto-update
+  url: http://github.com/containers/fetchit
+  systemd:
+  - name: sysd-ex
+    targetPath: examples/systemd/httpd.service
+    root: true
+    enable: true
+    schedule: "*/5 * * * *"
+  branch: main

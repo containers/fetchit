@@ -2,8 +2,8 @@ volume: new-volume # this needs to match the volume name passed to the podman ru
 targets:
 - name: fetchit
   url: http://github.com/containers/fetchit
-  methods:
-    kube:
-      targetPath: examples/kube/
-      schedule: "*/1 * * * *"
+  kube:
+  - name: kube-ex
+    targetPath: examples/kube/
+    schedule: "*/1 * * * *"
   branch: main

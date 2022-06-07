@@ -2,8 +2,8 @@ volume: fetchit-volume # this needs to match the volume name passed to the podma
 targets:
 - name: fetchit
   url: http://github.com/containers/fetchit
-  methods:
-    raw:
-      targetPath: examples/raw/
-      schedule: "*/1 * * * *"
+  raw:
+  - name: raw
+    targetPath: examples/raw/
+    schedule: "*/1 * * * *"
   branch: ci

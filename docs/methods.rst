@@ -16,14 +16,13 @@ pod is required to reload targets. The following fields are required with the Co
 
 .. code-block:: yaml
 
-   targets:
-   - name: config
-     methods:
-       configTarget:
-         schedule: "*/5 * * * *"
-         configUrl: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
+    configTarget:
+      name: config-reload
+      schedule: "*/5 * * * *"
+      configURL: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
+    targets:
 
-Changes pushed to the ConfigUrl will trigger a reloading of FetchIt targets. It's recommended to include the ConfigTarget
+Changes pushed to the ConfigURL will trigger a reloading of FetchIt targets. It's recommended to include the ConfigTarget
 in the FetchIt config to enable updates to targets without requiring a restart.
 
 Methods
@@ -43,11 +42,11 @@ In the examples directory, there is an Ansible playbook that is used to install 
    targets:
    - name: fetchit
      url: http://github.com/containers/fetchit
-     methods:
-       ansible: 
-         targetPath: examples/ansible
-         sshDirectory: /root/.ssh
-         schedule: "*/5 * * * *"
+     ansible:
+     - name: ans-ex
+       targetPath: examples/ansible
+       sshDirectory: /root/.ssh
+       schedule: "*/5 * * * *"
      branch: main
 
 The field sshDirectory is unique for this method. This directory should contain the private key used to connect to the host and the public key should be copied into the `.ssh/authorized_keys` file to allow for connectivity. The .ssh directory should be owned by root.
@@ -62,11 +61,11 @@ The RawTarget method will launch containers based upon their definition in a JSO
    targets:
    - name: fetchit
      url: http://github.com/containers/fetchit
-     methods:
-       raw:
-         targetPath: examples/raw
-         schedule: "*/5 * * * *"
-         pullImage: true
+     raw:
+     - name: raw-ex
+       targetPath: examples/raw
+       schedule: "*/5 * * * *"
+       pullImage: true
      branch: main
 
 The pullImage field is useful if a container image uses the latest tag. This will ensure that the method will attempt to pull the container image every time.
@@ -105,21 +104,21 @@ look for image updates with all podman-generated unit files that include the aut
    targets:
    - name: fetchit
      url: http://github.com/containers/fetchit
-     methods:
-       systemd:
-         targetPath: examples/systemd
-         root: true
-         enable: true
-         schedule: "*/5 * * * *"
+     systemd:
+     - name: sysd-ex
+       targetPath: examples/systemd
+       root: true
+       enable: true
+       schedule: "*/5 * * * *"
      branch: main
 
 .. code-block:: yaml
 
    targets:
    - name: autoupdate
-     methods:
-       systemd:
-         autoUpdateAll: true
+     systemd:
+       name: autoupdate-ex
+       autoUpdateAll: true
 
 File Transfer
 -------------
@@ -131,11 +130,11 @@ The File Transfer method will copy files from the container to the host. This me
    targets:
    - name: fetchit
      url: http://github.com/containers/fetchit
-     methods:
-       filetransfer:
-         targetPath: examples/filetransfer
-         destinationDirectory: /tmp/ft
-         schedule: "*/5 * * * *"
+     filetransfer:
+     - name: ft-ex
+       targetPath: examples/filetransfer
+       destinationDirectory: /tmp/ft
+       schedule: "*/5 * * * *"
      branch: main
 
 The destinationDirectory field is the directory on the host where the files will be copied to.
@@ -150,10 +149,10 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
    targets:
    - name: fetchit
      url: http://github.com/containers/fetchit
-     methods:
-       kube: 
-         targetPath: examples/kube
-         schedule: "*/5 * * * *"
+     kube:
+     - name: kube-ex
+       targetPath: examples/kube
+       schedule: "*/5 * * * *"
      branch: main
 
 An example Kube play YAML file will look similiar to the following. This will launch a container as well as the coresponding ConfigMap.

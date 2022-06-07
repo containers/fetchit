@@ -2,10 +2,10 @@ volume: fetchit-volume # this needs to match the volume name passed to the podma
 targets:
 - name: fetchit
   url: http://github.com/containers/fetchit
-  methods:
-    systemd:
-      targetPath: examples/systemd/httpd.service
-      root: true
-      enable: true
-      schedule: "*/1 * * * *"
+  systemd:
+  - name: httpd-root
+    targetPath: examples/systemd/httpd.service
+    root: true
+    enable: true
+    schedule: "*/1 * * * *"
   branch: main

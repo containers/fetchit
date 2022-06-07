@@ -2,9 +2,9 @@ volume: fetchit-volume # this needs to match the volume name passed to the podma
 targets:
 - name: fetchit
   url: http://github.com/containers/fetchit
-  methods:
-    fileTransfer:
-      targetPath: examples/filetransfer/
-      destinationDirectory: /tmp/ft
-      schedule: "*/1 * * * *"
+  fileTransfer:
+  - name: ft-example
+    targetPath: examples/filetransfer/
+    destinationDirectory: /tmp/ft
+    schedule: "*/1 * * * *"
   branch: ci
