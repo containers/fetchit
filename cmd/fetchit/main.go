@@ -1,6 +1,6 @@
 package main
 
-import "github.com/redhat-et/fetchit/pkg/engine"
+import "github.com/containers/fetchit/pkg/engine"
 
 func main() {
 	engine.Execute()

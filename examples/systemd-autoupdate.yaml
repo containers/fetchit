@@ -4,7 +4,7 @@ targets:
   methods:
     systemd:
       autoUpdateAll: true
-# will update to redhat-et/main after merge
+# will update to containers/main after merge
 - name: fetchit
   url: http://github.com/sallyom/harpoon
   methods:

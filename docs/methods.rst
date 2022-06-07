@@ -42,7 +42,7 @@ In the examples directory, there is an Ansible playbook that is used to install 
    volume: fetchit-volume
    targets:
    - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+     url: http://github.com/containers/fetchit
      methods:
        ansible: 
          targetPath: examples/ansible
@@ -61,7 +61,7 @@ The RawTarget method will launch containers based upon their definition in a JSO
    volume: fetchit-volume
    targets:
    - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+     url: http://github.com/containers/fetchit
      methods:
        raw:
          targetPath: examples/raw
@@ -104,7 +104,7 @@ look for image updates with all podman-generated unit files that include the aut
    volume: fetchit-volume
    targets:
    - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+     url: http://github.com/containers/fetchit
      methods:
        systemd:
          targetPath: examples/systemd
@@ -130,7 +130,7 @@ The File Transfer method will copy files from the container to the host. This me
    volume: fetchit-volume
    targets:
    - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+     url: http://github.com/containers/fetchit
      methods:
        filetransfer:
          targetPath: examples/filetransfer
@@ -149,7 +149,7 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
    volume: fetchit-volume
    targets:
    - name: fetchit
-     url: http://github.com/redhat-et/fetchit
+     url: http://github.com/containers/fetchit
      methods:
        kube: 
          targetPath: examples/kube

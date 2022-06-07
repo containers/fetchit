@@ -2,7 +2,7 @@
 # Note: It takes (default) 5 min for raw urls to be updated in GitHub, so this test will wait for 7 min
 targets:
 - name: fetchit
-  url: http://github.com/redhat-et/fetchit
+  url: http://github.com/containers/fetchit
   methods:
     configTarget:
       configUrl: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload-with-skew.yaml

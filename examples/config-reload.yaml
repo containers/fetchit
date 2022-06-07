@@ -4,7 +4,7 @@
 # new targets are fetched & run
 targets:
 - name: fetchit
-  url: https://github.com/redhat-et/fetchit
+  url: https://github.com/containers/fetchit
   methods:
     configTarget:
       configUrl: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload.yaml
