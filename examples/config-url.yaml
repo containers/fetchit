@@ -1,5 +1,5 @@
 # This is an example configTarget that is used in testing. Fetchit will start with this config then will load targets from ./examples/config-reload.yaml
 # Note: It takes (default) 5 min for raw urls to be updated in GitHub, so this test will wait for 7 min
 configTarget:
-  configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+  configURL: https://raw.githubusercontent.com/sallyom/fetchit/refactor-interface/examples/config-reload.yaml
   schedule: "*/1 * * * *"
