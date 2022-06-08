@@ -46,15 +46,13 @@ func (c *ConfigTarget) GetName() string {
 
 func (c *ConfigTarget) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: c.Schedule,
-		Skew:     c.Skew,
+		schedule: c.Schedule,
+		skew:     c.Skew,
 	}
 }
-func (c *ConfigTarget) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
-	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target.mu.Lock()
-	defer target.mu.Unlock()
 
+func (c *ConfigTarget) Process(ctx, conn context.Context, PAT string, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
 	// configURL in config file will override the environment variable
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
 	// config.URL from target overrides env variable
@@ -82,6 +80,12 @@ func (c *ConfigTarget) MethodEngine(ctx, conn context.Context, change *object.Ch
 
 func (c *ConfigTarget) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
 	return nil
+}
+
+func (c *ConfigTarget) Target() *Target {
+	return &Target{
+		Name: configFileMethod,
+	}
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod

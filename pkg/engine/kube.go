@@ -40,6 +40,7 @@ type Kube struct {
 	TargetPath string `mapstructure:"targetPath"`
 	// initialRun is set by fetchit
 	initialRun bool
+	target     *Target
 }
 
 func (k *Kube) Type() string {
@@ -52,12 +53,17 @@ func (k *Kube) GetName() string {
 
 func (k *Kube) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: k.Schedule,
-		Skew:     k.Skew,
+		schedule: k.Schedule,
+		skew:     k.Skew,
 	}
 }
 
-func (k *Kube) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
+func (k *Kube) Target() *Target {
+	return k.target
+}
+
+func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := k.Target()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
@@ -67,7 +73,7 @@ func (k *Kube) Process(ctx, conn context.Context, target *Target, PAT string, sk
 	if initial {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
 	}

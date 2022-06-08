@@ -1,5 +1,5 @@
 volume: raw-volume # this needs to match the volume name passed to the podman run command
-targets:
+targetConfigs:
 - name: fetchit
   url: https://github.com/containers/fetchit
   raw:

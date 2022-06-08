@@ -61,6 +61,7 @@ type Systemd struct {
 	Enable bool `mapstructure:"enable"`
 	// initialRun is set by fetchit
 	initialRun bool
+	target     *Target
 }
 
 func (sd *Systemd) Type() string {
@@ -73,12 +74,17 @@ func (sd *Systemd) GetName() string {
 
 func (sd *Systemd) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: sd.Schedule,
-		Skew:     sd.Skew,
+		schedule: sd.Schedule,
+		skew:     sd.Skew,
 	}
 }
 
-func (sd *Systemd) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
+func (sd *Systemd) Target() *Target {
+	return sd.target
+}
+
+func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := sd.Target()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
@@ -88,7 +94,7 @@ func (sd *Systemd) Process(ctx, conn context.Context, target *Target, PAT string
 	}
 	if sd.AutoUpdateAll {
 		sd.Enable = false
-		target.Url = ""
+		target.url = ""
 		sd.Root = true
 		sd.TargetPath = ""
 		sd.Restart = false
@@ -108,7 +114,7 @@ func (sd *Systemd) Process(ctx, conn context.Context, target *Target, PAT string
 		}
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
 	}

@@ -1,4 +1,4 @@
-targets:
+targetConfigs:
 - name: fetchit
   url: http://github.com/containers/fetchit
   raw:

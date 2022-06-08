@@ -31,6 +31,7 @@ type Ansible struct {
 	SshDirectory string `mapstructure:"sshDirectory"`
 	// initialRun is set by fetchit
 	initialRun bool
+	target     *Target
 }
 
 func (a *Ansible) Type() string {
@@ -41,15 +42,20 @@ func (a *Ansible) GetName() string {
 	return a.Name
 }
 
+func (a *Ansible) Target() *Target {
+	return a.target
+}
+
 func (a *Ansible) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: a.Schedule,
-		Skew:     a.Skew,
+		schedule: a.Schedule,
+		skew:     a.Skew,
 	}
 }
 
-func (ans *Ansible) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
+func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target := ans.Target()
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -57,7 +63,7 @@ func (ans *Ansible) Process(ctx, conn context.Context, target *Target, PAT strin
 	if ans.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
 	}

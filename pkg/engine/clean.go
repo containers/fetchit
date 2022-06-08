@@ -34,12 +34,19 @@ func (c *Clean) GetName() string {
 
 func (c *Clean) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: c.Schedule,
-		Skew:     c.Skew,
+		schedule: c.Schedule,
+		skew:     c.Skew,
 	}
 }
 
-func (c *Clean) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
+func (c *Clean) Target() *Target {
+	return &Target{
+		Name: cleanMethod,
+	}
+}
+
+func (c *Clean) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := c.Target()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()

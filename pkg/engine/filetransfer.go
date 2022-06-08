@@ -28,6 +28,7 @@ type FileTransfer struct {
 	DestinationDirectory string `mapstructure:"destinationDirectory"`
 	// initialRun is set by fetchit
 	initialRun bool
+	target     *Target
 }
 
 func (ft *FileTransfer) Type() string {
@@ -40,12 +41,17 @@ func (ft *FileTransfer) GetName() string {
 
 func (ft *FileTransfer) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: ft.Schedule,
-		Skew:     ft.Skew,
+		schedule: ft.Schedule,
+		skew:     ft.Skew,
 	}
 }
 
-func (ft *FileTransfer) Process(ctx, conn context.Context, target *Target, PAT string, skew int) {
+func (ft *FileTransfer) Target() *Target {
+	return ft.target
+}
+
+func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := ft.Target()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
@@ -53,7 +59,7 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, target *Target, PAT s
 	if ft.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
 	}

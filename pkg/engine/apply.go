@@ -18,7 +18,7 @@ func applyChanges(ctx context.Context, target *Target, currentState, desiredStat
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.url)
 
 	currentTree, err := getTreeFromHash(directory, currentState)
 	if err != nil {
@@ -40,24 +40,24 @@ func applyChanges(ctx context.Context, target *Target, currentState, desiredStat
 
 //getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.url)
 
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository: %s", directory)
 	}
 
-	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.Branch, target.Branch))
+	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.branch, target.branch))
 	if err = repo.Fetch(&git.FetchOptions{
 		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Force:    true,
 	}); err != nil && err != git.NoErrAlreadyUpToDate {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.Branch, target.Url)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}
 
-	branch, err := repo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.Branch)), false)
+	branch, err := repo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)), false)
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to branch %s", target.Branch)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to branch %s", target.branch)
 	}
 
 	wt, err := repo.Worktree()
@@ -67,14 +67,14 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	err = wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()})
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", branch.Hash(), target.Branch)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", branch.Hash(), target.branch)
 	}
 
 	return branch.Hash(), err
 }
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.url)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
@@ -93,7 +93,7 @@ func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, e
 }
 
 func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash, methodType, methodName string) error {
-	directory := filepath.Base(target.Url)
+	directory := filepath.Base(target.url)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
@@ -175,4 +175,21 @@ func checkTag(tags *[]string, name string) bool {
 		}
 	}
 	return false
+}
+
+func getChangeString(change *object.Change) (*string, error) {
+	if change != nil {
+		from, _, err := change.Files()
+		if err != nil {
+			return nil, err
+		}
+		if from != nil {
+			s, err := from.Contents()
+			if err != nil {
+				return nil, err
+			}
+			return &s, nil
+		}
+	}
+	return nil, nil
 }

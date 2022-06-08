@@ -36,6 +36,7 @@ type Raw struct {
 	PullImage bool `mapstructure:"pullImage"`
 	// initialRun is set by fetchit
 	initialRun bool
+	target     *Target
 }
 
 func (r *Raw) Type() string {
@@ -48,9 +49,13 @@ func (r *Raw) GetName() string {
 
 func (r *Raw) SchedInfo() SchedInfo {
 	return SchedInfo{
-		Schedule: r.Schedule,
-		Skew:     r.Skew,
+		schedule: r.Schedule,
+		skew:     r.Skew,
 	}
+}
+
+func (r *Raw) Target() *Target {
+	return r.target
 }
 
 /* below is an example.json file:
@@ -100,8 +105,9 @@ type RawPod struct {
 	CapDrop []string          `json:"CapDrop" yaml:"CapDrop"`
 }
 
-func (r *Raw) Process(ctx context.Context, conn context.Context, target *Target, PAT string, skew int) {
+func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target := r.Target()
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
@@ -110,7 +116,7 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, target *Target,
 	if r.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.Url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
 	}
