@@ -179,6 +179,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -227,6 +228,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -275,6 +277,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -320,6 +323,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -371,6 +375,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -416,6 +421,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure container is gone
@@ -452,6 +458,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/single/hello.txt ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure container is gone
@@ -485,6 +492,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure systemd container is gone
@@ -511,6 +519,9 @@ jobs:
       - name: Load the autoupdate timer drop-in file
         run: sudo mkdir /etc/systemd/system/podman-auto-update.timer.d && sudo cp examples/systemd/podman-auto-update.timer.d-override.conf /etc/systemd/system/podman-auto-update.timer.d/override.conf && sudo systemctl daemon-reload
 
+      - name: start podman auto-update timer
+        run: sudo systemctl restart podman-auto-update.timer
+
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
 
@@ -533,6 +544,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
@@ -545,7 +557,19 @@ jobs:
         run: sudo podman tag quay.io/sallyom/httpd-ex:latest registry.access.redhat.com/ubi8/httpd-24:latest
 
       - name: Wait for podman auto-update
-        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
+        run: timeout 330 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
+
+      - name: check the service
+        if: always()
+        run: sudo systemctl status podman-auto-update.timer
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
+      - name: list podman pods showing when they were started
+        if: always()
+        run: sudo podman ps -a
 
   systemd-enable-validate:
     runs-on: ubuntu-latest
@@ -587,6 +611,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure systemd containers are gone
@@ -691,6 +716,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: list files
@@ -745,6 +771,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
     
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
       
       - name: list packages
@@ -778,6 +805,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
  
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: list files
@@ -814,6 +842,7 @@ jobs:
         run: sleep 1m
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -865,6 +894,7 @@ jobs:
         run: sleep 30s 
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify volume is deleted
@@ -934,6 +964,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure only required containers are running (cap colors and fetchit)
@@ -991,6 +1022,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: Wait for fetchit to deploy
@@ -1075,6 +1107,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: get environment variable
@@ -1099,6 +1132,7 @@ jobs:
 
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: get environment variable
