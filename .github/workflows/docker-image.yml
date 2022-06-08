@@ -554,7 +554,7 @@ jobs:
         run: sudo podman tag quay.io/sallyom/httpd-ex:latest registry.access.redhat.com/ubi8/httpd-24:latest
 
       - name: Wait for podman auto-update
-        run: timeout 330 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
+        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
 
       - name: check the service
         if: always()
