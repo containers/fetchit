@@ -519,9 +519,6 @@ jobs:
       - name: Load the autoupdate timer drop-in file
         run: sudo mkdir /etc/systemd/system/podman-auto-update.timer.d && sudo cp examples/systemd/podman-auto-update.timer.d-override.conf /etc/systemd/system/podman-auto-update.timer.d/override.conf && sudo systemctl daemon-reload
 
-      - name: start podman auto-update timer
-        run: sudo systemctl restart podman-auto-update.timer
-
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
 
