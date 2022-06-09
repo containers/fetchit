@@ -21,7 +21,7 @@ import (
 
 const (
 	fetchitService = "fetchit"
-	defaultVolume  = "fetchit-volume"
+	fetchitVolume  = "fetchit-volume"
 	fetchitImage   = "quay.io/fetchit/fetchit:latest"
 	deleteFile     = "delete"
 )
@@ -31,7 +31,6 @@ var (
 	defaultConfigBackup = filepath.Join("/opt", "mount", "config-backup.yaml")
 
 	fetchitConfig *FetchitConfig
-	fetchitVolume string
 	fetchit       *Fetchit
 )
 
@@ -75,11 +74,6 @@ func Execute() {
 	cobra.CheckErr(fetchitCmd.Execute())
 }
 
-func (o *FetchitConfig) bindFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
-	flags.StringVar(&o.volume, "volume", defaultVolume, "podman volume to hold fetchit data. If volume doesn't exist, fetchit will create it.")
-}
-
 // restart fetches new targets from an updated config
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
@@ -111,7 +105,6 @@ func populateConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 
 func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	fetchit = newFetchit()
-	fetchitVolume = config.volume
 	fetchit.pat = fc.PAT
 	ctx := context.Background()
 	if fc.conn == nil {
@@ -206,10 +199,6 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 
 	if config == nil || (config.TargetConfigs == nil && config.ConfigReload == nil) {
 		cobra.CheckErr("no fetchit targets found, exiting")
-	}
-
-	if config.volume == "" {
-		config.volume = defaultVolume
 	}
 
 	return fc.populateFetchit(config)

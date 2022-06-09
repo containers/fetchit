@@ -17,11 +17,4 @@ var startCmd = &cobra.Command{
 func init() {
 	fetchitConfig = newFetchitConfig()
 	fetchitCmd.AddCommand(startCmd)
-	cmdGroup := []*cobra.Command{
-		fetchitCmd,
-		startCmd,
-	}
-	for _, cmd := range cmdGroup {
-		fetchitConfig.bindFlags(cmd)
-	}
 }

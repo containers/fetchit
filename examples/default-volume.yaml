@@ -1,8 +1,0 @@
-targetConfigs:
-- name: fetchit
-  url: http://github.com/containers/fetchit
-  raw:
-  - name: raw-ex
-    targetPath: examples/raw/
-    schedule: "*/1 * * * *"
-  branch: main

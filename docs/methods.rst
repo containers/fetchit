@@ -38,7 +38,6 @@ In the examples directory, there is an Ansible playbook that is used to install 
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
@@ -57,7 +56,6 @@ The RawTarget method will launch containers based upon their definition in a JSO
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
@@ -100,7 +98,6 @@ look for image updates with all podman-generated unit files that include the aut
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
@@ -126,7 +123,6 @@ The File Transfer method will copy files from the container to the host. This me
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
@@ -145,7 +141,6 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
 
 .. code-block:: yaml
 
-   volume: fetchit-volume
    targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
