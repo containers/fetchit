@@ -276,7 +276,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
-		// ConfigReload does not include git URL
+		// ConfigReload, Systemd.AutoUpdateAll, Clean methods do not include git URL
 		if method.Target().url != "" {
 			if err := getClone(method.Target(), f.pat); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.Target().Name, err)
