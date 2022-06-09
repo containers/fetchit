@@ -37,7 +37,7 @@ Define the parameters in your `$HOME/.fetchit/config.yaml` to relate to your git
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
 
 ```
-targets:
+targetConfigs:
 - name: fetchit
   url: http://github.com/containers/fetchit
   branch: main

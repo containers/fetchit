@@ -1,29 +1,29 @@
 Configuration
 =============
-The YAML configuration file defines targets and the method to use, how frequently to check the repository,
+The YAML configuration file defines git targets and the method to use, how frequently to check the repository,
 and various configuration values that relate to that method.
 
-A target is a unique value that holds methods. Mutiple targets can be defined. Methods that can be configured per
-target include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Clean`, and `ConfigTarget`.
+A target is a unique value that holds methods. Mutiple git targets (targetConfigs) can be defined. Methods that can be configured
+include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Clean`, and `FetchitConfigFile`.
 
 Dynamic Configuration Reload
 =============
 
 There are a few ways currently to trigger FetchIt to reload its targets without requiring a restart. The first is to
 pass the environment variable `$FETCHIT_CONFIG_URL` to the `podman run` command running the FetchIt image.
-The second is to include a ConfigTarget in the FetchIt config file. If neither of these exist, a restart of the FetchIt
-pod is required to reload targets. The following fields are required with the ConfigTarget:
+The second is to include a ConfigReload. If neither of these exist, a restart of the FetchIt
+pod is required to reload targetConfigs. The following fields are required with the ConfigReload method:
 
 .. code-block:: yaml
 
-    configTarget:
+    configReload:
       name: config-reload
       schedule: "*/5 * * * *"
       configURL: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
-    targets:
+    targetConfigs:
 
-Changes pushed to the ConfigURL will trigger a reloading of FetchIt targets. It's recommended to include the ConfigTarget
-in the FetchIt config to enable updates to targets without requiring a restart.
+Changes pushed to the ConfigURL will trigger a reloading of FetchIt target configs. It's recommended to include the ConfigReload
+in the FetchIt config to enable updates to target configs without requiring a restart.
 
 Methods
 =======
@@ -39,7 +39,7 @@ In the examples directory, there is an Ansible playbook that is used to install 
 .. code-block:: yaml
 
    volume: fetchit-volume
-   targets:
+   targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
      ansible:
@@ -58,7 +58,7 @@ The RawTarget method will launch containers based upon their definition in a JSO
 .. code-block:: yaml
 
    volume: fetchit-volume
-   targets:
+   targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
      raw:
@@ -101,7 +101,7 @@ look for image updates with all podman-generated unit files that include the aut
 .. code-block:: yaml
 
    volume: fetchit-volume
-   targets:
+   targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
      systemd:
@@ -114,7 +114,7 @@ look for image updates with all podman-generated unit files that include the aut
 
 .. code-block:: yaml
 
-   targets:
+   targetConfigs:
    - name: autoupdate
      systemd:
        name: autoupdate-ex
@@ -127,7 +127,7 @@ The File Transfer method will copy files from the container to the host. This me
 .. code-block:: yaml
 
    volume: fetchit-volume
-   targets:
+   targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
      filetransfer:
@@ -146,7 +146,7 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
 .. code-block:: yaml
 
    volume: fetchit-volume
-   targets:
+   targetConfigs:
    - name: fetchit
      url: http://github.com/containers/fetchit
      kube:

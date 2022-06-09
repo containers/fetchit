@@ -18,13 +18,13 @@ import (
 
 const configFileMethod = "config"
 
-// ConfigTarget configures a target for dynamic loading of fetchit config updates
-// $FETCHIT_CONFIG_URL environment variable or a local file with a ConfigTarget target
+// ConfigReload configures a target for dynamic loading of fetchit config updates
+// $FETCHIT_CONFIG_URL environment variable or a local file with a ConfigReload target
 // at ~/.fetchit/config.yaml will inform fetchit to use this target.
 // Without this target, fetchit will not watch for config updates.
-// At this time, only 1 FetchitConfigTarget target can be passed to fetchit
+// At this time, only 1 FetchitConfigReload target can be passed to fetchit
 // TODO: Collect multiple from multiple FetchitTargets and merge configs into 1 on disk
-type ConfigTarget struct {
+type ConfigReload struct {
 	// Schedule is how often to check for git updates and/or restart the fetchit service
 	// Must be valid cron expression
 	Schedule string `mapstructure:"schedule"`
@@ -36,22 +36,22 @@ type ConfigTarget struct {
 	initialRun bool
 }
 
-func (c *ConfigTarget) Type() string {
+func (c *ConfigReload) Type() string {
 	return configFileMethod
 }
 
-func (c *ConfigTarget) GetName() string {
+func (c *ConfigReload) GetName() string {
 	return configFileMethod
 }
 
-func (c *ConfigTarget) SchedInfo() SchedInfo {
+func (c *ConfigReload) SchedInfo() SchedInfo {
 	return SchedInfo{
 		schedule: c.Schedule,
 		skew:     c.Skew,
 	}
 }
 
-func (c *ConfigTarget) Process(ctx, conn context.Context, PAT string, skew int) {
+func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	// configURL in config file will override the environment variable
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
@@ -62,7 +62,7 @@ func (c *ConfigTarget) Process(ctx, conn context.Context, PAT string, skew int) 
 	os.Setenv("FETCHIT_CONFIG_URL", envURL)
 	// If ConfigURL is not populated, warn and leave
 	if envURL == "" {
-		klog.Warningf("Fetchit ConfigTarget found, but neither $FETCHIT_CONFIG_URL on system nor ConfigTarget.ConfigURL are set, exiting without updating the config.")
+		klog.Warningf("Fetchit ConfigReload found, but neither $FETCHIT_CONFIG_URL on system nor ConfigReload.ConfigURL are set, exiting without updating the config.")
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
@@ -74,15 +74,15 @@ func (c *ConfigTarget) Process(ctx, conn context.Context, PAT string, skew int) 
 	fetchitConfig.Restart()
 }
 
-func (c *ConfigTarget) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
+func (c *ConfigReload) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
 	return nil
 }
 
-func (c *ConfigTarget) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
+func (c *ConfigReload) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
 	return nil
 }
 
-func (c *ConfigTarget) Target() *Target {
+func (c *ConfigReload) Target() *Target {
 	return &Target{
 		Name: configFileMethod,
 	}

@@ -2,7 +2,7 @@
 # targetConfigs from .fetchit/config.yaml are populated
 # and for follow-up test, push a change to the config and confirm
 # new targetConfigs are fetched & run
-configTarget:
+configReload:
   configURL: https://raw.githubusercontent.com/sallyom/fetchit/refactor-interface/examples/config-reload.yaml
   schedule: "*/2 * * * *"
 targetConfigs:

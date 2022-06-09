@@ -21,7 +21,7 @@ type Method interface {
 // FetchitConfig requires necessary objects to process targets
 type FetchitConfig struct {
 	TargetConfigs []*TargetConfig `mapstructure:"targetConfigs"`
-	ConfigTarget  *ConfigTarget   `mapstructure:"configTarget"`
+	ConfigReload  *ConfigReload   `mapstructure:"configReload"`
 	PAT           string          `mapstructure:"pat"`
 	volume        string          `mapstructure:"volume"`
 	conn          context.Context
@@ -38,7 +38,7 @@ type TargetConfig struct {
 	Kube         []*Kube         `mapstructure:"kube"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
-	configReload *ConfigTarget
+	configReload *ConfigReload
 	mu           sync.Mutex
 }
 
@@ -46,7 +46,7 @@ type Target struct {
 	Name         string
 	url          string
 	branch       string
-	configReload *ConfigTarget
+	configReload *ConfigReload
 	mu           sync.Mutex
 }
 

@@ -132,18 +132,18 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 
 	// look for a ConfigURL, only find the first
 	// TODO: add logic to merge multiple configs
-	if config.ConfigTarget != nil {
-		if config.ConfigTarget.ConfigURL != "" {
+	if config.ConfigReload != nil {
+		if config.ConfigReload.ConfigURL != "" {
 			// reset URL if necessary
 			// ConfigURL set in config file overrides env variable
 			// If the same, this is no change, if diff then the new config has updated the configURL
-			os.Setenv("FETCHIT_CONFIG_URL", config.ConfigTarget.ConfigURL)
-			// Convert configTarget to a proper target for processing
-			configTarget := &TargetConfig{
+			os.Setenv("FETCHIT_CONFIG_URL", config.ConfigReload.ConfigURL)
+			// Convert configReload to a proper target for processing
+			reload := &TargetConfig{
 				Name:         configFileMethod,
-				configReload: config.ConfigTarget,
+				configReload: config.ConfigReload,
 			}
-			config.TargetConfigs = append(config.TargetConfigs, configTarget)
+			config.TargetConfigs = append(config.TargetConfigs, reload)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 		}
 	}
 
-	if config == nil || (config.TargetConfigs == nil && config.ConfigTarget == nil) {
+	if config == nil || (config.TargetConfigs == nil && config.ConfigReload == nil) {
 		cobra.CheckErr("no fetchit targets found, exiting")
 	}
 
@@ -276,7 +276,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
-		// ConfigTarget does not include git URL
+		// ConfigReload does not include git URL
 		if method.Target().url != "" {
 			if err := getClone(method.Target(), f.pat); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.Target().Name, err)
@@ -342,10 +342,10 @@ func getClone(target *Target, PAT string) error {
 
 // CheckForConfigUpdates, downloads, & places config file
 // in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
-// This runs with the initial startup as well as with scheduled ConfigTarget runs,
+// This runs with the initial startup as well as with scheduled ConfigReload runs,
 // if $FETCHIT_CONFIG_URL is set.
 func (fc *FetchitConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
-	// envURL is either set by user or set to match a configURL in a configTarget
+	// envURL is either set by user or set to match a configURL in a configReload
 	if envURL == "" {
 		return false
 	}
