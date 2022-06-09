@@ -219,10 +219,10 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: move config file to default location
-        run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url.yaml /root/.fetchit/config.yaml
+        run: sudo mkdir "${HOME}"/.fetchit && sudo cp ./examples/config-url.yaml "${HOME}"/.fetchit/config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v "${HOME}"/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'

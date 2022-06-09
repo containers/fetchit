@@ -168,7 +168,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
-	// the pod at /opt/mount/fetchit-config.yaml
+	// the pod at /opt/mount/config.yaml
 	if initial {
 		if _, err := os.Stat(defaultConfigPath); err != nil {
 			cobra.CheckErr(fmt.Errorf("the local config file must be mounted to /opt/mount directory at /opt/mount/config.yaml in the fetchit pod: %v", err))
@@ -214,6 +214,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			branch: tc.Branch,
 		}
 		if tc.configReload != nil {
+			tc.configReload.initialRun = true
 			fetchit.methodTargetScheds[tc.configReload] = tc.configReload.SchedInfo()
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, configFileMethod)
 		}
@@ -226,6 +227,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		if tc.Ansible != nil {
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, ansibleMethod)
 			for _, a := range tc.Ansible {
+				a.initialRun = true
 				a.target = gitTarget
 				fetchit.methodTargetScheds[a] = a.SchedInfo()
 			}
@@ -233,6 +235,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		if tc.FileTransfer != nil {
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, filetransferMethod)
 			for _, ft := range tc.FileTransfer {
+				ft.initialRun = true
 				ft.target = gitTarget
 				fetchit.methodTargetScheds[ft] = ft.SchedInfo()
 			}
@@ -240,6 +243,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		if tc.Kube != nil {
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, kubeMethod)
 			for _, k := range tc.Kube {
+				k.initialRun = true
 				k.target = gitTarget
 				fetchit.methodTargetScheds[k] = k.SchedInfo()
 			}
@@ -247,6 +251,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		if tc.Raw != nil {
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, rawMethod)
 			for _, r := range tc.Raw {
+				r.initialRun = true
 				r.target = gitTarget
 				fetchit.methodTargetScheds[r] = r.SchedInfo()
 			}
@@ -254,6 +259,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		if tc.Systemd != nil {
 			fetchit.allMethodTypes = append(fetchit.allMethodTypes, systemdMethod)
 			for _, sd := range tc.Systemd {
+				sd.initialRun = true
 				sd.target = gitTarget
 				fetchit.methodTargetScheds[sd] = sd.SchedInfo()
 			}

@@ -73,6 +73,10 @@ func (sd *Systemd) GetName() string {
 }
 
 func (sd *Systemd) SchedInfo() SchedInfo {
+	// with autoupdate, a schedule is not required
+	if sd.AutoUpdateAll {
+		sd.Schedule = "*/1 * * * *"
+	}
 	return SchedInfo{
 		schedule: sd.Schedule,
 		skew:     sd.Skew,
@@ -93,10 +97,8 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 		return
 	}
 	if sd.AutoUpdateAll {
-		sd.Enable = false
-		target.url = ""
+		sd.Enable = true
 		sd.Root = true
-		sd.TargetPath = ""
 		sd.Restart = false
 		sd.Name = podmanAutoUpdate
 	}
