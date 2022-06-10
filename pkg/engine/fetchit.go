@@ -88,10 +88,10 @@ func (fc *FetchitConfig) Restart() {
 
 func populateConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 	config := newFetchitConfig()
-	flagConfigDir := filepath.Dir(defaultConfigPath)
-	flagConfigName := filepath.Base(defaultConfigPath)
-	v.AddConfigPath(flagConfigDir)
-	v.SetConfigName(flagConfigName)
+	configDir := filepath.Dir(defaultConfigPath)
+	configName := filepath.Base(defaultConfigPath)
+	v.AddConfigPath(configDir)
+	v.SetConfigName(configName)
 	v.SetConfigType("yaml")
 
 	if err := v.ReadInConfig(); err == nil {
@@ -168,10 +168,12 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
-	// the pod at /opt/mount/config.yaml
+	// the pod at /opt/mount
 	if initial {
-		if _, err := os.Stat(defaultConfigPath); err != nil {
-			cobra.CheckErr(fmt.Errorf("the local config file must be mounted to /opt/mount directory at /opt/mount/config.yaml in the fetchit pod: %v", err))
+		if _, err := os.Stat(filepath.Dir(defaultConfigPath)); err != nil {
+			if envURL == "" {
+				cobra.CheckErr(fmt.Errorf("the local config file must be mounted to /opt/mount directory at /opt/mount/config.yaml in the fetchit pod: %v", err))
+			}
 		}
 	}
 
@@ -180,7 +182,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 		// Only run this from initial startup and only after trying to populate the config from a local file.
 		// because CheckForConfigUpdates also runs with each processConfig, so if !initial this is already done
 		// If configURL is passed in, a config file on disk has priority on the initial run.
-		_ = fc.CheckForConfigUpdates(envURL, false, true)
+		_ = checkForConfigUpdates(envURL, false, true)
 	}
 
 	// if config is not yet populated, fc.CheckForConfigUpdates has placed the config
@@ -333,20 +335,4 @@ func getClone(target *Target, PAT string) error {
 		}
 	}
 	return nil
-}
-
-// CheckForConfigUpdates, downloads, & places config file
-// in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
-// This runs with the initial startup as well as with scheduled ConfigReload runs,
-// if $FETCHIT_CONFIG_URL is set.
-func (fc *FetchitConfig) CheckForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
-	// envURL is either set by user or set to match a configURL in a configReload
-	if envURL == "" {
-		return false
-	}
-	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial)
-	if err != nil {
-		klog.Info(err)
-	}
-	return reset
 }

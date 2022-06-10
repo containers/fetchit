@@ -66,7 +66,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) 
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
-	restart := fetchitConfig.CheckForConfigUpdates(envURL, true, false)
+	restart := checkForConfigUpdates(envURL, true, false)
 	if !restart {
 		return
 	}
@@ -86,6 +86,22 @@ func (c *ConfigReload) Target() *Target {
 	return &Target{
 		Name: configFileMethod,
 	}
+}
+
+// checkForConfigUpdates downloads & places config file
+// in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
+// This runs with the initial startup as well as with scheduled ConfigReload runs,
+// if $FETCHIT_CONFIG_URL is set.
+func checkForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
+	// envURL is either set by user or set to match a configURL in a configReload
+	if envURL == "" {
+		return false
+	}
+	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial)
+	if err != nil {
+		klog.Info(err)
+	}
+	return reset
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod
