@@ -7,36 +7,57 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/redhat-et/fetchit/pkg/engine/utils"
 )
 
-/*
-For any given target, will get the head of the branch
-in the repository specified by the target's url
-*/
-func (fc *FetchitConfig) GetLatest(target *Target) (plumbing.Hash, error) {
-	directory := filepath.Base(target.Url)
+func applyChanges(ctx context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) (map[*object.Change]string, error) {
+	if desiredState.IsZero() {
+		return nil, errors.New("Cannot run Apply if desired state is empty")
+	}
+	directory := filepath.Base(target.url)
+
+	currentTree, err := getTreeFromHash(directory, currentState)
+	if err != nil {
+		return nil, utils.WrapErr(err, "Error getting tree from hash %s", currentState)
+	}
+
+	desiredTree, err := getTreeFromHash(directory, desiredState)
+	if err != nil {
+		return nil, utils.WrapErr(err, "Error getting tree from hash %s", desiredState)
+	}
+
+	changeMap, err := getFilteredChangeMap(directory, targetPath, currentTree, desiredTree, tags)
+	if err != nil {
+		return nil, utils.WrapErr(err, "Error getting filtered change map from %s to %s", currentState, desiredState)
+	}
+
+	return changeMap, nil
+}
+
+//getLatest will get the head of the branch in the repository specified by the target's url
+func getLatest(target *Target) (plumbing.Hash, error) {
+	directory := filepath.Base(target.url)
 
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository: %s", directory)
 	}
 
-	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.Branch, target.Branch))
+	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.branch, target.branch))
 	if err = repo.Fetch(&git.FetchOptions{
 		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Force:    true,
 	}); err != nil && err != git.NoErrAlreadyUpToDate {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.Branch, target.Url)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}
 
-	branch, err := repo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.Branch)), false)
+	branch, err := repo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)), false)
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to branch %s", target.Branch)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to branch %s", target.branch)
 	}
 
 	wt, err := repo.Worktree()
@@ -46,15 +67,15 @@ func (fc *FetchitConfig) GetLatest(target *Target) (plumbing.Hash, error) {
 
 	err = wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()})
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", branch.Hash(), target.Branch)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", branch.Hash(), target.branch)
 	}
 
 	return branch.Hash(), err
 }
 
-func (fc *FetchitConfig) GetCurrent(target *Target, method string) (plumbing.Hash, error) {
-	directory := filepath.Base(target.Url)
-	tagName := fmt.Sprintf("current-%s", method)
+func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
+	directory := filepath.Base(target.url)
+	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
@@ -71,9 +92,9 @@ func (fc *FetchitConfig) GetCurrent(target *Target, method string) (plumbing.Has
 	return ref.Hash(), err
 }
 
-func (fc *FetchitConfig) UpdateCurrent(ctx context.Context, target *Target, method string, newCurrent plumbing.Hash) error {
-	directory := filepath.Base(target.Url)
-	tagName := fmt.Sprintf("current-%s", method)
+func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash, methodType, methodName string) error {
+	directory := filepath.Base(target.url)
+	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
@@ -88,45 +109,6 @@ func (fc *FetchitConfig) UpdateCurrent(ctx context.Context, target *Target, meth
 	_, err = repo.CreateTag(tagName, newCurrent, nil)
 	if err != nil {
 		return utils.WrapErr(err, "Error creating new current tag with hash %s", newCurrent)
-	}
-
-	return nil
-}
-
-// Side effects are running/applying changes concurrently and on success moving old "current" tag
-func (fc *FetchitConfig) Apply(
-	ctx context.Context,
-	mo *SingleMethodObj,
-	currentState plumbing.Hash,
-	desiredState plumbing.Hash,
-	targetPath string,
-	tags *[]string,
-) error {
-	if desiredState.IsZero() {
-		return errors.New("Cannot run Apply if desired state is empty")
-	}
-	directory := filepath.Base(mo.Target.Url)
-
-	currentTree, err := getTreeFromHash(directory, currentState)
-	if err != nil {
-		return utils.WrapErr(err, "Error getting tree from hash %s", currentState)
-	}
-
-	desiredTree, err := getTreeFromHash(directory, desiredState)
-	if err != nil {
-		return utils.WrapErr(err, "Error getting tree from hash %s", desiredState)
-	}
-
-	changeMap, err := getFilteredChangeMap(directory, targetPath, currentTree, desiredTree, tags)
-	if err != nil {
-		return utils.WrapErr(err, "Error getting filtered change map from %s to %s", currentState, desiredState)
-	}
-
-	err = fc.runChangesConcurrent(ctx, mo, changeMap)
-	if err != nil {
-		return utils.WrapErr(err, "Error applying change from %s to %s for path %s in %s",
-			currentState, desiredState, targetPath, directory,
-		)
 	}
 
 	return nil
@@ -195,21 +177,19 @@ func checkTag(tags *[]string, name string) bool {
 	return false
 }
 
-func (fc *FetchitConfig) runChangesConcurrent(ctx context.Context, mo *SingleMethodObj, changeMap map[*object.Change]string) error {
-	ch := make(chan error)
-	for change, changePath := range changeMap {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := fc.EngineMethod(ctx, mo, changePath, change); err != nil {
-				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changeMap {
-		err := <-ch
+func getChangeString(change *object.Change) (*string, error) {
+	if change != nil {
+		from, _, err := change.Files()
 		if err != nil {
-			return err
+			return nil, err
+		}
+		if from != nil {
+			s, err := from.Contents()
+			if err != nil {
+				return nil, err
+			}
+			return &s, nil
 		}
 	}
-	return nil
+	return nil, nil
 }

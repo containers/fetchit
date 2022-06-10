@@ -1,16 +1,16 @@
 # for this test, start with this config, then wait to be sure the
-# targets from .fetchit/config.yaml are populated
+# targetConfigs from .fetchit/config.yaml are populated
 # and for follow-up test, push a change to the config and confirm
-# new targets are fetched & run
-targets:
+# new targetConfigs are fetched & run
+configReload:
+  configURL: https://raw.githubusercontent.com/sallyom/fetchit/refactor-interface/examples/config-reload.yaml
+  schedule: "*/2 * * * *"
+targetConfigs:
 - name: fetchit
-  url: https://github.com/redhat-et/fetchit
-  methods:
-    configTarget:
-      configUrl: https://raw.githubusercontent.com/josephsawaya/fetchit/better-apply/examples/config-reload.yaml
-      schedule: "*/2 * * * *"
-    raw:
-      targetPath: examples/raw/
-      schedule: "*/1 * * * *"
-      pullImage: false
+  url: https://github.com/containers/fetchit
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw/
+    schedule: "*/1 * * * *"
+    pullImage: false
   branch: main

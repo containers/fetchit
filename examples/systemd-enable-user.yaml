@@ -1,11 +1,11 @@
-targets:
+targetConfigs:
 - name: fetchit
-  url: http://github.com/redhat-et/fetchit
-  methods:
-    systemd:
-      targetPath: examples/systemd/httpd.service
-      root: false
-      enable: true
-      schedule: "*/1 * * * *"
+  url: https://github.com/containers/fetchit
+  systemd:
+  - name: httpd-user
+    targetPath: examples/systemd/httpd.service
+    root: false
+    enable: true
+    schedule: "*/1 * * * *"
   branch: main
 

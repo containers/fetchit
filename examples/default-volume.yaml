@@ -1,8 +1,0 @@
-targets:
-- name: fetchit
-  url: http://github.com/redhat-et/fetchit
-  methods:
-    raw:
-      targetPath: examples/raw/
-      schedule: "*/1 * * * *"
-  branch: main

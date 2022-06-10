@@ -9,11 +9,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/play"
 	"github.com/containers/podman/v4/pkg/domain/entities"
-	"github.com/redhat-et/fetchit/pkg/engine/utils"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
@@ -22,14 +25,132 @@ import (
 	k8syaml "sigs.k8s.io/yaml"
 )
 
-func kubePodman(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
+const kubeMethod = "kube"
 
+// Kube to launch pods using podman kube-play
+type Kube struct {
+	// Name must be unique within target Kube methods
+	Name string `mapstructure:"name"`
+	// Schedule is how often to check for git updates and/or restart the fetchit service
+	// Must be valid cron expression
+	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
+	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
+	TargetPath string `mapstructure:"targetPath"`
+	// initialRun is set by fetchit
+	initialRun bool
+	target     *Target
+}
+
+func (k *Kube) Type() string {
+	return kubeMethod
+}
+
+func (k *Kube) GetName() string {
+	return k.Name
+}
+
+func (k *Kube) SchedInfo() SchedInfo {
+	return SchedInfo{
+		schedule: k.Schedule,
+		skew:     k.Skew,
+	}
+}
+
+func (k *Kube) Target() *Target {
+	return k.target
+}
+
+func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := k.Target()
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	initial := k.initialRun
+	tag := []string{"yaml", "yml"}
+	if initial {
+		err := getClone(target, PAT)
+		if err != nil {
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			return
+		}
+	}
+
+	latest, err := getLatest(target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
+		return
+	}
+
+	current, err := getCurrent(target, kubeMethod, k.Name)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = k.Apply(ctx, conn, target, current, latest, k.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		updateCurrent(ctx, target, latest, kubeMethod, k.Name)
+		klog.Infof("Moved kube from %s to %s for target %s", current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, kube currently at %s", target.Name, current)
+	}
+
+	k.initialRun = false
+}
+
+func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	prev, err := getChangeString(change)
+	if err != nil {
+		return err
+	}
+	return k.kubePodman(ctx, conn, path, prev)
+}
+
+func (k *Kube) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
+	changeMap, err := applyChanges(ctx, target, currentState, desiredState, targetPath, tags)
+	if err != nil {
+		return err
+	}
+	if err := k.runChangesConcurrent(ctx, conn, changeMap); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kube) runChangesConcurrent(ctx context.Context, conn context.Context, changeMap map[*object.Change]string) error {
+	ch := make(chan error)
+	for change, changePath := range changeMap {
+		go func(ch chan<- error, changePath string, change *object.Change) {
+			if err := k.MethodEngine(ctx, conn, change, changePath); err != nil {
+				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
+			}
+			ch <- nil
+		}(ch, changePath, change)
+	}
+	for range changeMap {
+		err := <-ch
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
 	if path != deleteFile {
 		klog.Infof("Creating podman container from %s using kube method", path)
 	}
 
 	if prev != nil {
-		err := stopPods(mo.Conn, []byte(*prev))
+		err := stopPods(conn, []byte(*prev))
 		if err != nil {
 			return utils.WrapErr(err, "Error stopping pods")
 		}
@@ -42,14 +163,14 @@ func kubePodman(ctx context.Context, mo *SingleMethodObj, path string, prev *str
 		}
 
 		// Try stopping the pods, don't care if they don't exist
-		err = stopPods(mo.Conn, kubeYaml)
+		err = stopPods(conn, kubeYaml)
 		if err != nil {
 			if !strings.Contains(err.Error(), "no such pod") {
 				return utils.WrapErr(err, "Error stopping pods")
 			}
 		}
 
-		err = createPods(mo.Conn, path, kubeYaml)
+		err = createPods(conn, path, kubeYaml)
 		if err != nil {
 			return utils.WrapErr(err, "Error creating pod")
 		}

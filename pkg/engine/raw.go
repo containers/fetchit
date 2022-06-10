@@ -1,13 +1,62 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"io/ioutil"
+	"time"
 
+	"github.com/containers/common/libnetwork/types"
+	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
+	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"gopkg.in/yaml.v3"
 
 	"k8s.io/klog/v2"
 )
+
+const rawMethod = "raw"
+
+// Raw to deploy pods from json or yaml files
+type Raw struct {
+	// Name must be unique within target Raw methods
+	Name string `mapstructure:"name"`
+	// Schedule is how often to check for git updates and/or restart the fetchit service
+	// Must be valid cron expression
+	Schedule string `mapstructure:"schedule"`
+	// Number of seconds to skew the schedule by
+	Skew *int `mapstructure:"skew"`
+	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
+	TargetPath string `mapstructure:"targetPath"`
+	// Pull images configured in target files each time regardless of if it already exists
+	PullImage bool `mapstructure:"pullImage"`
+	// initialRun is set by fetchit
+	initialRun bool
+	target     *Target
+}
+
+func (r *Raw) Type() string {
+	return rawMethod
+}
+
+func (r *Raw) GetName() string {
+	return r.Name
+}
+
+func (r *Raw) SchedInfo() SchedInfo {
+	return SchedInfo{
+		schedule: r.Schedule,
+		skew:     r.Skew,
+	}
+}
+
+func (r *Raw) Target() *Target {
+	return r.target
+}
 
 /* below is an example.json file:
 {"Image":"docker.io/mmumshad/simple-webapp-color:latest",
@@ -56,7 +105,51 @@ type RawPod struct {
 	CapDrop []string          `json:"CapDrop" yaml:"CapDrop"`
 }
 
-func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *string) error {
+func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, skew int) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target := r.Target()
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	tag := []string{".json", ".yaml", ".yml"}
+
+	if r.initialRun {
+		err := getClone(target, PAT)
+		if err != nil {
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			return
+		}
+	}
+
+	latest, err := getLatest(target)
+	if err != nil {
+		klog.Errorf("Failed to get latest commit: %v", err)
+		return
+	}
+
+	current, err := getCurrent(target, rawMethod, r.Name)
+	if err != nil {
+		klog.Errorf("Failed to get current commit: %v", err)
+		return
+	}
+
+	if latest != current {
+		err = r.Apply(ctx, conn, target, current, latest, r.TargetPath, &tag)
+		if err != nil {
+			klog.Errorf("Failed to apply changes: %v", err)
+			return
+		}
+
+		updateCurrent(ctx, target, latest, rawMethod, r.Name)
+		klog.Infof("Moved raw %s from %s to %s for target %s", r.Name, current, latest, target.Name)
+	} else {
+		klog.Infof("No changes applied to target %s this run, raw %s currently at %s", target.Name, r.Name, current)
+	}
+
+	r.initialRun = false
+}
+
+func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
 
 	klog.Infof("Creating podman container from %s", path)
 
@@ -72,7 +165,7 @@ func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *stri
 
 	klog.Infof("Identifying if image exists locally")
 
-	err = detectOrFetchImage(mo.Conn, raw.Image, mo.Target.Methods.Raw.PullImage)
+	err = detectOrFetchImage(conn, raw.Image, r.PullImage)
 	if err != nil {
 		return err
 	}
@@ -84,7 +177,7 @@ func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *stri
 			return err
 		}
 
-		err = deleteContainer(mo.Conn, raw.Name)
+		err = deleteContainer(conn, raw.Name)
 		if err != nil {
 			return err
 		}
@@ -96,23 +189,162 @@ func rawPodman(ctx context.Context, mo *SingleMethodObj, path string, prev *stri
 		return nil
 	}
 
-	err = removeExisting(mo.Conn, raw.Name)
+	err = removeExisting(conn, raw.Name)
 	if err != nil {
 		return err
 	}
 
 	s := createSpecGen(*raw)
 
-	createResponse, err := containers.CreateWithSpec(mo.Conn, s, nil)
+	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		return err
 	}
 	klog.Infof("Container %s created.", s.Name)
 
-	if err := containers.Start(mo.Conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
 	klog.Infof("Container %s started....Requeuing", s.Name)
+
+	return nil
+}
+
+func (r *Raw) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	prev, err := getChangeString(change)
+	if err != nil {
+		return err
+	}
+	return r.rawPodman(ctx, conn, path, prev)
+}
+
+func (r *Raw) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
+	changeMap, err := applyChanges(ctx, target, currentState, desiredState, targetPath, tags)
+	if err != nil {
+		return err
+	}
+	if err := r.runChangesConcurrent(ctx, conn, changeMap); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Raw) runChangesConcurrent(ctx context.Context, conn context.Context, changeMap map[*object.Change]string) error {
+	ch := make(chan error)
+	for change, changePath := range changeMap {
+		go func(ch chan<- error, changePath string, change *object.Change) {
+			if err := r.MethodEngine(ctx, conn, change, changePath); err != nil {
+				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
+			}
+			ch <- nil
+		}(ch, changePath, change)
+	}
+	for range changeMap {
+		err := <-ch
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func convertMounts(mounts []mount) []specs.Mount {
+	result := []specs.Mount{}
+	for _, m := range mounts {
+		toAppend := specs.Mount{
+			Destination: m.Destination,
+			Type:        m.Type,
+			Source:      m.Source,
+			Options:     m.Options,
+		}
+		result = append(result, toAppend)
+	}
+	return result
+}
+
+func convertPorts(ports []port) []types.PortMapping {
+	result := []types.PortMapping{}
+	for _, p := range ports {
+		toAppend := types.PortMapping{
+			HostIP:        p.HostIP,
+			ContainerPort: p.ContainerPort,
+			HostPort:      p.HostPort,
+			Range:         p.Range,
+			Protocol:      p.Protocol,
+		}
+		result = append(result, toAppend)
+	}
+	return result
+}
+
+func convertVolumes(namedVolumes []namedVolume) []*specgen.NamedVolume {
+	result := []*specgen.NamedVolume{}
+	for _, n := range namedVolumes {
+		toAppend := specgen.NamedVolume{
+			Name:    n.Name,
+			Dest:    n.Dest,
+			Options: n.Options,
+		}
+		result = append(result, &toAppend)
+	}
+	return result
+}
+
+func createSpecGen(raw RawPod) *specgen.SpecGenerator {
+	// Create a new container
+	s := specgen.NewSpecGenerator(raw.Image, false)
+	s.Name = raw.Name
+	s.Env = map[string]string(raw.Env)
+	s.Mounts = convertMounts(raw.Mounts)
+	s.PortMappings = convertPorts(raw.Ports)
+	s.Volumes = convertVolumes(raw.Volumes)
+	s.CapAdd = []string(raw.CapAdd)
+	s.CapDrop = []string(raw.CapDrop)
+	s.RestartPolicy = "always"
+	return s
+}
+
+func deleteContainer(conn context.Context, podName string) error {
+	err := containers.Stop(conn, podName, nil)
+	if err != nil {
+		return err
+	}
+
+	containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func rawPodFromBytes(b []byte) (*RawPod, error) {
+	b = bytes.TrimSpace(b)
+	raw := RawPod{}
+	if b[0] == '{' {
+		err := json.Unmarshal(b, &raw)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal json")
+		}
+	} else {
+		err := yaml.Unmarshal(b, &raw)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Unable to unmarshal yaml")
+		}
+	}
+	return &raw, nil
+}
+
+// Using this might not be necessary
+func removeExisting(conn context.Context, podName string) error {
+	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
+	if err == nil || inspectData == nil {
+		klog.Infof("A container named %s already exists. Removing the container before redeploy.", podName)
+		err := deleteContainer(conn, podName)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

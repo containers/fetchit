@@ -52,7 +52,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -114,7 +114,7 @@ jobs:
 
   build-systemd-arm:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -173,12 +173,13 @@ jobs:
         run: sudo mkdir /root/.fetchit
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/redhat-et/fetchit/main/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/sallyom/fetchit/refactor-interface/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -218,63 +219,16 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: move config file to default location
-        run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url.yaml /root/.fetchit/config.yaml
+        run: sudo mkdir "${HOME}"/.fetchit && sudo cp ./examples/config-url.yaml "${HOME}"/.fetchit/config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v "${HOME}"/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
-        run: sudo podman logs fetchit
-
-      - name: verify container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
-      - name: Print the current running container
-        run: sudo podman ps
-
-  fetchit-config-reload-skew-validate:
-    runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Enable the podman socket
-        run: sudo systemctl enable --now podman.socket
-
-      - name: pull artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: fetchit-image
-          path: /tmp
-
-      - name: Load the image
-        run: sudo podman load -i /tmp/fetchit.tar
-
-      - name: pull artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: colors
-          path: /tmp
-
-      - name: Load the image
-        run: sudo podman load -i /tmp/colors.tar
-
-      - name: tag the image
-        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-
-      - name: move config file to default location
-        run: sudo mkdir /root/.fetchit && sudo cp ./examples/config-url-with-skew.yaml /root/.fetchit/config.yaml
-
-      - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v /root/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
-      - name: identify colors container
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-
-      - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -314,12 +268,13 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -333,54 +288,6 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
-  default-volume-validate:
-    runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
-    steps:
-      - uses: actions/checkout@v2
-        
-      - name: Enable the podman socket
-        run: sudo systemctl enable --now podman.socket
-
-      - name: pull artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: fetchit-image
-          path: /tmp
-
-      - name: Load the image
-        run: sudo podman load -i /tmp/fetchit.tar
-
-      - name: pull artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: colors
-          path: /tmp
-
-      - name: Load the image
-        run: sudo podman load -i /tmp/colors.tar
-
-      - name: tag the image
-        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
-      - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/default-volume.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
-      - name: identify colors container
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
-      - name: Logs
-        run: sudo podman logs fetchit
-
-      - name: verify container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
-      - name: Print the current running container
-        run: sudo podman ps
-
-      - name: verify fetchit-volume is volume name
-        run: if [[ $(sudo podman volume inspect fetchit-volume) ]] ; then echo "Fetchit successfully used default volume name"; else exit 1; fi
 
   filetransfer-validate:
     runs-on: ubuntu-latest
@@ -416,6 +323,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure container is gone
@@ -452,6 +360,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/single/hello.txt ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure container is gone
@@ -485,6 +394,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure systemd container is gone
@@ -533,6 +443,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-autoupdate.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure httpd.service is running
@@ -546,6 +457,18 @@ jobs:
 
       - name: Wait for podman auto-update
         run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
+
+      - name: check the service
+        if: always()
+        run: sudo systemctl status podman-auto-update.timer
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
+      - name: list podman pods showing when they were started
+        if: always()
+        run: sudo podman ps -a
 
   systemd-enable-validate:
     runs-on: ubuntu-latest
@@ -587,6 +510,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure systemd containers are gone
@@ -691,6 +615,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: list files
@@ -745,6 +670,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
     
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
       
       - name: list packages
@@ -778,6 +704,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
  
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: list files
@@ -808,12 +735,13 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Wait for fetchit to deploy
         run: sleep 1m
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify container is running
@@ -850,7 +778,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
         
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: identify fetchit container
         run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
@@ -865,6 +793,7 @@ jobs:
         run: sleep 30s 
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: verify volume is deleted
@@ -934,6 +863,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: ensure only required containers are running (cap colors and fetchit)
@@ -991,6 +921,7 @@ jobs:
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
         
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: Wait for fetchit to deploy
@@ -1065,7 +996,7 @@ jobs:
         
       - name: set values relating to the current env
         run: | 
-          sed -i 's|  url: http://github.com/redhat-et/fetchit|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
+          sed -i 's|  url: http://github.com/containers/fetchit|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
           sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
 
       - name: Start fetchit
@@ -1075,6 +1006,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: get environment variable
@@ -1099,6 +1031,7 @@ jobs:
 
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
       - name: get environment variable
@@ -1106,7 +1039,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1133,7 +1066,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-latest
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, default-volume-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
