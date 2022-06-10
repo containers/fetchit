@@ -42,12 +42,13 @@ type Fetchit struct {
 	restartFetchit     bool
 	scheduler          *gocron.Scheduler
 	methodTargetScheds map[Method]SchedInfo
-	allMethodTypes     []string
+	allMethodTypes     map[string]struct{}
 }
 
 func newFetchit() *Fetchit {
 	return &Fetchit{
 		methodTargetScheds: make(map[Method]SchedInfo),
+		allMethodTypes:     make(map[string]struct{}),
 	}
 }
 
@@ -78,7 +79,7 @@ func Execute() {
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
 func (fc *FetchitConfig) Restart() {
-	for _, mt := range fetchit.allMethodTypes {
+	for mt := range fetchit.allMethodTypes {
 		fetchit.scheduler.RemoveByTags(mt)
 	}
 	fetchit.scheduler.Clear()
@@ -215,52 +216,54 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			url:    tc.Url,
 			branch: tc.Branch,
 		}
+
 		if tc.configReload != nil {
 			tc.configReload.initialRun = true
 			fetchit.methodTargetScheds[tc.configReload] = tc.configReload.SchedInfo()
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, configFileMethod)
+			fetchit.allMethodTypes[configFileMethod] = struct{}{}
 		}
 
 		if tc.Clean != nil {
 			fetchit.methodTargetScheds[tc.Clean] = tc.Clean.SchedInfo()
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, cleanMethod)
+			fetchit.allMethodTypes[cleanMethod] = struct{}{}
+
 		}
 
 		if tc.Ansible != nil {
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, ansibleMethod)
-			for _, a := range tc.Ansible {
+			fetchit.allMethodTypes[ansibleMethod] = struct{}{}
+			for _, a := range *tc.Ansible {
 				a.initialRun = true
 				a.target = gitTarget
 				fetchit.methodTargetScheds[a] = a.SchedInfo()
 			}
 		}
 		if tc.FileTransfer != nil {
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, filetransferMethod)
-			for _, ft := range tc.FileTransfer {
+			fetchit.allMethodTypes[filetransferMethod] = struct{}{}
+			for _, ft := range *tc.FileTransfer {
 				ft.initialRun = true
 				ft.target = gitTarget
 				fetchit.methodTargetScheds[ft] = ft.SchedInfo()
 			}
 		}
 		if tc.Kube != nil {
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, kubeMethod)
-			for _, k := range tc.Kube {
+			fetchit.allMethodTypes[kubeMethod] = struct{}{}
+			for _, k := range *tc.Kube {
 				k.initialRun = true
 				k.target = gitTarget
 				fetchit.methodTargetScheds[k] = k.SchedInfo()
 			}
 		}
 		if tc.Raw != nil {
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, rawMethod)
-			for _, r := range tc.Raw {
+			fetchit.allMethodTypes[rawMethod] = struct{}{}
+			for _, r := range *tc.Raw {
 				r.initialRun = true
 				r.target = gitTarget
 				fetchit.methodTargetScheds[r] = r.SchedInfo()
 			}
 		}
 		if tc.Systemd != nil {
-			fetchit.allMethodTypes = append(fetchit.allMethodTypes, systemdMethod)
-			for _, sd := range tc.Systemd {
+			fetchit.allMethodTypes[rawMethod] = struct{}{}
+			for _, sd := range *tc.Systemd {
 				sd.initialRun = true
 				sd.target = gitTarget
 				fetchit.methodTargetScheds[sd] = sd.SchedInfo()
@@ -274,9 +277,9 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
 		// ConfigReload, Systemd.AutoUpdateAll, Clean methods do not include git URL
-		if method.Target().url != "" {
-			if err := getClone(method.Target(), f.pat); err != nil {
-				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.Target().Name, err)
+		if method.GetTarget().url != "" {
+			if err := getClone(method.GetTarget(), f.pat); err != nil {
+				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().Name, err)
 			}
 		}
 	}
@@ -289,8 +292,8 @@ func (f *Fetchit) RunTargets() {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		mt := method.Type()
-		klog.Infof("Processing Target: %s Method: %s Name: %s", method.Target().Name, mt, method.GetName())
+		mt := method.GetKind()
+		klog.Infof("Processing Target: %s Method: %s Name: %s", method.GetTarget().Name, mt, method.GetName())
 		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, f.pat, skew)
 		s.StartImmediately()
 	}

@@ -25,18 +25,11 @@ const configFileMethod = "config"
 // At this time, only 1 FetchitConfigReload target can be passed to fetchit
 // TODO: Collect multiple from multiple FetchitTargets and merge configs into 1 on disk
 type ConfigReload struct {
-	// Schedule is how often to check for git updates and/or restart the fetchit service
-	// Must be valid cron expression
-	Schedule string `mapstructure:"schedule"`
-	// Number of seconds to skew the schedule by
-	Skew *int `mapstructure:"skew"`
-	// URL location of config file, such as a raw github URL
-	ConfigURL string `mapstructure:"configURL"`
-	// initialRun is set by fetchit
-	initialRun bool
+	CommonMethod `mapstructure:",squash"`
+	ConfigURL    string `mapstructure:"configURL"`
 }
 
-func (c *ConfigReload) Type() string {
+func (c *ConfigReload) GetKind() string {
 	return configFileMethod
 }
 
@@ -44,11 +37,14 @@ func (c *ConfigReload) GetName() string {
 	return configFileMethod
 }
 
-func (c *ConfigReload) SchedInfo() SchedInfo {
-	return SchedInfo{
-		schedule: c.Schedule,
-		skew:     c.Skew,
+func (c *ConfigReload) GetTarget() *Target {
+	return &Target{
+		Name: configFileMethod,
 	}
+}
+
+func (c *ConfigReload) SetTarget(t *Target) {
+	return
 }
 
 func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) {
@@ -78,14 +74,8 @@ func (c *ConfigReload) MethodEngine(ctx, conn context.Context, change *object.Ch
 	return nil
 }
 
-func (c *ConfigReload) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
+func (c *ConfigReload) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
 	return nil
-}
-
-func (c *ConfigReload) Target() *Target {
-	return &Target{
-		Name: configFileMethod,
-	}
 }
 
 // checkForConfigUpdates downloads & places config file
