@@ -14,7 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-func applyChanges(ctx context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) (map[*object.Change]string, error) {
+func applyChanges(ctx context.Context, target *Target, targetPath string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}

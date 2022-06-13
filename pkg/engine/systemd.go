@@ -30,13 +30,7 @@ const (
 
 // Systemd to place and/or enable systemd unit files on host
 type Systemd struct {
-	// Name must be unique within target Systemd methods
-	Name string `mapstructure:"name"`
-	// Schedule is how often to check for git updates and/or restart the fetchit service
-	// Must be valid cron expression
-	Schedule string `mapstructure:"schedule"`
-	// Number of seconds to skew the schedule by
-	Skew *int `mapstructure:"skew"`
+	CommonMethod `mapstructure:",squash"`
 	// AutoUpdateAll will start podman-auto-update.service, podman-auto-update.timer
 	// on the host. With this field true, all other fields are ignored. To place unit files
 	// on host and/or enable individual services, create a separate Target.Methods.Systemd
@@ -45,10 +39,6 @@ type Systemd struct {
 	// TODO: update /etc/systemd/system/podman-auto-update.timer.d/override.conf with schedule
 	// By default, podman will auto-update at midnight daily when this service is running
 	AutoUpdateAll bool `mapstructure:"autoUpdateAll"`
-	// Where in the git repository to fetch a systemd unit file
-	// All '*.service' files will be placed in appropriate systemd path
-	// TargetPath must be a single exact file
-	TargetPath string `mapstructure:"targetPath"`
 	// If true, will place unit file in /etc/systemd/system/
 	// If false (default) will place unit file in ~/.config/systemd/user/
 	Root bool `mapstructure:"root"`
@@ -59,17 +49,10 @@ type Systemd struct {
 	// If true, will enable and start systemd services from fetched unit files
 	// If false (default), will place unit file(s) in appropriate systemd path
 	Enable bool `mapstructure:"enable"`
-	// initialRun is set by fetchit
-	initialRun bool
-	target     *Target
 }
 
-func (sd *Systemd) Type() string {
+func (sd *Systemd) GetKind() string {
 	return systemdMethod
-}
-
-func (sd *Systemd) GetName() string {
-	return sd.Name
 }
 
 func (sd *Systemd) SchedInfo() SchedInfo {
@@ -83,12 +66,8 @@ func (sd *Systemd) SchedInfo() SchedInfo {
 	}
 }
 
-func (sd *Systemd) Target() *Target {
-	return sd.target
-}
-
 func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
-	target := sd.Target()
+	target := sd.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
@@ -119,31 +98,18 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
 			return
 		}
-	}
 
-	latest, err := getLatest(target)
-	if err != nil {
-		klog.Errorf("Failed to get latest commit: %v", err)
-		return
-	}
-
-	current, err := getCurrent(target, systemdMethod, sd.Name)
-	if err != nil {
-		klog.Errorf("Failed to get current commit: %v", err)
-		return
-	}
-
-	if latest != current {
-		err = sd.Apply(ctx, conn, target, current, latest, sd.TargetPath, &tag)
+		err = zeroToCurrent(ctx, conn, sd, target, &tag)
 		if err != nil {
-			klog.Errorf("Failed to apply changes: %v", err)
+			klog.Errorf("Error moving to current: %v", err)
 			return
 		}
+	}
 
-		updateCurrent(ctx, target, latest, systemdMethod, sd.Name)
-		klog.Infof("Moved systemd %s from %s to %s for target %s", sd.Name, current, latest, target.Name)
-	} else {
-		klog.Infof("No changes applied to target %s this run, systemd currently at %s", target.Name, current)
+	err := currentToLatest(ctx, conn, sd, target, &tag)
+	if err != nil {
+		klog.Errorf("Error moving current to latest: %v", err)
+		return
 	}
 
 	sd.initialRun = false
@@ -172,32 +138,13 @@ func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, chang
 	return sd.systemdPodman(ctx, conn, path, dest, prev)
 }
 
-func (sd *Systemd) Apply(ctx, conn context.Context, target *Target, currentState, desiredState plumbing.Hash, targetPath string, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, target, currentState, desiredState, targetPath, tags)
+func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
+	changeMap, err := applyChanges(ctx, sd.GetTarget(), sd.GetTargetPath(), currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}
-	if err := sd.runChangesConcurrent(ctx, conn, changeMap); err != nil {
+	if err := runChangesConcurrent(ctx, conn, sd, changeMap); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (sd *Systemd) runChangesConcurrent(ctx context.Context, conn context.Context, changeMap map[*object.Change]string) error {
-	ch := make(chan error)
-	for change, changePath := range changeMap {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := sd.MethodEngine(ctx, conn, change, changePath); err != nil {
-				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changeMap {
-		err := <-ch
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -215,7 +162,9 @@ func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path
 	}
 	if sd.initialRun {
 		ft := &FileTransfer{
-			Name: sd.Name,
+			CommonMethod: CommonMethod{
+				Name: sd.Name,
+			},
 		}
 		if err := ft.fileTransferPodman(ctx, conn, path, dest, prev); err != nil {
 			return utils.WrapErr(err, "Error deploying systemd %s file(s), Path: %s", sd.Name, sd.TargetPath)

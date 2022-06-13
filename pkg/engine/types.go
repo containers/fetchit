@@ -2,19 +2,23 @@ package engine
 
 import (
 	"context"
+	"sync"
+
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"sync"
 )
 
 type Method interface {
-	Type() string
 	GetName() string
-	Target() *Target
+	GetTargetPath() string
+	GetKind() string
+	GetTarget() *Target
+	SetTarget(*Target)
+	SetInitialRun(bool)
 	SchedInfo() SchedInfo
 	Process(ctx context.Context, conn context.Context, PAT string, skew int)
-	Apply(ctx context.Context, conn context.Context, target *Target, currentState plumbing.Hash, desiredState plumbing.Hash, targetPath string, tags *[]string) error
+	Apply(ctx context.Context, conn context.Context, currentState plumbing.Hash, desiredState plumbing.Hash, tags *[]string) error
 	MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error
 }
 
@@ -29,15 +33,15 @@ type FetchitConfig struct {
 }
 
 type TargetConfig struct {
-	Name         string          `mapstructure:"name"`
-	Url          string          `mapstructure:"url"`
-	Branch       string          `mapstructure:"branch"`
-	Clean        *Clean          `mapstructure:"clean"`
-	Ansible      []*Ansible      `mapstructure:"ansible"`
-	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
-	Kube         []*Kube         `mapstructure:"kube"`
-	Raw          []*Raw          `mapstructure:"raw"`
-	Systemd      []*Systemd      `mapstructure:"systemd"`
+	Name         string           `mapstructure:"name"`
+	Url          string           `mapstructure:"url"`
+	Branch       string           `mapstructure:"branch"`
+	Clean        *Clean           `mapstructure:"clean"`
+	Ansible      *[]*Ansible      `mapstructure:"ansible"`
+	FileTransfer *[]*FileTransfer `mapstructure:"filetransfer"`
+	Kube         *[]*Kube         `mapstructure:"kube"`
+	Raw          *[]*Raw          `mapstructure:"raw"`
+	Systemd      *[]*Systemd      `mapstructure:"systemd"`
 	configReload *ConfigReload
 	mu           sync.Mutex
 }
