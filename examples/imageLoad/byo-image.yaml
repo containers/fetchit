@@ -1,0 +1,10 @@
+{
+    "Image":"quay.io/notreal/httpd:latest",
+    "Name": "local",
+    "Ports": [{
+        "host_ip":        "",
+        "container_port": 8080,
+        "host_port":      9090,
+        "range":         0,
+        "protocol":      ""}]
+}
