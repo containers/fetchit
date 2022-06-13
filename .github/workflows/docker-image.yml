@@ -1010,7 +1010,7 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: get environment variable
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(podman exec colors1 env | grep blue| wc -l); done'
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman exec colors1 env | grep blue| wc -l); done'
 
       - name: update variable
         run: |
@@ -1025,7 +1025,7 @@ jobs:
             git push -f
 
       - name: Wait for fetchit to deploy
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(podman exec colors1 env | grep pink| wc -l); done'
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman exec colors1 env | grep pink| wc -l); done'
 
       - name: Logs
         if: always()
