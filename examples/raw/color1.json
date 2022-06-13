@@ -1,13 +1,19 @@
 {
-    "Image":"docker.io/mmumshad/simple-webapp-color:latest",
-    "Name": "colors1",
-    "Env": {"APP_COLOR": "blue", "tree": "trunk"},
-    "Mounts": [],
-    "Volumes": [],
-    "Ports": [{
-        "host_ip":        "",
-        "container_port": 8080,
-        "host_port":      8080,
-        "range":         0,
-        "protocol":      ""}]
+  "Image": "docker.io/mmumshad/simple-webapp-color:latest",
+  "Name": "colors1",
+  "Env": {
+    "APP_COLOR": "pink",
+    "tree": "trunk"
+  },
+  "Mounts": [],
+  "Volumes": [],
+  "Ports": [
+    {
+      "host_ip": "",
+      "container_port": 8080,
+      "host_port": 8080,
+      "range": 0,
+      "protocol": ""
+    }
+  ]
 }
