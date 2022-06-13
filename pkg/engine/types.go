@@ -33,15 +33,15 @@ type FetchitConfig struct {
 }
 
 type TargetConfig struct {
-	Name         string           `mapstructure:"name"`
-	Url          string           `mapstructure:"url"`
-	Branch       string           `mapstructure:"branch"`
-	Clean        *Clean           `mapstructure:"clean"`
-	Ansible      *[]*Ansible      `mapstructure:"ansible"`
-	FileTransfer *[]*FileTransfer `mapstructure:"filetransfer"`
-	Kube         *[]*Kube         `mapstructure:"kube"`
-	Raw          *[]*Raw          `mapstructure:"raw"`
-	Systemd      *[]*Systemd      `mapstructure:"systemd"`
+	Name         string          `mapstructure:"name"`
+	Url          string          `mapstructure:"url"`
+	Branch       string          `mapstructure:"branch"`
+	Clean        *Clean          `mapstructure:"clean"`
+	Ansible      []*Ansible      `mapstructure:"ansible"`
+	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
+	Kube         []*Kube         `mapstructure:"kube"`
+	Raw          []*Raw          `mapstructure:"raw"`
+	Systemd      []*Systemd      `mapstructure:"systemd"`
 	configReload *ConfigReload
 	mu           sync.Mutex
 }
