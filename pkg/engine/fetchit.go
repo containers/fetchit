@@ -270,9 +270,9 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		// image tc
-		if tc.Image != nil {
+		if len(tc.Image) > 0 {
 			fetchit.allMethodTypes[imageMethod] = struct{}{}
-			for _, i := range *tc.Image {
+			for _, i := range tc.Image {
 				i.initialRun = true
 				i.target = gitTarget
 				fetchit.methodTargetScheds[i] = i.SchedInfo()

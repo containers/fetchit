@@ -41,7 +41,7 @@ type TargetConfig struct {
 	Kube         []*Kube         `mapstructure:"kube"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
- 	Image        []*Image        `mapstructure:"image"`
+	Image        []*Image        `mapstructure:"image"`
 
 	configReload *ConfigReload
 	mu           sync.Mutex
