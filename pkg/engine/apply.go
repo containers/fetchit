@@ -20,12 +20,12 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, curren
 	}
 	directory := filepath.Base(target.url)
 
-	currentTree, err := getTreeFromHash(directory, currentState)
+	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting tree from hash %s", currentState)
 	}
 
-	desiredTree, err := getTreeFromHash(directory, desiredState)
+	desiredTree, err := getSubTreeFromHash(directory, desiredState, targetPath)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting tree from hash %s", desiredState)
 	}
@@ -114,7 +114,7 @@ func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash
 	return nil
 }
 
-func getTreeFromHash(directory string, hash plumbing.Hash) (*object.Tree, error) {
+func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string) (*object.Tree, error) {
 	if hash.IsZero() {
 		return &object.Tree{}, nil
 	}
@@ -134,7 +134,12 @@ func getTreeFromHash(directory string, hash plumbing.Hash) (*object.Tree, error)
 		return nil, utils.WrapErr(err, "Error getting tree from commit at hash %s from repo %s", hash, directory)
 	}
 
-	return tree, nil
+	subTree, err := tree.Tree(targetPath)
+	if err != nil {
+		return nil, utils.WrapErr(err, "Error getting sub tree at %s from commit at %s from repo %s", targetPath, hash, directory)
+	}
+
+	return subTree, nil
 }
 
 func getFilteredChangeMap(
@@ -152,11 +157,11 @@ func getFilteredChangeMap(
 
 	changeMap := make(map[*object.Change]string)
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
+		if change.To.Name != "" {
 			checkTag(tags, change.To.Name)
-			path := filepath.Join(directory, change.To.Name)
+			path := filepath.Join(directory, targetPath, change.To.Name)
 			changeMap[change] = path
-		} else if strings.Contains(change.From.Name, targetPath) {
+		} else if change.From.Name != "" {
 			checkTag(tags, change.From.Name)
 			changeMap[change] = deleteFile
 		}
