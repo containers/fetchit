@@ -11,12 +11,8 @@ import (
 
 type Method interface {
 	GetName() string
-	GetTargetPath() string
 	GetKind() string
 	GetTarget() *Target
-	SetTarget(*Target)
-	SetInitialRun(bool)
-	SchedInfo() SchedInfo
 	Process(ctx context.Context, conn context.Context, PAT string, skew int)
 	Apply(ctx context.Context, conn context.Context, currentState plumbing.Hash, desiredState plumbing.Hash, tags *[]string) error
 	MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error

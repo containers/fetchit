@@ -35,10 +35,6 @@ func (c *Clean) GetTarget() *Target {
 	}
 }
 
-func (c *Clean) SetTarget(t *Target) {
-	return
-}
-
 func (c *Clean) Process(ctx, conn context.Context, PAT string, skew int) {
 	target := c.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
