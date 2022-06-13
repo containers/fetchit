@@ -1024,15 +1024,16 @@ jobs:
             git commit -m "color changes" -a
             git push -f
 
-      - name: Wait for fetchit to deploy
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman exec colors1 env | grep pink| wc -l); done'
-
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
 
       - name: get environment variable
-        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) = "APP_COLOR=pink" ]] ; then exit 1; else echo "Environment variable set"; fi
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman exec colors1 env | grep pink| wc -l); done'
+        
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
