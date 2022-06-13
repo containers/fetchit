@@ -1010,7 +1010,9 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: get environment variable
-        run: if [[ $(sudo podman exec colors1 env | grep APP_COLOR) = "APP_COLOR=blue" ]] ; then exit 1; else echo "Environment variable set"; fi
+        run: |
+          env_color=pink
+          timeout 150 bash -c "until [ $env_color = "blue" ]; do env_color=$(sudo podman exec colors1 env | grep APP_COLOR); done"
 
       - name: update variable
         run: |
