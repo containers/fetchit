@@ -44,14 +44,6 @@ func (m *CommonMethod) GetTarget() *Target {
 	return m.target
 }
 
-func (m *CommonMethod) SetTarget(t *Target) {
-	m.target = t
-}
-
-func (m *CommonMethod) SetInitialRun(b bool) {
-	m.initialRun = b
-}
-
 func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
 	current, err := getCurrent(target, systemdMethod, m.GetName())
 	if err != nil {
