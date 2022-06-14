@@ -1,12 +1,9 @@
 package engine
 
 import (
-	"archive/zip"
 	"context"
 	"fmt"
-	"io"
 	"math/rand"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -353,66 +350,7 @@ func getClone(target *Target, PAT string) error {
 			return err
 		}
 	} else if !exists && target.disconnected {
-		klog.Infof("loading disconnected archive from %s", target.url)
-		// Place the data into the placeholder file
-		data, err := http.Get(target.url)
-		if err != nil {
-			klog.Error("Failed getting data from ", target.url)
-			return err
-		}
-		defer data.Body.Close()
-
-		// Fail early if http error code is not 200
-		if data.StatusCode != http.StatusOK {
-			klog.Error("Failed getting data from ", target.url)
-			return err
-		}
-
-		// Unzip the data from the http response
-		// Create the destination file
-		os.MkdirAll(directory, 0755)
-
-		outFile, err := os.Create(absPath + "/" + target.Name + ".zip")
-
-		// Write the body to file
-		io.Copy(outFile, data.Body)
-
-		// Unzip the file
-		r, err := zip.OpenReader(outFile.Name())
-		if err != nil {
-			klog.Infof("error opening zip file: %s", err)
-		}
-		for _, f := range r.File {
-			rc, err := f.Open()
-			if err != nil {
-				return err
-			}
-			defer rc.Close()
-
-			fpath := filepath.Join(directory, f.Name)
-			if f.FileInfo().IsDir() {
-				os.MkdirAll(fpath, f.Mode())
-			} else {
-				var fdir string
-				if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-					fdir = fpath[:lastIndex]
-				}
-
-				os.MkdirAll(fdir, f.Mode())
-				f, err := os.OpenFile(
-					fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-
-				_, err = io.Copy(f, rc)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		err = os.Remove(outFile.Name())
+		extractZip(target.url, target.Name)
 	}
 	return nil
 }

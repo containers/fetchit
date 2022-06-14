@@ -69,72 +69,85 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 	return nil
 }
 
-func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
-	if target.disconnected {
-		trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-		directory := filepath.Base(trimDir)
-		absPath, err := filepath.Abs(directory)
+func extractZip(url, name string) error {
+	trimDir := strings.TrimSuffix(url, path.Ext(url))
+	directory := filepath.Base(trimDir)
+	absPath, err := filepath.Abs(directory)
 
-		klog.Infof("loading disconnected archive from %s", target.url)
-		// Place the data into the placeholder file
-		data, err := http.Get(target.url)
+	klog.Infof("loading disconnected archive from %s", url)
+	// Place the data into the placeholder file
+	data, err := http.Get(url)
+	if err != nil {
+		klog.Error("Failed getting data from ", url)
+		return err
+	}
+	defer data.Body.Close()
+
+	// Fail early if http error code is not 200
+	if data.StatusCode != http.StatusOK {
+		klog.Error("Failed getting data from ", url)
+		return err
+	}
+
+	// Unzip the data from the http response
+	// Create the destination file
+	os.MkdirAll(directory, 0755)
+
+	outFile, err := os.Create(absPath + "/" + name + ".zip")
+	if err != nil {
+		klog.Error("Failed creating file ", absPath+"/"+name+".zip")
+		return err
+	}
+
+	// Write the body to file
+	io.Copy(outFile, data.Body)
+
+	// Unzip the file
+	r, err := zip.OpenReader(outFile.Name())
+	if err != nil {
+		klog.Infof("error opening zip file: %s", err)
+	}
+	for _, f := range r.File {
+		rc, err := f.Open()
 		if err != nil {
-			klog.Error("Failed getting data from ", target.url)
 			return err
 		}
-		defer data.Body.Close()
+		defer rc.Close()
 
-		// Fail early if http error code is not 200
-		if data.StatusCode != http.StatusOK {
-			klog.Error("Failed getting data from ", target.url)
-			return err
-		}
+		fpath := filepath.Join(directory, f.Name)
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, f.Mode())
+		} else {
+			var fdir string
+			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+				fdir = fpath[:lastIndex]
+			}
 
-		// Unzip the data from the http response
-		// Create the destination file
-		os.MkdirAll(directory, 0755)
-
-		outFile, err := os.Create(absPath + "/" + target.Name + ".zip")
-
-		// Write the body to file
-		io.Copy(outFile, data.Body)
-
-		// Unzip the file
-		r, err := zip.OpenReader(outFile.Name())
-		if err != nil {
-			klog.Infof("error opening zip file: %s", err)
-		}
-		for _, f := range r.File {
-			rc, err := f.Open()
+			os.MkdirAll(fdir, f.Mode())
+			f, err := os.OpenFile(
+				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer f.Close()
 
-			fpath := filepath.Join(directory, f.Name)
-			if f.FileInfo().IsDir() {
-				os.MkdirAll(fpath, f.Mode())
-			} else {
-				var fdir string
-				if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-					fdir = fpath[:lastIndex]
-				}
-
-				os.MkdirAll(fdir, f.Mode())
-				f, err := os.OpenFile(
-					fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-				if err != nil {
-					return err
-				}
-				defer f.Close()
-
-				_, err = io.Copy(f, rc)
-				if err != nil {
-					return err
-				}
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
 			}
 		}
-		err = os.Remove(outFile.Name())
+	}
+	err = os.Remove(outFile.Name())
+	if err != nil {
+		klog.Error("Failed removing file ", outFile.Name())
+		return err
+	}
+	return nil
+}
+
+func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
+	if target.disconnected {
+		extractZip(target.url, target.Name)
 	}
 	latest, err := getLatest(target)
 	if err != nil {
