@@ -24,13 +24,6 @@ func (i *Image) GetKind() string {
 	return imageMethod
 }
 
-func (i *Image) SchedInfo() SchedInfo {
-	return SchedInfo{
-		schedule: i.Schedule,
-		skew:     i.Skew,
-	}
-}
-
 func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
 	target := i.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
@@ -45,17 +38,10 @@ func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
 }
 
 func (i *Image) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
-	return i.loadPodman(ctx, conn, i.Url)
+	return nil
 }
 
 func (i *Image) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, i.GetTarget(), i.GetTargetPath(), currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChangesConcurrent(ctx, conn, i, changeMap); err != nil {
-		return err
-	}
 	return nil
 }
 
