@@ -32,7 +32,7 @@ func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
 
 	err := i.loadPodman(ctx, conn, i.Url)
 	if err != nil {
-		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, imageMethod, err)
+		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, imageMethod, err)
 	}
 
 }

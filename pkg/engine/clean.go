@@ -11,57 +11,50 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const cleanMethod = "clean"
+const pruneMethod = "prune"
 
-// Clean configures targets to run a system prune periodically
-type Clean struct {
+// Prune configures targets to run a podman system prune periodically
+type Prune struct {
 	CommonMethod `mapstructure:",squash"`
 	Volumes      bool `mapstructure:"volumes"`
 	All          bool `mapstructure:"all"`
 }
 
-func (c *Clean) GetKind() string {
-	return cleanMethod
+func (p *Prune) GetKind() string {
+	return pruneMethod
 }
 
-func (c *Clean) GetName() string {
-	return cleanMethod
+func (p *Prune) GetName() string {
+	return pruneMethod
 }
 
-func (c *Clean) GetTarget() *Target {
-	return &Target{
-		Name: cleanMethod,
-		url:  "",
-	}
-}
-
-func (c *Clean) Process(ctx, conn context.Context, PAT string, skew int) {
-	target := c.GetTarget()
+func (p *Prune) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := p.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
-	// Nothing to do with certain file we're just collecting garbage so can call the cleanPodman method straight from here
+	// Nothing to do with certain file we're just collecting garbage so can call the prunePodman method straight from here
 	opts := system.PruneOptions{
-		All:     &c.All,
-		Volumes: &c.Volumes,
+		All:     &p.All,
+		Volumes: &p.Volumes,
 	}
 
-	err := c.cleanPodman(ctx, conn, opts)
+	err := p.prunePodman(ctx, conn, opts)
 	if err != nil {
-		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.Name, cleanMethod, err)
+		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, pruneMethod, err)
 	}
 
 }
 
-func (c *Clean) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
+func (p *Prune) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
 	return nil
 }
 
-func (c *Clean) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
+func (p *Prune) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
 	return nil
 }
 
-func (c *Clean) cleanPodman(ctx, conn context.Context, opts system.PruneOptions) error {
+func (p *Prune) prunePodman(ctx, conn context.Context, opts system.PruneOptions) error {
 	klog.Info("Pruning system")
 	report, err := system.Prune(conn, &opts)
 	if err != nil {

@@ -63,7 +63,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	wt, err := repo.Worktree()
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.Name)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.name)
 	}
 
 	err = wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()})

@@ -1,8 +1,6 @@
+podmanAutoUpdate:
+  root: true
 targetConfigs:
-- name: autoupdate
-  systemd:
-  - name: autoupdate-ex
-    autoUpdateAll: true
 - name: fetchit
   url: http://github.com/containers/fetchit
   systemd:

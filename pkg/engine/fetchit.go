@@ -140,6 +140,30 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 			config.TargetConfigs = append(config.TargetConfigs, reload)
 		}
 	}
+	if config.Prune != nil {
+		prune := &TargetConfig{
+			Name:  pruneMethod,
+			prune: config.Prune,
+		}
+		config.TargetConfigs = append(config.TargetConfigs, prune)
+	}
+	if config.Images != nil {
+		for _, i := range config.Images {
+			imageLoad := &TargetConfig{
+				Name:  i.Name,
+				image: i,
+			}
+			config.TargetConfigs = append(config.TargetConfigs, imageLoad)
+		}
+	}
+	if config.PodmanAutoUpdate != nil {
+		sysds := config.PodmanAutoUpdate.AutoUpdateSystemd()
+		autoUp := &TargetConfig{
+			Name:    podmanAutoUpdate,
+			Systemd: sysds,
+		}
+		config.TargetConfigs = append(config.TargetConfigs, autoUp)
+	}
 
 	fc.TargetConfigs = config.TargetConfigs
 	if fc.scheduler == nil {
@@ -200,7 +224,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 		}
 	}
 
-	if config == nil || (config.TargetConfigs == nil && config.ConfigReload == nil) {
+	if config == nil {
 		cobra.CheckErr("no fetchit targets found, exiting")
 	}
 
@@ -211,21 +235,32 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 	for _, tc := range targetConfigs {
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
-		gitTarget := &Target{
-			Name:   tc.Name,
+
+		internalTarget := &Target{
+			name:   tc.Name,
 			url:    tc.Url,
 			branch: tc.Branch,
 		}
 
 		if tc.configReload != nil {
+			tc.configReload.target = internalTarget
 			tc.configReload.initialRun = true
 			fetchit.methodTargetScheds[tc.configReload] = tc.configReload.SchedInfo()
 			fetchit.allMethodTypes[configFileMethod] = struct{}{}
 		}
 
-		if tc.Clean != nil {
-			fetchit.methodTargetScheds[tc.Clean] = tc.Clean.SchedInfo()
-			fetchit.allMethodTypes[cleanMethod] = struct{}{}
+		if tc.prune != nil {
+			tc.prune.target = internalTarget
+			fetchit.methodTargetScheds[tc.prune] = tc.prune.SchedInfo()
+			fetchit.allMethodTypes[pruneMethod] = struct{}{}
+
+		}
+
+		if tc.image != nil {
+			tc.image.target = internalTarget
+			tc.image.initialRun = true
+			fetchit.methodTargetScheds[tc.image] = tc.image.SchedInfo()
+			fetchit.allMethodTypes[imageMethod] = struct{}{}
 
 		}
 
@@ -233,7 +268,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			fetchit.allMethodTypes[ansibleMethod] = struct{}{}
 			for _, a := range tc.Ansible {
 				a.initialRun = true
-				a.target = gitTarget
+				a.target = internalTarget
 				fetchit.methodTargetScheds[a] = a.SchedInfo()
 			}
 		}
@@ -241,7 +276,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			fetchit.allMethodTypes[filetransferMethod] = struct{}{}
 			for _, ft := range tc.FileTransfer {
 				ft.initialRun = true
-				ft.target = gitTarget
+				ft.target = internalTarget
 				fetchit.methodTargetScheds[ft] = ft.SchedInfo()
 			}
 		}
@@ -249,7 +284,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			fetchit.allMethodTypes[kubeMethod] = struct{}{}
 			for _, k := range tc.Kube {
 				k.initialRun = true
-				k.target = gitTarget
+				k.target = internalTarget
 				fetchit.methodTargetScheds[k] = k.SchedInfo()
 			}
 		}
@@ -257,7 +292,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			fetchit.allMethodTypes[rawMethod] = struct{}{}
 			for _, r := range tc.Raw {
 				r.initialRun = true
-				r.target = gitTarget
+				r.target = internalTarget
 				fetchit.methodTargetScheds[r] = r.SchedInfo()
 			}
 		}
@@ -265,17 +300,8 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			fetchit.allMethodTypes[rawMethod] = struct{}{}
 			for _, sd := range tc.Systemd {
 				sd.initialRun = true
-				sd.target = gitTarget
+				sd.target = internalTarget
 				fetchit.methodTargetScheds[sd] = sd.SchedInfo()
-			}
-		}
-		// image tc
-		if len(tc.Image) > 0 {
-			fetchit.allMethodTypes[imageMethod] = struct{}{}
-			for _, i := range tc.Image {
-				i.initialRun = true
-				i.target = gitTarget
-				fetchit.methodTargetScheds[i] = i.SchedInfo()
 			}
 		}
 	}
@@ -285,10 +311,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
-		// ConfigReload, Systemd.AutoUpdateAll, Image, Clean methods do not include git URL
+		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
 			if err := getClone(method.GetTarget(), f.pat); err != nil {
-				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().Name, err)
+				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().name, err)
 			}
 		}
 	}
@@ -302,7 +328,7 @@ func (f *Fetchit) RunTargets() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mt := method.GetKind()
-		klog.Infof("Processing Target: %s Method: %s Name: %s", method.GetTarget().Name, mt, method.GetName())
+		klog.Infof("Processing Target: %s Method: %s Name: %s", method.GetTarget().name, mt, method.GetName())
 		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, f.pat, skew)
 		s.StartImmediately()
 	}
