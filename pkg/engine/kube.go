@@ -76,7 +76,7 @@ func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *o
 }
 
 func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, k.GetTarget(), k.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, k.GetTarget(), k.GetTargetPath(), k.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

@@ -180,7 +180,7 @@ func (r *Raw) MethodEngine(ctx context.Context, conn context.Context, change *ob
 }
 
 func (r *Raw) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, r.GetTarget(), r.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, r.GetTarget(), r.GetTargetPath(), r.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

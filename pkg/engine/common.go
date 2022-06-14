@@ -20,6 +20,8 @@ type CommonMethod struct {
 	Skew *int `mapstructure:"skew"`
 	// Where in the git repository to fetch a file or directory (to fetch all files in directory)
 	TargetPath string `mapstructure:"targetPath"`
+	// A glob to pattern match files in the target path directory
+	Glob *string `mapstructure:"glob"`
 	// initialRun is set by fetchit
 	initialRun bool
 	target     *Target

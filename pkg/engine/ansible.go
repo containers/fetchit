@@ -61,7 +61,7 @@ func (ans *Ansible) MethodEngine(ctx context.Context, conn context.Context, chan
 }
 
 func (ans *Ansible) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ans.GetTarget(), ans.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, ans.GetTarget(), ans.GetTargetPath(), ans.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

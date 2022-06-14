@@ -12,9 +12,10 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/gobwas/glob"
 )
 
-func applyChanges(ctx context.Context, target *Target, targetPath string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
+func applyChanges(ctx context.Context, target *Target, targetPath string, globPattern *string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
@@ -30,7 +31,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, curren
 		return nil, utils.WrapErr(err, "Error getting tree from hash %s", desiredState)
 	}
 
-	changeMap, err := getFilteredChangeMap(directory, targetPath, currentTree, desiredTree, tags)
+	changeMap, err := getFilteredChangeMap(directory, targetPath, globPattern, currentTree, desiredTree, tags)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting filtered change map from %s to %s", currentState, desiredState)
 	}
@@ -143,8 +144,9 @@ func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string)
 }
 
 func getFilteredChangeMap(
-	directory string,
+	directory,
 	targetPath string,
+	globPattern *string,
 	currentTree,
 	desiredTree *object.Tree,
 	tags *[]string,
@@ -155,14 +157,25 @@ func getFilteredChangeMap(
 		return nil, utils.WrapErr(err, "Error getting diff between current and latest", targetPath)
 	}
 
+	var g glob.Glob
+	if globPattern == nil {
+		g, err = glob.Compile("**")
+		if err != nil {
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+		}
+	} else {
+		g, err = glob.Compile(*globPattern)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+		}
+	}
+
 	changeMap := make(map[*object.Change]string)
 	for _, change := range changes {
-		if change.To.Name != "" {
-			checkTag(tags, change.To.Name)
+		if change.To.Name != "" && checkTag(tags, change.To.Name) && g.Match(change.To.Name) {
 			path := filepath.Join(directory, targetPath, change.To.Name)
 			changeMap[change] = path
-		} else if change.From.Name != "" {
-			checkTag(tags, change.From.Name)
+		} else if change.From.Name != "" && checkTag(tags, change.From.Name) && g.Match(change.From.Name) {
 			changeMap[change] = deleteFile
 		}
 	}
