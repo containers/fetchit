@@ -56,7 +56,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 
-		klog.Infof("Moved %s to %s for target %s", m.GetName(), current, target.Name)
+		klog.Infof("Moved %s to %s for target %s", m.GetName(), current, target.name)
 	}
 
 	return nil
@@ -80,9 +80,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		}
 
 		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
-		klog.Infof("Moved %s from %s to %s for target %s", m.GetName(), current, latest, target.Name)
+		klog.Infof("Moved %s from %s to %s for target %s", m.GetName(), current, latest, target.name)
 	} else {
-		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.Name, m.GetKind(), current)
+		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.name, m.GetKind(), current)
 	}
 
 	return nil

@@ -31,14 +31,6 @@ const (
 // Systemd to place and/or enable systemd unit files on host
 type Systemd struct {
 	CommonMethod `mapstructure:",squash"`
-	// AutoUpdateAll will start podman-auto-update.service, podman-auto-update.timer
-	// on the host. With this field true, all other fields are ignored. To place unit files
-	// on host and/or enable individual services, create a separate Target.Methods.Systemd
-	// 'podman auto-update' updates all services running podman with the autoupdate label
-	// see https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html#systemd-unit-and-timer
-	// TODO: update /etc/systemd/system/podman-auto-update.timer.d/override.conf with schedule
-	// By default, podman will auto-update at midnight daily when this service is running
-	AutoUpdateAll bool `mapstructure:"autoUpdateAll"`
 	// If true, will place unit file in /etc/systemd/system/
 	// If false (default) will place unit file in ~/.config/systemd/user/
 	Root bool `mapstructure:"root"`
@@ -48,22 +40,51 @@ type Systemd struct {
 	Restart bool `mapstructure:"restart"`
 	// If true, will enable and start systemd services from fetched unit files
 	// If false (default), will place unit file(s) in appropriate systemd path
-	Enable bool `mapstructure:"enable"`
+	Enable        bool `mapstructure:"enable"`
+	autoUpdateAll bool
+}
+
+type PodmanAutoUpdate struct {
+	// AutoUpdateAll will start podman-auto-update.service, podman-auto-update.timer on the host
+	// 'podman auto-update' updates all services running podman with the autoupdate label
+	// see https://docs.podman.io/en/latest/markdown/podman-auto-update.1.html#systemd-unit-and-timer
+	// TODO: update /etc/systemd/system/podman-auto-update.timer.d/override.conf with schedule
+	// By default, podman will auto-update at midnight daily when this service is running
+	Root bool `mapstructure:"root"`
+	User bool `mapstructure:"user"`
+}
+
+func (p *PodmanAutoUpdate) AutoUpdateSystemd() []*Systemd {
+	var sysds []*Systemd
+	if p.Root {
+		sd := &Systemd{
+			Root:          true,
+			autoUpdateAll: true,
+			// Schedule with Autoupdate is no-op
+			CommonMethod: CommonMethod{
+				Name:     podmanAutoUpdate + "-root",
+				Schedule: "*/1 * * * *",
+			},
+		}
+		sysds = append(sysds, sd)
+	}
+	if p.User {
+		sd := &Systemd{
+			Root:          false,
+			autoUpdateAll: true,
+			// Schedule with Autoupdate is no-op
+			CommonMethod: CommonMethod{
+				Name:     podmanAutoUpdate + "-user",
+				Schedule: "*/1 * * * *",
+			},
+		}
+		sysds = append(sysds, sd)
+	}
+	return sysds
 }
 
 func (sd *Systemd) GetKind() string {
 	return systemdMethod
-}
-
-func (sd *Systemd) SchedInfo() SchedInfo {
-	// with autoupdate, a schedule is not required
-	if sd.AutoUpdateAll {
-		sd.Schedule = "*/1 * * * *"
-	}
-	return SchedInfo{
-		schedule: sd.Schedule,
-		skew:     sd.Skew,
-	}
 }
 
 func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
@@ -72,21 +93,15 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
-	if sd.AutoUpdateAll && !sd.initialRun {
+	if sd.autoUpdateAll && !sd.initialRun {
 		return
-	}
-	if sd.AutoUpdateAll {
-		sd.Enable = true
-		sd.Root = true
-		sd.Restart = false
-		sd.Name = podmanAutoUpdate
 	}
 	tag := []string{".service"}
 	if sd.Restart {
 		sd.Enable = true
 	}
 	if sd.initialRun {
-		if sd.AutoUpdateAll {
+		if sd.autoUpdateAll {
 			if err := sd.MethodEngine(ctx, conn, nil, ""); err != nil {
 				klog.Infof("Failed to start podman-auto-update.service: %v", err)
 			}
@@ -95,7 +110,7 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 		}
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
 		}
 
@@ -151,7 +166,7 @@ func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState p
 
 func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path, dest string, prev *string) error {
 	klog.Infof("Deploying systemd file(s) %s", path)
-	if sd.AutoUpdateAll {
+	if sd.autoUpdateAll {
 		if !sd.initialRun {
 			return nil
 		}
@@ -214,6 +229,7 @@ func (sd *Systemd) enableRestartSystemdService(conn context.Context, action, des
 			xdg = "/run/user/1000"
 		}
 		runMountsd = xdg + "/systemd"
+		runMounttmp = xdg
 	}
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{

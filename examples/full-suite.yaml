@@ -1,3 +1,7 @@
+prune:
+  All: true
+  Volumes: false
+  schedule: "*/1 * * * *"
 targetConfigs:
 - name: fetchit
   url: http://github.com/containers/fetchit
@@ -21,9 +25,5 @@ targetConfigs:
   - name: ft-ex
     targetPath: examples/filetransfer/
     destinationDirectory: /tmp/ft
-    schedule: "*/1 * * * *"
-  clean:
-    All: true
-    Volumes: false
     schedule: "*/1 * * * *"
   branch: main

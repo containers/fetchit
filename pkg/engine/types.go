@@ -20,35 +20,37 @@ type Method interface {
 
 // FetchitConfig requires necessary objects to process targets
 type FetchitConfig struct {
-	TargetConfigs []*TargetConfig `mapstructure:"targetConfigs"`
-	ConfigReload  *ConfigReload   `mapstructure:"configReload"`
-	PAT           string          `mapstructure:"pat"`
-	conn          context.Context
-	scheduler     *gocron.Scheduler
+	TargetConfigs    []*TargetConfig   `mapstructure:"targetConfigs"`
+	ConfigReload     *ConfigReload     `mapstructure:"configReload"`
+	Prune            *Prune            `mapstructure:"prune"`
+	PodmanAutoUpdate *PodmanAutoUpdate `mapstructure:"podmanAutoUpdate"`
+	Images           []*Image          `mapstructure:"images"`
+	PAT              string            `mapstructure:"pat"`
+	conn             context.Context
+	scheduler        *gocron.Scheduler
 }
 
 type TargetConfig struct {
 	Name         string          `mapstructure:"name"`
 	Url          string          `mapstructure:"url"`
 	Branch       string          `mapstructure:"branch"`
-	Clean        *Clean          `mapstructure:"clean"`
 	Ansible      []*Ansible      `mapstructure:"ansible"`
 	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
 	Kube         []*Kube         `mapstructure:"kube"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
-	Image        []*Image        `mapstructure:"image"`
 
+	image        *Image
+	prune        *Prune
 	configReload *ConfigReload
 	mu           sync.Mutex
 }
 
 type Target struct {
-	Name         string
-	url          string
-	branch       string
-	configReload *ConfigReload
-	mu           sync.Mutex
+	name   string
+	url    string
+	branch string
+	mu     sync.Mutex
 }
 
 type SchedInfo struct {

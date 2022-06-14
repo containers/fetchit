@@ -36,7 +36,7 @@ func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
 	if ans.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
 		}
 
