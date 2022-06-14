@@ -1140,6 +1140,9 @@ jobs:
           sudo mkdir -p /tmp/disco
           cd fetchit && sudo zip -r /tmp/disco/fetchit.zip ../fetchit
 
+      - name: pull the web container
+        run: podman pull registry.access.redhat.com/ubi8/httpd-24
+
       - name: start httpd and serve the fetchit.zip image
         run: sudo podman run -d --name httpd -p 9000:8080 -v /tmp/disco:/var/www/html registry.access.redhat.com/ubi8/httpd-24
 
@@ -1161,9 +1164,6 @@ jobs:
 
       - name: list files
         run: ls /tmp/ft
-
-      - name: ensure only required containers are running (cap colors and fetchit)
-        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
 
       - name: verify raw container is running
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | grep -v cap | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
