@@ -64,7 +64,7 @@ func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.C
 }
 
 func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ft.GetTarget(), ft.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, ft.GetTarget(), ft.GetTargetPath(), ft.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

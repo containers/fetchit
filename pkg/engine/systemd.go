@@ -139,7 +139,7 @@ func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, chang
 }
 
 func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, sd.GetTarget(), sd.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, sd.GetTarget(), sd.GetTargetPath(), sd.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

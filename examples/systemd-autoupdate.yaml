@@ -7,7 +7,7 @@ targetConfigs:
   url: http://github.com/containers/fetchit
   systemd:
   - name: sysd-ex
-    targetPath: examples/systemd/httpd.service
+    targetPath: examples/systemd
     root: true
     enable: true
     schedule: "*/5 * * * *"

@@ -3,7 +3,7 @@ targetConfigs:
   url: http://github.com/containers/fetchit
   ansible:
     - name: ansible
-      targetPath: examples/ansible/
+      targetPath: examples/ansible
       sshDirectory: /root/.ssh
       schedule: "*/1 * * * *"
   branch: main

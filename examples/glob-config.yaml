@@ -1,9 +1,10 @@
 targetConfigs:
 - name: fetchit
-  url: https://github.com/containers/fetchit
+  url: https://github.com/josephsawaya/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw
+    glob: "*.json"
     schedule: "*/1 * * * *"
     pullImage: false
-  branch: main
+  branch: fix-target-path
