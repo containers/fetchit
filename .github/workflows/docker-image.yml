@@ -173,7 +173,7 @@ jobs:
         run: sudo mkdir /root/.fetchit
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/sallyom/fetchit/refactor-interface/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /root/.fetchit:/opt/mount -e FETCHIT_CONFIG_URL=https://raw.githubusercontent.com/josephsawaya/fetchit/fix-target-path/examples/raw-config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
