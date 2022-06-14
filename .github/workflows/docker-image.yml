@@ -801,6 +801,55 @@ jobs:
 
       - name: verify image is deleted
         run: if [[ $(sudo podman image ls | grep alpine) ]] ; then exit 1; else echo "Image correctly removed" 1; fi
+  
+  glob-validate:
+    runs-on: ubuntu-latest
+    needs: [ build , pull-and-archive ]
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+        
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/glob-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        
+      - name: identify colors container
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+        
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
+      - name: verify container is running
+        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Print the current running container
+        run: sudo podman ps
+
+      - name: Check the capabilities of cap1
+        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   multi-engine-validate:
     runs-on: ubuntu-latest
