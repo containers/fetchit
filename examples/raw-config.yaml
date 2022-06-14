@@ -3,7 +3,7 @@ targetConfigs:
   url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
-    targetPath: examples/raw/
+    targetPath: examples/raw
     schedule: "*/1 * * * *"
     pullImage: false
   branch: main
