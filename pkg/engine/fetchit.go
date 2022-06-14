@@ -269,6 +269,15 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 				fetchit.methodTargetScheds[sd] = sd.SchedInfo()
 			}
 		}
+		// image tc
+		if len(tc.Image) > 0 {
+			fetchit.allMethodTypes[imageMethod] = struct{}{}
+			for _, i := range tc.Image {
+				i.initialRun = true
+				i.target = gitTarget
+				fetchit.methodTargetScheds[i] = i.SchedInfo()
+			}
+		}
 	}
 	return fetchit
 }
@@ -276,7 +285,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 // This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
-		// ConfigReload, Systemd.AutoUpdateAll, Clean methods do not include git URL
+		// ConfigReload, Systemd.AutoUpdateAll, Image, Clean methods do not include git URL
 		if method.GetTarget().url != "" {
 			if err := getClone(method.GetTarget(), f.pat); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().Name, err)

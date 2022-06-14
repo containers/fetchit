@@ -23,7 +23,6 @@ type FetchitConfig struct {
 	TargetConfigs []*TargetConfig `mapstructure:"targetConfigs"`
 	ConfigReload  *ConfigReload   `mapstructure:"configReload"`
 	PAT           string          `mapstructure:"pat"`
-	volume        string          `mapstructure:"volume"`
 	conn          context.Context
 	scheduler     *gocron.Scheduler
 }
@@ -38,6 +37,8 @@ type TargetConfig struct {
 	Kube         []*Kube         `mapstructure:"kube"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
+	Image        []*Image        `mapstructure:"image"`
+
 	configReload *ConfigReload
 	mu           sync.Mutex
 }
