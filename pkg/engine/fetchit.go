@@ -1,18 +1,23 @@
 package engine
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -212,9 +217,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		gitTarget := &Target{
-			Name:   tc.Name,
-			url:    tc.Url,
-			branch: tc.Branch,
+			Name:         tc.Name,
+			url:          tc.Url,
+			branch:       tc.Branch,
+			disconnected: tc.Disconnected,
 		}
 
 		if tc.configReload != nil {
@@ -311,7 +317,8 @@ func (f *Fetchit) RunTargets() {
 }
 
 func getClone(target *Target, PAT string) error {
-	directory := filepath.Base(target.url)
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	directory := filepath.Base(trimDir)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
 		return err
@@ -327,14 +334,14 @@ func getClone(target *Target, PAT string) error {
 		return err
 	}
 
-	if !exists {
+	if !exists && !target.disconnected {
 		klog.Infof("git clone %s %s --recursive", target.url, target.branch)
 		var user string
 		if PAT != "" {
 			user = "fetchit"
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
-			Auth: &http.BasicAuth{
+			Auth: &githttp.BasicAuth{
 				Username: user, // the value of this field should not matter when using a PAT
 				Password: PAT,
 			},
@@ -345,6 +352,67 @@ func getClone(target *Target, PAT string) error {
 		if err != nil {
 			return err
 		}
+	} else if !exists && target.disconnected {
+		klog.Infof("loading disconnected archive from %s", target.url)
+		// Place the data into the placeholder file
+		data, err := http.Get(target.url)
+		if err != nil {
+			klog.Error("Failed getting data from ", target.url)
+			return err
+		}
+		defer data.Body.Close()
+
+		// Fail early if http error code is not 200
+		if data.StatusCode != http.StatusOK {
+			klog.Error("Failed getting data from ", target.url)
+			return err
+		}
+
+		// Unzip the data from the http response
+		// Create the destination file
+		os.MkdirAll(directory, 0755)
+
+		outFile, err := os.Create(absPath + "/" + target.Name + ".zip")
+
+		// Write the body to file
+		io.Copy(outFile, data.Body)
+
+		// Unzip the file
+		r, err := zip.OpenReader(outFile.Name())
+		if err != nil {
+			klog.Infof("error opening zip file: %s", err)
+		}
+		for _, f := range r.File {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			fpath := filepath.Join(directory, f.Name)
+			if f.FileInfo().IsDir() {
+				os.MkdirAll(fpath, f.Mode())
+			} else {
+				var fdir string
+				if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+					fdir = fpath[:lastIndex]
+				}
+
+				os.MkdirAll(fdir, f.Mode())
+				f, err := os.OpenFile(
+					fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+
+				_, err = io.Copy(f, rc)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		err = os.Remove(outFile.Name())
 	}
 	return nil
 }
