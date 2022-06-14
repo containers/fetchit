@@ -45,7 +45,7 @@ func (m *CommonMethod) GetTarget() *Target {
 }
 
 func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
-	current, err := getCurrent(target, systemdMethod, m.GetName())
+	current, err := getCurrent(target, m.GetKind(), m.GetName())
 	if err != nil {
 		return fmt.Errorf("Failed to get current commit: %v", err)
 	}
@@ -68,7 +68,7 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		return fmt.Errorf("Failed to get latest commit: %v", err)
 	}
 
-	current, err := getCurrent(target, systemdMethod, m.GetName())
+	current, err := getCurrent(target, m.GetKind(), m.GetName())
 	if err != nil {
 		return fmt.Errorf("Failed to get current commit: %v", err)
 	}
@@ -79,7 +79,7 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 
-		updateCurrent(ctx, target, latest, systemdMethod, m.GetName())
+		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
 		klog.Infof("Moved %s from %s to %s for target %s", m.GetName(), current, latest, target.Name)
 	} else {
 		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.Name, m.GetKind(), current)
