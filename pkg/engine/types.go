@@ -30,6 +30,7 @@ type FetchitConfig struct {
 type TargetConfig struct {
 	Name         string          `mapstructure:"name"`
 	Url          string          `mapstructure:"url"`
+	Disconnected bool            `mapstructure:"disconnected"`
 	Branch       string          `mapstructure:"branch"`
 	Clean        *Clean          `mapstructure:"clean"`
 	Ansible      []*Ansible      `mapstructure:"ansible"`
@@ -49,6 +50,7 @@ type Target struct {
 	branch       string
 	configReload *ConfigReload
 	mu           sync.Mutex
+	disconnected bool
 }
 
 type SchedInfo struct {

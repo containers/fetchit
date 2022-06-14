@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -212,9 +214,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		gitTarget := &Target{
-			Name:   tc.Name,
-			url:    tc.Url,
-			branch: tc.Branch,
+			Name:         tc.Name,
+			url:          tc.Url,
+			branch:       tc.Branch,
+			disconnected: tc.Disconnected,
 		}
 
 		if tc.configReload != nil {
@@ -311,7 +314,8 @@ func (f *Fetchit) RunTargets() {
 }
 
 func getClone(target *Target, PAT string) error {
-	directory := filepath.Base(target.url)
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	directory := filepath.Base(trimDir)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
 		return err
@@ -327,14 +331,14 @@ func getClone(target *Target, PAT string) error {
 		return err
 	}
 
-	if !exists {
+	if !exists && !target.disconnected {
 		klog.Infof("git clone %s %s --recursive", target.url, target.branch)
 		var user string
 		if PAT != "" {
 			user = "fetchit"
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
-			Auth: &http.BasicAuth{
+			Auth: &githttp.BasicAuth{
 				Username: user, // the value of this field should not matter when using a PAT
 				Password: PAT,
 			},
@@ -345,6 +349,8 @@ func getClone(target *Target, PAT string) error {
 		if err != nil {
 			return err
 		}
+	} else if !exists && target.disconnected {
+		extractZip(target.url, target.Name)
 	}
 	return nil
 }
