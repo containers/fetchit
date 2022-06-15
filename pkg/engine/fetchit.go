@@ -238,9 +238,9 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			name:   tc.Name,
-			url:    tc.Url,
-			branch: tc.Branch,
+			name:         tc.Name,
+			url:          tc.Url,
+			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
 		}
 
@@ -375,7 +375,7 @@ func getClone(target *Target, PAT string) error {
 			return err
 		}
 	} else if !exists && target.disconnected {
-		extractZip(target.url, target.Name)
+		extractZip(target.url, target.name)
 	}
 	return nil
 }

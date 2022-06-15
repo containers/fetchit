@@ -149,7 +149,7 @@ func extractZip(url, name string) error {
 
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
 	if target.disconnected {
-		extractZip(target.url, target.Name)
+		extractZip(target.url, target.name)
 	}
 	latest, err := getLatest(target)
 	if err != nil {
