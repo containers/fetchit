@@ -37,12 +37,6 @@ func (c *ConfigReload) GetName() string {
 	return configFileMethod
 }
 
-func (c *ConfigReload) GetTarget() *Target {
-	return &Target{
-		Name: configFileMethod,
-	}
-}
-
 func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	// configURL in config file will override the environment variable

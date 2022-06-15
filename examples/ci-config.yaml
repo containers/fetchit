@@ -3,6 +3,6 @@ targetConfigs:
   url: http://github.com/containers/fetchit
   raw:
   - name: raw
-    targetPath: examples/raw/
+    targetPath: examples/raw
     schedule: "*/1 * * * *"
   branch: ci

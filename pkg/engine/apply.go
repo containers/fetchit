@@ -13,26 +13,27 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/gobwas/glob"
 )
 
-func applyChanges(ctx context.Context, target *Target, targetPath string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
+func applyChanges(ctx context.Context, target *Target, targetPath string, globPattern *string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
 	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
 	directory := filepath.Base(trimDir)
 
-	currentTree, err := getTreeFromHash(directory, currentState)
+	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting tree from hash %s", currentState)
 	}
 
-	desiredTree, err := getTreeFromHash(directory, desiredState)
+	desiredTree, err := getSubTreeFromHash(directory, desiredState, targetPath)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting tree from hash %s", desiredState)
 	}
 
-	changeMap, err := getFilteredChangeMap(directory, targetPath, currentTree, desiredTree, tags)
+	changeMap, err := getFilteredChangeMap(directory, targetPath, globPattern, currentTree, desiredTree, tags)
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting filtered change map from %s to %s", currentState, desiredState)
 	}
@@ -64,7 +65,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	wt, err := repo.Worktree()
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.Name)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.name)
 	}
 
 	err = wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()})
@@ -118,7 +119,7 @@ func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash
 	return nil
 }
 
-func getTreeFromHash(directory string, hash plumbing.Hash) (*object.Tree, error) {
+func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string) (*object.Tree, error) {
 	if hash.IsZero() {
 		return &object.Tree{}, nil
 	}
@@ -138,12 +139,18 @@ func getTreeFromHash(directory string, hash plumbing.Hash) (*object.Tree, error)
 		return nil, utils.WrapErr(err, "Error getting tree from commit at hash %s from repo %s", hash, directory)
 	}
 
-	return tree, nil
+	subTree, err := tree.Tree(targetPath)
+	if err != nil {
+		return nil, utils.WrapErr(err, "Error getting sub tree at %s from commit at %s from repo %s", targetPath, hash, directory)
+	}
+
+	return subTree, nil
 }
 
 func getFilteredChangeMap(
-	directory string,
+	directory,
 	targetPath string,
+	globPattern *string,
 	currentTree,
 	desiredTree *object.Tree,
 	tags *[]string,
@@ -154,14 +161,25 @@ func getFilteredChangeMap(
 		return nil, utils.WrapErr(err, "Error getting diff between current and latest", targetPath)
 	}
 
+	var g glob.Glob
+	if globPattern == nil {
+		g, err = glob.Compile("**")
+		if err != nil {
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+		}
+	} else {
+		g, err = glob.Compile(*globPattern)
+		if err != nil {
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+		}
+	}
+
 	changeMap := make(map[*object.Change]string)
 	for _, change := range changes {
-		if strings.Contains(change.To.Name, targetPath) {
-			checkTag(tags, change.To.Name)
-			path := filepath.Join(directory, change.To.Name)
+		if change.To.Name != "" && checkTag(tags, change.To.Name) && g.Match(change.To.Name) {
+			path := filepath.Join(directory, targetPath, change.To.Name)
 			changeMap[change] = path
-		} else if strings.Contains(change.From.Name, targetPath) {
-			checkTag(tags, change.From.Name)
+		} else if change.From.Name != "" && checkTag(tags, change.From.Name) && g.Match(change.From.Name) {
 			changeMap[change] = deleteFile
 		}
 	}

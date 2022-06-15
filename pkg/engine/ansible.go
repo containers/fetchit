@@ -36,7 +36,7 @@ func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
 	if ans.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
 		}
 
@@ -61,7 +61,7 @@ func (ans *Ansible) MethodEngine(ctx context.Context, conn context.Context, chan
 }
 
 func (ans *Ansible) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ans.GetTarget(), ans.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, ans.GetTarget(), ans.GetTargetPath(), ans.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

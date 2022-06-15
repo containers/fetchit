@@ -3,7 +3,7 @@ targetConfigs:
   url: https://github.com/containers/fetchit
   systemd:
   - name: httpd-user
-    targetPath: examples/systemd/httpd.service
+    targetPath: examples/systemd
     root: false
     enable: true
     schedule: "*/1 * * * *"

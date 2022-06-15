@@ -47,7 +47,7 @@ func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
 	if initial {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.Name, err)
+			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
 		}
 
@@ -76,7 +76,7 @@ func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *o
 }
 
 func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, k.GetTarget(), k.GetTargetPath(), currentState, desiredState, tags)
+	changeMap, err := applyChanges(ctx, k.GetTarget(), k.GetTargetPath(), k.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}

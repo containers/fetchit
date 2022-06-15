@@ -1,13 +1,13 @@
-targetConfigs:
-- name: fetchit
-  url: https://github.com/cooktheryan/fetchit
-  image:
+images:
   - name: httpd-ex
     url: http://localhost:8080/httpd.tar
     schedule: "*/1 * * * *"
+targetConfigs:
+- name: fetchit
+  url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
-    targetPath: examples/imageLoad/
+    targetPath: examples/imageLoad
     schedule: "*/1 * * * *"
     pullImage: false
-  branch: imageWNewMeth
+  branch: main

@@ -1,8 +1,4 @@
-targetConfigs:
-- name: fetchit
-  url: http://github.com/containers/fetchit
-  clean:
-    All: true
-    Volumes: true
-    schedule: "*/1 * * * *"
-  branch: main
+prune:
+  All: true
+  Volumes: true
+  schedule: "*/1 * * * *"

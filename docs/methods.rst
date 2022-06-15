@@ -4,7 +4,7 @@ The YAML configuration file defines git targets and the method to use, how frequ
 and various configuration values that relate to that method.
 
 A target is a unique value that holds methods. Mutiple git targets (targetConfigs) can be defined. Methods that can be configured
-include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Clean`, and `FetchitConfigFile`.
+include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Prune`, and `ConfigReload`.
 
 Dynamic Configuration Reload
 =============
@@ -89,12 +89,21 @@ A Raw JSON file can contain the following fields.
 Volume and host mounts can be provided in the JSON file.
 
 
+PodmanAutoUpdate
+-------
+If this method is present in the config file, podman-auto-update.service & podman-auto-update.timer
+will be enabled on the host. Podman auto-update will look for image updates with all podman-generated unit files
+that include the auto-update label, according to the timer schedule. Can configure for root, non-root, or both.
+
+.. code-block:: yaml
+
+   podmanAutoUpdate:
+     root: true
+     user: true
+
 Systemd
 -------
 SystemdTarget is a method that will place, enable, and restart systemd unit files.
-SystemdTarget can also enable podman-auto-update.service & podman-auto-update.timer on the host.
-With AutoUpdateAll: True, all other fields are ignored. This is because podman auto-update will
-look for image updates with all podman-generated unit files that include the auto-update label.
 
 .. code-block:: yaml
 
@@ -108,14 +117,6 @@ look for image updates with all podman-generated unit files that include the aut
        enable: true
        schedule: "*/5 * * * *"
      branch: main
-
-.. code-block:: yaml
-
-   targetConfigs:
-   - name: autoupdate
-     systemd:
-       name: autoupdate-ex
-       autoUpdateAll: true
 
 File Transfer
 -------------
