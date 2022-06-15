@@ -3,7 +3,7 @@
 # and for follow-up test, push a change to the config and confirm
 # new targetConfigs are fetched & run
 configReload:
-  configURL: https://raw.githubusercontent.com/containers/fetchit/fix-target-path/examples/config-reload.yaml
+  configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
   schedule: "*/2 * * * *"
 targetConfigs:
 - name: fetchit
