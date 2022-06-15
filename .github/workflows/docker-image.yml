@@ -1136,6 +1136,7 @@ jobs:
         run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep notreal | wc -l); done'
 
       - name: Logs
+        if: always()
         run: sudo podman logs fetchit
 
   push-amd-image-to-registry:
