@@ -7,7 +7,7 @@ targetConfigs:
   url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
-    targetPath: examples/imageLoad/
+    targetPath: examples/imageLoad
     schedule: "*/1 * * * *"
     pullImage: false
   branch: main
