@@ -240,6 +240,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		internalTarget := &Target{
 			name:         tc.Name,
 			url:          tc.Url,
+			localPath:    tc.LocalPath,
 			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
 		}
@@ -337,7 +338,16 @@ func (f *Fetchit) RunTargets() {
 	s.StartAsync()
 	select {}
 }
-
+func getRepo(target *Target, PAT string) error {
+	if target.url != "" {
+		getClone(target, PAT)
+	} else if target.disconnected && len(fetchitConfig.TargetConfigs) == 0 {
+		getDisconnected(target)
+	} else if target.disconnected && len(fetchitConfig.TargetConfigs) > 0 {
+		getLocalDisconnected(target)
+	}
+	return nil
+}
 func getClone(target *Target, PAT string) error {
 	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
 	directory := filepath.Base(trimDir)
@@ -356,7 +366,7 @@ func getClone(target *Target, PAT string) error {
 		return err
 	}
 
-	if !exists && !target.disconnected {
+	if !exists {
 		klog.Infof("git clone %s %s --recursive", target.url, target.branch)
 		var user string
 		if PAT != "" {
@@ -374,8 +384,43 @@ func getClone(target *Target, PAT string) error {
 		if err != nil {
 			return err
 		}
-	} else if !exists && target.disconnected {
+	}
+	return nil
+}
+
+func getDisconnected(target *Target) error {
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	directory := filepath.Base(trimDir)
+	var exists bool
+	if _, err := os.Stat(directory); err == nil {
+		exists = true
+		// if directory/.git does not exist, fail quickly
+		if _, err := os.Stat(directory + "/.git"); err != nil {
+			return fmt.Errorf("%s exists but is not a git repository", directory)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !exists {
 		extractZip(target.url, target.name)
+	}
+	return nil
+}
+
+func getLocalDisconnected(target *Target) error {
+	directory := filepath.Base(target.localPath)
+	var exists bool
+	if _, err := os.Stat(directory); err == nil {
+		exists = true
+		// if directory/.git does not exist, fail quickly
+		if _, err := os.Stat(directory + "/.git"); err != nil {
+			return fmt.Errorf("%s exists but is not a git repository", directory)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !exists {
+		localPathPull(target.name, target.localPath)
 	}
 	return nil
 }

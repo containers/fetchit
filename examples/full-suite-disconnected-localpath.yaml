@@ -1,0 +1,30 @@
+targetConfigs:
+- name: fetchit
+  localPath: /home/rcook/go/src/github.com/redhat-et/fetchit
+  disconnected: true
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw
+    schedule: "*/1 * * * *"
+    pullImage: false
+  systemd:
+  - name: sysd-ex
+    targetPath: examples/systemd/httpd.service
+    root: true
+    enable: false
+    schedule: "*/1 * * * *"
+  ansible:
+  - name: ans-ex
+    targetPath: examples/ansible
+    sshDirectory: /root/.ssh
+    schedule: "*/1 * * * *"
+  filetransfer:
+  - name: ft-ex
+    targetPath: examples/filetransfer
+    destinationDirectory: /tmp/ft
+    schedule: "*/1 * * * *"
+  clean:
+    All: true
+    Volumes: false
+    schedule: "*/1 * * * *"
+  branch: main

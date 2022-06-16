@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -14,14 +13,14 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/gobwas/glob"
+	"k8s.io/klog/v2"
 )
 
 func applyChanges(ctx context.Context, target *Target, targetPath string, globPattern *string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := filepath.Base(target.name)
 
 	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
 	if err != nil {
@@ -43,8 +42,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 
 //getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := filepath.Base(target.name)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository: %s", directory)
@@ -77,10 +75,9 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 }
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := filepath.Base(target.name)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
-
+	klog.Info("Directory: %s", directory)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository: %s", directory)
@@ -97,8 +94,7 @@ func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, e
 }
 
 func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash, methodType, methodName string) error {
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := filepath.Base(target.name)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)

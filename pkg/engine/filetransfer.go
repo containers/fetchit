@@ -32,8 +32,13 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int)
 	if ft.initialRun {
 		err := getClone(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
-			return
+			if len(target.url) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
+				return
+			} else if len(target.localPath) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.localPath, target.name, err)
+				return
+			}
 		}
 
 		err = zeroToCurrent(ctx, conn, ft, target, nil)

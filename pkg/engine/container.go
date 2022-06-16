@@ -23,9 +23,9 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "cp " + copyFile}
+	s.Command = []string{"sh", "-c", "cp -rp" + " " + copyFile}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	return s
 }
 

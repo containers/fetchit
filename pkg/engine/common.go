@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
+	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"k8s.io/klog/v2"
@@ -147,9 +148,35 @@ func extractZip(url, name string) error {
 	return nil
 }
 
+func localPathPull(name, localpath string) error {
+	klog.Info("Using local path")
+	// Need to use the filetransfer method to populate the directory from the localPath
+	ctx := context.Background()
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil {
+		klog.Error("Failed to create connection to podman")
+		return err
+	}
+	dest := filepath.Join(localpath)
+	copyFile := (localpath + " " + "/opt/")
+	klog.Info("Copying file ", copyFile)
+	// Set prev	as a nil value to prevent the previous commit from being used
+	s := generateSpec(filetransferMethod, name, copyFile, dest, name)
+	createResponse, err := createAndStartContainer(conn, s)
+	if err != nil {
+		return err
+	}
+
+	// Wait for the container to finish
+	waitAndRemoveContainer(conn, createResponse.ID)
+	return nil
+}
+
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
-	if target.disconnected {
+	if target.disconnected && len(target.localPath) == 0 {
 		extractZip(target.url, target.name)
+	} else if target.disconnected && len(target.localPath) > 0 {
+		localPathPull(target.name, target.localPath)
 	}
 	latest, err := getLatest(target)
 	if err != nil {
