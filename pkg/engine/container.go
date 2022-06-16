@@ -9,8 +9,6 @@ import (
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
-
-	"k8s.io/klog/v2"
 )
 
 const stopped = define.ContainerStateStopped
@@ -66,7 +64,6 @@ func createAndStartContainer(conn context.Context, s *specgen.SpecGenerator) (en
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return createResponse, err
 	}
-	klog.Infof("Container %s created.", s.Name)
 
 	return createResponse, nil
 }
