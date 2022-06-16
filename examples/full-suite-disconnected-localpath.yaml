@@ -1,7 +1,11 @@
+prune:
+  All: true
+  Volumes: false
+  schedule: "*/1 * * * *"
 targetConfigs:
 - name: fetchit
-  localPath: /tmp/fetchit
   disconnected: true
+  localPath: /tmp/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw
@@ -22,9 +26,5 @@ targetConfigs:
   - name: ft-ex
     targetPath: examples/filetransfer
     destinationDirectory: /tmp/ft
-    schedule: "*/1 * * * *"
-  clean:
-    All: true
-    Volumes: false
     schedule: "*/1 * * * *"
   branch: main
