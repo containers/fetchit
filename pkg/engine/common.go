@@ -166,9 +166,7 @@ func localDevicePull(name, device string) error {
 		return err
 	}
 
-	// Wait for the container to finish
-	//waitAndRemoveContainer(conn, createResponse.ID)
-	klog.Info("container name is ", createResponse.ID)
+	waitAndRemoveContainer(conn, createResponse.ID)
 	return nil
 }
 
