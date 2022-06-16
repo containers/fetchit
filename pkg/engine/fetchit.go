@@ -316,7 +316,7 @@ func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
-			if err := getClone(method.GetTarget(), f.pat); err != nil {
+			if err := getRepo(method.GetTarget(), f.pat); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().name, err)
 			}
 		}
@@ -339,11 +339,11 @@ func (f *Fetchit) RunTargets() {
 	select {}
 }
 func getRepo(target *Target, PAT string) error {
-	if target.url != "" {
+	if target.url != "" && !target.disconnected {
 		getClone(target, PAT)
-	} else if target.disconnected && len(fetchitConfig.TargetConfigs) == 0 {
+	} else if target.disconnected && len(target.url) > 0 {
 		getDisconnected(target)
-	} else if target.disconnected && len(fetchitConfig.TargetConfigs) > 0 {
+	} else if target.disconnected && len(target.localPath) > 0 {
 		getLocalDisconnected(target)
 	}
 	return nil

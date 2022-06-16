@@ -30,7 +30,7 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int)
 	defer target.mu.Unlock()
 
 	if ft.initialRun {
-		err := getClone(target, PAT)
+		err := getRepo(target, PAT)
 		if err != nil {
 			if len(target.url) > 0 {
 				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
