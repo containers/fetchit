@@ -9,7 +9,7 @@ targetConfigs:
     pullImage: false
   systemd:
   - name: sysd-ex
-    targetPath: examples/systemd/httpd.service
+    targetPath: examples/systemd
     root: true
     enable: false
     schedule: "*/1 * * * *"

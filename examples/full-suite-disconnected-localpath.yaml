@@ -1,6 +1,6 @@
 targetConfigs:
 - name: fetchit
-  localPath: /home/rcook/go/src/github.com/redhat-et/fetchit
+  localPath: /tmp/fetchit
   disconnected: true
   raw:
   - name: raw-ex
@@ -9,7 +9,7 @@ targetConfigs:
     pullImage: false
   systemd:
   - name: sysd-ex
-    targetPath: examples/systemd/httpd.service
+    targetPath: examples/systemd
     root: true
     enable: false
     schedule: "*/1 * * * *"

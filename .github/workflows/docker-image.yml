@@ -1205,18 +1205,116 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
+      - name: Wait for fetchit to deploy
+        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+
+      - name: ensure only required containers are running (cap colors and fetchit)
+        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
+
+      - name: verify raw container is running
+        run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
 
-      - name: list files
-        run: ls /tmp/ft
+  disconnected-validate-dir:
+    runs-on: ubuntu-latest
+    needs: [ build, pull-and-archive ]
+    steps:
+      - name: checkout with token
+        uses: actions/checkout@v3
+        with:
+          path: ci
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: ssh-keygen
+        run: sudo ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
+
+      - name: cp pub into authorized
+        run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+  
+      - name: Pull ansible artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: ansible-image-amd
+          path: /tmp
+
+      - name: Load the ansible image
+        run: sudo podman load -i /tmp/ansible-amd.tar
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: Make directory
+        run: mkdir -p /tmp/ft
+
+      - name: Create an archive of the fetchit repo
+        run: sudo git clone https://github.com/containers/fetchit.git /tmp/fetchit
+
+      - name: pull the web container
+        run: podman pull registry.access.redhat.com/ubi8/httpd-24
+
+      - name: start httpd and serve the fetchit.zip image
+        run: sudo podman run -d --name httpd -p 9000:8080 -v /tmp/disco:/var/www/html registry.access.redhat.com/ubi8/httpd-24
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected-localpath.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+
+      - name: Wait for fetchit to deploy
+        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
+
+      - name: identify colors container
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+
+      - name: ensure only required containers are running (cap colors and fetchit)
+        run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
 
       - name: verify raw container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | grep -v cap | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
 
   push-amd-image-to-registry:
     runs-on: ubuntu-latest
