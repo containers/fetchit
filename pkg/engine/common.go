@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -227,19 +226,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	return nil
 }
 
-func runChangesConcurrent(ctx context.Context, conn context.Context, m Method, changeMap map[*object.Change]string) error {
-	ch := make(chan error)
+func runChanges(ctx context.Context, conn context.Context, m Method, changeMap map[*object.Change]string) error {
 	for change, changePath := range changeMap {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := m.MethodEngine(ctx, conn, change, changePath); err != nil {
-				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changeMap {
-		err := <-ch
-		if err != nil {
+		if err := m.MethodEngine(ctx, conn, change, changePath); err != nil {
 			return err
 		}
 	}

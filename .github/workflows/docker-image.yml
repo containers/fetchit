@@ -1206,16 +1206,16 @@ jobs:
         run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
-        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+        run: timeout 300 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+        run: timeout 200 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
+        run: timeout 200 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
 
       - name: identify colors container
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+        run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1288,16 +1288,16 @@ jobs:
         run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected-localpath.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for fetchit to deploy
-        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+        run: timeout 300 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+        run: timeout 200 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
+        run: timeout 200 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
 
       - name: identify colors container
-        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+        run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi

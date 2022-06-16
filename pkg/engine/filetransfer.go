@@ -73,7 +73,7 @@ func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredSt
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, ft, changeMap); err != nil {
+	if err := runChanges(ctx, conn, ft, changeMap); err != nil {
 		return err
 	}
 	return nil

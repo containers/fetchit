@@ -158,7 +158,7 @@ func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState p
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, sd, changeMap); err != nil {
+	if err := runChanges(ctx, conn, sd, changeMap); err != nil {
 		return err
 	}
 	return nil

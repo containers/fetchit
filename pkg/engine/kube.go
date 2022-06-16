@@ -80,7 +80,7 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, k, changeMap); err != nil {
+	if err := runChanges(ctx, conn, k, changeMap); err != nil {
 		return err
 	}
 	return nil

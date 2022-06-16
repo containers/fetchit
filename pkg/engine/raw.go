@@ -184,7 +184,7 @@ func (r *Raw) Apply(ctx, conn context.Context, currentState, desiredState plumbi
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, r, changeMap); err != nil {
+	if err := runChanges(ctx, conn, r, changeMap); err != nil {
 		return err
 	}
 	return nil
