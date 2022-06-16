@@ -241,6 +241,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			name:         tc.Name,
 			url:          tc.Url,
 			localPath:    tc.LocalPath,
+			device:       tc.Device,
 			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
 		}
@@ -345,6 +346,9 @@ func getRepo(target *Target, PAT string) error {
 		getDisconnected(target)
 	} else if target.disconnected && len(target.localPath) > 0 {
 		getLocalDisconnected(target)
+	} else if target.disconnected && len(target.device) > 0 {
+		klog.Info("yo dog we are disconnected with device. The device is: ", target.device)
+		getDeviceDisconnected(target)
 	}
 	return nil
 }
@@ -421,6 +425,24 @@ func getLocalDisconnected(target *Target) error {
 	}
 	if !exists {
 		localPathPull(target.name, target.localPath)
+	}
+	return nil
+}
+
+func getDeviceDisconnected(target *Target) error {
+	directory := filepath.Base(target.name)
+	var exists bool
+	if _, err := os.Stat(directory); err == nil {
+		exists = true
+		// if directory/.git does not exist, fail quickly
+		if _, err := os.Stat(directory + "/.git"); err != nil {
+			return fmt.Errorf("%s exists but is not a git repository", directory)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !exists {
+		localDevicePull(target.name, target.device)
 	}
 	return nil
 }

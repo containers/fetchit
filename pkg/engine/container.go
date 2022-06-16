@@ -29,6 +29,20 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 	return s
 }
 
+func generateDeviceSpec(method, file, copyFile, device string, name string) *specgen.SpecGenerator {
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = method + "-" + name + "-" + file
+	s.Privileged = true
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/fetchit", ";", "cp -rp" + " " + copyFile}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
+	s.Devices = []specs.LinuxDevice{{Path: device}}
+	return s
+}
+
 func generateSpecRemove(method, file, pathToRemove, dest, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file

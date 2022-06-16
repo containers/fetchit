@@ -148,6 +148,30 @@ func extractZip(url, name string) error {
 	return nil
 }
 
+func localDevicePull(name, device string) error {
+	klog.Info("Using local path")
+	// Need to use the filetransfer method to populate the directory from the localPath
+	ctx := context.Background()
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil {
+		klog.Error("Failed to create connection to podman")
+		return err
+	}
+	copyFile := ("/mnt/fetchit" + " " + "/opt/")
+	klog.Info("Copying file ", copyFile)
+	// Set prev	as a nil value to prevent the previous commit from being used
+	s := generateDeviceSpec(filetransferMethod, name, copyFile, device, name)
+	createResponse, err := createAndStartContainer(conn, s)
+	if err != nil {
+		return err
+	}
+
+	// Wait for the container to finish
+	//waitAndRemoveContainer(conn, createResponse.ID)
+	klog.Info("container name is ", createResponse.ID)
+	return nil
+}
+
 func localPathPull(name, localpath string) error {
 	klog.Info("Using local path")
 	// Need to use the filetransfer method to populate the directory from the localPath
@@ -173,10 +197,12 @@ func localPathPull(name, localpath string) error {
 }
 
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
-	if target.disconnected && len(target.localPath) == 0 {
+	if target.disconnected && len(target.url) > 0 {
 		extractZip(target.url, target.name)
 	} else if target.disconnected && len(target.localPath) > 0 {
 		localPathPull(target.name, target.localPath)
+	} else if target.disconnected && len(target.device) > 0 {
+		localDevicePull(target.name, target.device)
 	}
 	latest, err := getLatest(target)
 	if err != nil {
