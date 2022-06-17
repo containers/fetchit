@@ -189,7 +189,7 @@ func localPathPull(name, localpath string) error {
 	}
 
 	// Wait for the container to finish
-	waitAndRemoveContainer(conn, createResponse.ID)
+	klog.Info("Waiting for container to finish", createResponse.ID)
 	return nil
 }
 

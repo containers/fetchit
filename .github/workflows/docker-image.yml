@@ -1203,7 +1203,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit --network=host -v fetchit-volume:/opt -v ./ci/examples/full-suite-disconnected.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -1279,7 +1279,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit --network=host -v ./ci/examples/full-suite-disconnected-localpath.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit --network=host -v fetchit-volume:/opt -v ./ci/examples/full-suite-disconnected-localpath.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
