@@ -1215,7 +1215,7 @@ jobs:
         run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
       - name: list files
-        run: sudo ls /etc/systemd/system/httpd.service
+        run: sudo ls /tmp/ft
 
       - name: Logs
         if: always()
