@@ -347,7 +347,6 @@ func getRepo(target *Target, PAT string) error {
 	} else if target.disconnected && len(target.localPath) > 0 {
 		getLocalDisconnected(target)
 	} else if target.disconnected && len(target.device) > 0 {
-		klog.Info("yo dog we are disconnected with device. The device is: ", target.device)
 		getDeviceDisconnected(target)
 	}
 	return nil

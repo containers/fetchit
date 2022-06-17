@@ -35,7 +35,7 @@ func generateDeviceSpec(method, file, copyFile, device string, name string) *spe
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/fetchit", ";", "cp -r" + " " + copyFile}
+	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/ ; cp -rp" + " " + copyFile}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	s.Devices = []specs.LinuxDevice{{Path: device}}
 	return s
