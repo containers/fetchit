@@ -1205,17 +1205,17 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit --network=host -v fetchit-volume:/opt -v ./ci/examples/full-suite-disconnected.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: identify colors container
-        run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+      - name: Wait for fetchit to deploy
+        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done" 
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
-
-      - name: verify raw container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
-      - name: list files
-        run: sudo ls /tmp/ft
 
       - name: Logs
         if: always()
@@ -1281,17 +1281,17 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit --network=host -v fetchit-volume:/opt -v ./ci/examples/full-suite-disconnected-localpath.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit-amd:latest
 
-      - name: identify colors container
-        run: timeout 200 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
+      - name: Wait for fetchit to deploy
+        run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done" 
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
-
-      - name: verify raw container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
-
-      - name: list files
-        run: sudo ls /etc/systemd/system/httpd.service
 
       - name: Logs
         if: always()
