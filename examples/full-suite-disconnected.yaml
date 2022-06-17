@@ -1,7 +1,3 @@
-prune:
-  All: true
-  Volumes: false
-  schedule: "*/2 * * * *"
 targetConfigs:
 - name: fetchit
   disconnected: true
