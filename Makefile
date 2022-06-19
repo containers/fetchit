@@ -5,7 +5,6 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Include openshift build-machinery-go libraries
 include ./vendor/github.com/openshift/build-machinery-go/make/golang.mk
-include ./vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk
 
 SRC_ROOT :=$(shell pwd)
 
