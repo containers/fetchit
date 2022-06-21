@@ -21,7 +21,7 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "rsync -avz --delete" + " " + copyFile}
+	s.Command = []string{"sh", "-c", "cp -rp" + " " + copyFile}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	return s
@@ -35,7 +35,7 @@ func generateDeviceSpec(method, file, copyFile, device string, name string) *spe
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/ ; rsync -avz --delete" + " " + copyFile}
+	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/ ; cp -rp" + " " + copyFile}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	s.Devices = []specs.LinuxDevice{{Path: device}}
 	return s

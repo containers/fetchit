@@ -25,8 +25,6 @@ FROM registry.access.redhat.com/ubi9/ubi:latest
 
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 
-RUN dnf -y install rsync && dnf clean all
-
 WORKDIR /opt
 
 CMD ["/usr/local/bin/fetchit", "start"]
