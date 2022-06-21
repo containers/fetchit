@@ -111,27 +111,3 @@ func localDevicePull(name, device string) error {
 	waitAndRemoveContainer(conn, createResponse.ID)
 	return nil
 }
-
-func localPathPull(name, localpath string) error {
-	klog.Info("Using local path")
-	// Need to use the filetransfer method to populate the directory from the localPath
-	ctx := context.Background()
-	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
-	if err != nil {
-		klog.Error("Failed to create connection to podman")
-		return err
-	}
-	dest := filepath.Join(localpath)
-	copyFile := (localpath + " " + "/opt/")
-	klog.Info("Copying file ", copyFile)
-	// Set prev	as a nil value to prevent the previous commit from being used
-	s := generateSpec(filetransferMethod, name, copyFile, dest, name)
-	createResponse, err := createAndStartContainer(conn, s)
-	if err != nil {
-		return err
-	}
-
-	// Wait for the container to finish
-	waitAndRemoveContainer(conn, createResponse.ID)
-	return nil
-}

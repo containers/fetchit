@@ -66,8 +66,6 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
 	if target.disconnected && len(target.url) > 0 {
 		extractZip(target.url, target.name)
-	} else if target.disconnected && len(target.localPath) > 0 {
-		localPathPull(target.name, target.localPath)
 	} else if target.disconnected && len(target.device) > 0 {
 		localDevicePull(target.name, target.device)
 	}
