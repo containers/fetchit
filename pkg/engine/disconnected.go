@@ -90,24 +90,22 @@ func extractZip(url, name string) error {
 	return nil
 }
 
-func localDevicePull(name, device string) error {
-	klog.Info("Using local path")
+func localDevicePull(name, device, trimDir string) (id string, err error) {
 	// Need to use the filetransfer method to populate the directory from the localPath
 	ctx := context.Background()
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
 		klog.Error("Failed to create connection to podman")
-		return err
+		return "", err
 	}
-	copyFile := ("/mnt/" + name + " " + "/opt")
-	klog.Info("Copying file ", copyFile)
+	copyFile := ("/mnt/" + name + " " + "/opt" + "/")
 	// Set prev	as a nil value to prevent the previous commit from being used
-	s := generateDeviceSpec(filetransferMethod, name, copyFile, device, name)
+	s := generateDeviceSpec(filetransferMethod, name+"disconnected"+trimDir, copyFile, device, name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Wait for the container to finish
 	waitAndRemoveContainer(conn, createResponse.ID)
-	return nil
+	return createResponse.ID, nil
 }

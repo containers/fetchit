@@ -33,7 +33,6 @@ type FetchitConfig struct {
 type TargetConfig struct {
 	Name         string          `mapstructure:"name"`
 	Url          string          `mapstructure:"url"`
-	LocalPath    string          `mapstructure:"localPath"`
 	Device       string          `mapstructure:"device"`
 	Disconnected bool            `mapstructure:"disconnected"`
 	Branch       string          `mapstructure:"branch"`

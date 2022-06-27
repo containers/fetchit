@@ -240,7 +240,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		internalTarget := &Target{
 			name:         tc.Name,
 			url:          tc.Url,
-			localPath:    tc.LocalPath,
 			device:       tc.Device,
 			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
@@ -421,7 +420,7 @@ func getDeviceDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		localDevicePull(target.name, target.device)
+		localDevicePull(target.name, target.device, "")
 	}
 	return nil
 }

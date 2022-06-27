@@ -67,7 +67,7 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	if target.disconnected && len(target.url) > 0 {
 		extractZip(target.url, target.name)
 	} else if target.disconnected && len(target.device) > 0 {
-		localDevicePull(target.name, target.device)
+		localDevicePull(target.name, target.device, "")
 	}
 	latest, err := getLatest(target)
 	if err != nil {
