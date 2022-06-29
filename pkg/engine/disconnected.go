@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"k8s.io/klog/v2"
 )
 
@@ -98,9 +99,18 @@ func localDevicePull(name, device, trimDir string) (id string, err error) {
 		klog.Error("Failed to create connection to podman")
 		return "", err
 	}
+	// List currently running containers to ensure we don't create a duplicate
+	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
+	klog.Info("Checking for existing container: ", containerName)
+	inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
+	if err == nil || inspectData == nil {
+		klog.Error("The container already exists..requeuing")
+		return "", err
+	}
+
 	copyFile := ("/mnt/" + name + " " + "/opt" + "/")
 	// Set prev	as a nil value to prevent the previous commit from being used
-	s := generateDeviceSpec(filetransferMethod, name+"disconnected"+trimDir, copyFile, device, name)
+	s := generateDeviceSpec(filetransferMethod, "disconnected"+trimDir, copyFile, device, name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
 		return "", err

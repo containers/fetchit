@@ -91,7 +91,7 @@ func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
 	// Define the path to the image
 	trimDir := filepath.Base(i.ImagePath)
 	baseDir := filepath.Dir(i.ImagePath)
-	id, err := localDevicePull(baseDir, i.Device, trimDir)
+	id, err := localDevicePull(baseDir, i.Device, "-"+trimDir)
 	if err != nil {
 		klog.Error("Failed to load image from device")
 		return err
