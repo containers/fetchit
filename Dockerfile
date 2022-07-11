@@ -21,7 +21,7 @@ RUN GOPATH=/opt/app-root GOCACHE=/mnt/cache make $MAKE_TARGET
 RUN mv $GOPATH/src/github.com/containers/fetchit/_output/bin/linux_$ARCH/fetchit /usr/local/bin/
 
 # RUN STAGE
-FROM registry.access.redhat.com/ubi9/ubi:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 
