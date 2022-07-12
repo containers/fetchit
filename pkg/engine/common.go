@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"k8s.io/klog/v2"
@@ -63,6 +64,11 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 	return nil
 }
 
+type empty struct {
+}
+
+var badCommitList map[plumbing.Hash]empty = make(map[plumbing.Hash]empty)
+
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
 	if target.disconnected && len(target.url) > 0 {
 		extractZip(target.url, target.name)
@@ -79,10 +85,27 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		return fmt.Errorf("Failed to get current commit: %v", err)
 	}
 
+	if _, ok := badCommitList[latest]; ok {
+		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.name, m.GetKind(), current)
+		return nil
+	}
+
 	if latest != current {
 		err = m.Apply(ctx, conn, current, latest, tag)
 		if err != nil {
-			return fmt.Errorf("Failed to apply changes: %v", err)
+			// Roll back automatically
+			klog.Errorf("Failed to apply changes, rolling back to %v: %v", current, err)
+			err = checkout(target, current)
+			if err != nil {
+				return utils.WrapErr(err, "Failed to checkout %s", current)
+			}
+			err = m.Apply(ctx, conn, latest, current, tag)
+			if err != nil {
+				// Roll back failed
+				return fmt.Errorf("Roll back failed, state between %s and %s: %v", current, latest, err)
+			}
+			badCommitList[latest] = empty{}
+			return fmt.Errorf("Rolled back to %v: %v", current, err)
 		}
 
 		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
