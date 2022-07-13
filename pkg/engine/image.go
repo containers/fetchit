@@ -2,8 +2,10 @@ package engine
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -39,7 +41,7 @@ func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
 	defer target.mu.Unlock()
 
 	if len(i.Url) > 0 {
-		err := i.loadHTTPPodman(ctx, conn, i.Url)
+		err := i.loadHTTPPodman(ctx, conn, i.Url, target.name)
 		if err != nil {
 			klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, imageMethod, err)
 		}
@@ -59,8 +61,9 @@ func (i *Image) Apply(ctx, conn context.Context, currentState, desiredState plum
 	return nil
 }
 
-func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
+func (i *Image) loadHTTPPodman(ctx, conn context.Context, url, target string) error {
 	klog.Infof("Loading image from %s", i.Url)
+	imageName := (path.Base(url))
 	// Place the data into the placeholder file
 	data, err := http.Get(i.Url)
 	if err != nil {
@@ -74,47 +77,90 @@ func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
 		klog.Error("Failed getting data from ", i.Url)
 		return err
 	}
-
-	// Load image from path on the system using podman load
-	imported, err := images.Load(conn, data.Body)
+	// Create the file to write the data to
+	file, err := os.Create("/opt/" + target + imageName)
 	if err != nil {
+		klog.Error("Failed creating file ", file)
+		return err
+	}
+	// Write the data to the file
+	_, err = io.Copy(file, data.Body)
+	if err != nil {
+		klog.Error("Failed writing data to ", file)
 		return err
 	}
 
-	klog.Infof("Image %s loaded....Requeuing", imported.Names[0])
-
-	return nil
-}
-
-func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
-	klog.Infof("Loading image from %s", i.ImagePath)
-	// Define the path to the image
-	trimDir := filepath.Base(i.ImagePath)
-	baseDir := filepath.Dir(i.ImagePath)
-	id, err := localDevicePull(baseDir, i.Device, "-"+trimDir)
+	pathToLoad := "/opt/" + target + imageName
+	err = i.podmanImageLoad(ctx, conn, pathToLoad)
 	if err != nil {
 		klog.Error("Failed to load image from device")
 		return err
 	}
-	// Wait for the image to be copied into the fetchit container
-	containers.Wait(conn, id, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
-	// Read the file that needs to be processed
-	file, err := os.Open("/opt/" + i.ImagePath)
+	return nil
+}
+
+func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
+	// Define the path to the image
+	trimDir := filepath.Base(i.ImagePath)
+	baseDir := filepath.Dir(i.ImagePath)
+	pathToLoad := "/opt/" + i.ImagePath
+	_, exitCode, err := localDeviceCheck(baseDir, i.Device, "-"+trimDir)
 	if err != nil {
-		klog.Error("Failed opening file ", i.ImagePath)
+		klog.Error("Failed to check device")
+		return err
+	}
+	if exitCode != 0 {
+		klog.Info("Device not present...requeuing")
+		// List files to see if anything needs to be flushed
+		if _, err := os.Stat(pathToLoad); err == nil {
+			klog.Info("Flushing image from device ", pathToLoad)
+			flushImages(pathToLoad)
+		}
+		return nil
+	} else if exitCode == 0 {
+		// If file does not exist pull from the device
+		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
+			id, err := localDevicePull(baseDir, i.Device, "-"+trimDir, true)
+			if err != nil {
+				klog.Info("Issue pulling image from device ", err)
+			}
+
+			// Wait for the image to be copied into the fetchit container
+			containers.Wait(conn, id, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
+		}
+		err = i.podmanImageLoad(ctx, conn, pathToLoad)
+		if err != nil {
+			klog.Error("Failed to load image", pathToLoad)
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+
+func (i *Image) podmanImageLoad(ctx, conn context.Context, pathToLoad string) error {
+	// Load image from path on the system using podman load
+	// Read the file that needs to be processed
+	klog.Infof("Loading image from %s", i.ImagePath)
+
+	file, err := os.Open(pathToLoad)
+	if err != nil {
+		klog.Error("Failed opening file ", pathToLoad)
 		return err
 	}
 	defer file.Close()
-	// Load image from path on the system using podman load
 	imported, err := images.Load(conn, file)
 	if err != nil {
-		os.Remove(i.ImagePath)
+		os.Remove(pathToLoad)
 		return err
 	}
 
 	klog.Infof("Image %s loaded....Requeuing", imported.Names[0])
-
-	os.Remove(i.ImagePath)
 	return nil
+}
 
+func flushImages(imagePath string) {
+	if _, err := os.Stat(imagePath); err == nil {
+		os.Remove(imagePath)
+	}
 }

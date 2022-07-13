@@ -420,7 +420,7 @@ func getDeviceDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		localDevicePull(target.name, target.device, "")
+		localDevicePull(target.name, target.device, "", false)
 	}
 	return nil
 }

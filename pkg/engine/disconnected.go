@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"k8s.io/klog/v2"
@@ -88,10 +89,11 @@ func extractZip(url, name string) error {
 		klog.Error("Failed removing file ", outFile.Name())
 		return err
 	}
+	createDiffFile(name)
 	return nil
 }
 
-func localDevicePull(name, device, trimDir string) (id string, err error) {
+func localDevicePull(name, device, trimDir string, image bool) (id string, err error) {
 	// Need to use the filetransfer method to populate the directory from the localPath
 	ctx := context.Background()
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
@@ -99,23 +101,108 @@ func localDevicePull(name, device, trimDir string) (id string, err error) {
 		klog.Error("Failed to create connection to podman")
 		return "", err
 	}
+	// Ensure that the device is present
+	_, exitCode, err := localDeviceCheck(name, device, "-"+trimDir)
+	if err != nil {
+		klog.Error("Failed to check device")
+		return "", err
+	}
+	if exitCode != 0 {
+		// remove the diff file
+		cache := "/opt/.cache/" + name + "/"
+		dest := cache + "/" + "HEAD"
+		err = os.Remove(dest)
+		klog.Info("Device not present...requeuing")
+		return "", nil
+	} else if exitCode == 0 {
+		// List currently running containers to ensure we don't create a duplicate
+		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
+		inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
+		if err == nil || inspectData == nil {
+			klog.Error("The container already exists..requeuing")
+			return "", err
+		}
+
+		copyFile := ("/mnt/" + name + " " + "/opt" + "/")
+		s := generateDeviceSpec(filetransferMethod, "disconnected"+trimDir, copyFile, device, name)
+		createResponse, err := createAndStartContainer(conn, s)
+		if err != nil {
+			return "", err
+		}
+		// Wait for the container to finish
+		waitAndRemoveContainer(conn, createResponse.ID)
+		if !image {
+			createDiffFile(name)
+		}
+		return createResponse.ID, nil
+	}
+	return "", nil
+}
+
+// This function is more of a health check to check if the device is present. If the device
+// doesn't exist, it will return an error.
+func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, err error) {
+	// Need to use the filetransfer method to populate the directory from the localPath
+	ctx := context.Background()
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil {
+		klog.Error("Failed to create connection to podman")
+		return "", 0, err
+	}
 	// List currently running containers to ensure we don't create a duplicate
 	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
-	klog.Info("Checking for existing container: ", containerName)
 	inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
 		klog.Error("The container already exists..requeuing")
-		return "", err
+		return "", 0, err
 	}
 
-	copyFile := ("/mnt/" + name + " " + "/opt" + "/")
-	// Set prev	as a nil value to prevent the previous commit from being used
-	s := generateDeviceSpec(filetransferMethod, "disconnected"+trimDir, copyFile, device, name)
+	s := generateDevicePresentSpec(filetransferMethod, "disconnected"+trimDir, device, name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
+
 	// Wait for the container to finish
-	waitAndRemoveContainer(conn, createResponse.ID)
-	return createResponse.ID, nil
+	exitCode, err := containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
+	if err != nil {
+		return "", exitCode, err
+	}
+
+	_, err = containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
+	if err != nil {
+		// There's a podman bug somewhere that's causing this
+		if err.Error() == "unexpected end of JSON input" {
+			return "", exitCode, nil
+		}
+		return "", exitCode, err
+	}
+
+	return createResponse.ID, exitCode, nil
+}
+
+func createDiffFile(name string) error {
+	cache := "/opt/.cache/" + name + "/"
+	os.MkdirAll(cache, os.ModePerm)
+	// Copy the file to the cache directory
+	src := "/opt/" + name + "/" + ".git/logs/HEAD"
+	dest := cache + "/" + "HEAD"
+	// Read the src file
+	srcFile, err := os.Open(src)
+	if err != nil {
+		klog.Error("Failed to open file ", src)
+		return err
+	}
+	destination, err := os.Create(dest)
+	if err != nil {
+		klog.Error("Failed to create file ", dest)
+		return err
+	}
+	defer destination.Close()
+	_, err = io.Copy(destination, srcFile)
+	if err != nil {
+		klog.Error("Failed to copy file ", src)
+		return err
+	}
+	return nil
 }

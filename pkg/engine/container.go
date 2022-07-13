@@ -41,6 +41,19 @@ func generateDeviceSpec(method, file, copyFile, device string, name string) *spe
 	return s
 }
 
+func generateDevicePresentSpec(method, file, device string, name string) *specgen.SpecGenerator {
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = method + "-" + name + "-" + file + "-" + "device-check"
+	s.Privileged = true
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"sh", "-c", "if [ ! -b " + device + " ]; then exit 1; fi"}
+	s.Devices = []specs.LinuxDevice{{Path: device}}
+	return s
+}
+
 func generateSpecRemove(method, file, pathToRemove, dest, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file
