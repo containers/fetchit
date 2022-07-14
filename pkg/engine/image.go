@@ -62,39 +62,50 @@ func (i *Image) Apply(ctx, conn context.Context, currentState, desiredState plum
 }
 
 func (i *Image) loadHTTPPodman(ctx, conn context.Context, url, target string) error {
-	klog.Infof("Loading image from %s", i.Url)
 	imageName := (path.Base(url))
-	// Place the data into the placeholder file
-	data, err := http.Get(i.Url)
+	pathToLoad := "/opt/" + imageName
+	data, err := http.Get(url)
 	if err != nil {
-		klog.Error("Failed getting data from ", i.Url)
-		return err
-	}
-	defer data.Body.Close()
+		// remove the image if it exists
+		if _, err := os.Stat(pathToLoad); err == nil {
+			klog.Info("Flushing image from device ", pathToLoad)
+			flushImages(pathToLoad)
+		}
+		klog.Info("URL not present...requeuing")
+		return nil
+	} else if data.StatusCode == http.StatusOK {
+		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
+			klog.Infof("Loading image from %s", url)
+			// Place the data into the placeholder file
+			defer data.Body.Close()
 
-	// Fail early if http error code is not 200
-	if data.StatusCode != http.StatusOK {
-		klog.Error("Failed getting data from ", i.Url)
-		return err
-	}
-	// Create the file to write the data to
-	file, err := os.Create("/opt/" + target + imageName)
-	if err != nil {
-		klog.Error("Failed creating file ", file)
-		return err
-	}
-	// Write the data to the file
-	_, err = io.Copy(file, data.Body)
-	if err != nil {
-		klog.Error("Failed writing data to ", file)
-		return err
-	}
+			// Fail early if http error code is not 200
+			if data.StatusCode != http.StatusOK {
+				klog.Error("Failed getting data from ", i.Url)
+				return err
+			}
+			// Create the file to write the data to
+			file, err := os.Create("/opt/" + imageName)
+			if err != nil {
+				klog.Error("Failed creating file ", file)
+				return err
+			}
+			// Write the data to the file
+			_, err = io.Copy(file, data.Body)
+			if err != nil {
+				klog.Error("Failed writing data to ", file)
+				return err
+			}
 
-	pathToLoad := "/opt/" + target + imageName
-	err = i.podmanImageLoad(ctx, conn, pathToLoad)
-	if err != nil {
-		klog.Error("Failed to load image from device")
-		return err
+			err = i.podmanImageLoad(ctx, conn, pathToLoad)
+			if err != nil {
+				klog.Error("Failed to load image from device")
+				return err
+			}
+			return nil
+		} else {
+			return nil
+		}
 	}
 	return nil
 }
