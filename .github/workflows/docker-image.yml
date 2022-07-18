@@ -658,7 +658,8 @@ jobs:
           path: /tmp
 
       - name: Load the ansible image
-        run: sudo podman load -i /tmp/ansible-amd.tar
+        run: |
+          sudo podman load -i /tmp/ansible-amd.tar
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest 
@@ -1170,7 +1171,9 @@ jobs:
           path: /tmp
 
       - name: Load the ansible image
-        run: sudo podman load -i /tmp/ansible-amd.tar
+        run: |
+         sudo podman load -i /tmp/ansible-amd.tar
+         sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest
 
       - name: pull artifact
         uses: actions/download-artifact@v1
