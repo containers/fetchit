@@ -67,7 +67,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 type empty struct {
 }
 
-var badCommitList map[plumbing.Hash]empty = make(map[plumbing.Hash]empty)
+var BadCommitMethods map[string]map[plumbing.Hash]empty = make(map[string]map[plumbing.Hash]empty)
 
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
 	if target.disconnected && len(target.url) > 0 {
@@ -85,7 +85,11 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		return fmt.Errorf("Failed to get current commit: %v", err)
 	}
 
-	if _, ok := badCommitList[latest]; ok {
+	if _, ok := BadCommitMethods[m.GetKind()]; !ok {
+		BadCommitMethods[m.GetKind()] = make(map[plumbing.Hash]empty)
+	}
+
+	if _, ok := BadCommitMethods[m.GetKind()][latest]; ok {
 		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.name, m.GetKind(), current)
 		return nil
 	}
@@ -104,7 +108,7 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 				// Roll back failed
 				return fmt.Errorf("Roll back failed, state between %s and %s: %v", current, latest, err)
 			}
-			badCommitList[latest] = empty{}
+			BadCommitMethods[m.GetKind()][latest] = empty{}
 			return fmt.Errorf("Rolled back to %v: %v", current, err)
 		}
 
