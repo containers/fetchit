@@ -141,7 +141,7 @@ func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
 		}
 		err = i.podmanImageLoad(ctx, conn, pathToLoad)
 		if err != nil {
-			klog.Error("Failed to load image", pathToLoad)
+			klog.Error("Failed to load image ", pathToLoad)
 			return err
 		}
 		return nil

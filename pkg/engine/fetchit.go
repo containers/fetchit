@@ -129,7 +129,7 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	// look for a ConfigURL, only find the first
 	// TODO: add logic to merge multiple configs
 	if config.ConfigReload != nil {
-		if config.ConfigReload.ConfigURL != "" {
+		if config.ConfigReload.ConfigURL != "" || config.ConfigReload.Device != "" {
 			// reset URL if necessary
 			// ConfigURL set in config file overrides env variable
 			// If the same, this is no change, if diff then the new config has updated the configURL
