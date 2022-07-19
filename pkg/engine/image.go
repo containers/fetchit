@@ -115,7 +115,7 @@ func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
 	trimDir := filepath.Base(i.ImagePath)
 	baseDir := filepath.Dir(i.ImagePath)
 	pathToLoad := "/opt/" + i.ImagePath
-	_, exitCode, err := localDeviceCheck(baseDir, i.Device, "-"+trimDir)
+	_, exitCode, err := localDeviceCheck(baseDir, i.Device, trimDir)
 	if err != nil {
 		klog.Error("Failed to check device")
 		return err

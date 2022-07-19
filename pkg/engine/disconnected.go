@@ -113,7 +113,7 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		return "", err
 	}
 	// Ensure that the device is present
-	_, exitCode, err := localDeviceCheck(name, device, "-"+trimDir)
+	_, exitCode, err := localDeviceCheck(name, device, trimDir)
 	if err != nil {
 		klog.Error("Failed to check device")
 		return "", err
@@ -127,7 +127,7 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		return "", nil
 	} else if exitCode == 0 {
 		// List currently running containers to ensure we don't create a duplicate
-		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
+		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + "-" + trimDir)
 		inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
 		if err == nil || inspectData == nil {
 			klog.Error("The container already exists..requeuing")
