@@ -66,14 +66,17 @@ func (i *Image) loadHTTPPodman(ctx, conn context.Context, url, target string) er
 	pathToLoad := "/opt/" + imageName
 	data, err := http.Get(url)
 	if err != nil {
+		// klog.Info("Failed to get image from url ", url) saving this for if we do various log levels
 		// remove the image if it exists
-		if _, err := os.Stat(pathToLoad); err == nil {
-			klog.Info("Flushing image from device ", pathToLoad)
-			flushImages(pathToLoad)
+		if _, err := os.Stat(pathToLoad); err != nil {
+			klog.Info("URL not present...requeuing")
+			return nil
 		}
-		klog.Info("URL not present...requeuing")
+		klog.Info("Flushing image from device ", pathToLoad)
+		flushImages(pathToLoad)
 		return nil
-	} else if data.StatusCode == http.StatusOK {
+	}
+	if data.StatusCode == http.StatusOK {
 		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
 			klog.Infof("Loading image from %s", url)
 			// Place the data into the placeholder file

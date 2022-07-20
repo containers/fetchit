@@ -125,7 +125,8 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		err = os.Remove(dest)
 		klog.Info("Device not present...requeuing")
 		return "", nil
-	} else if exitCode == 0 {
+	}
+	if exitCode == 0 {
 		// List currently running containers to ensure we don't create a duplicate
 		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + "-" + trimDir)
 		inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
