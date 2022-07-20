@@ -45,7 +45,7 @@ func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
 	initial := k.initialRun
 	tag := []string{"yaml", "yml"}
 	if initial {
-		err := getClone(target, PAT)
+		err := getRepo(target, PAT)
 		if err != nil {
 			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
@@ -80,7 +80,7 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, k, changeMap); err != nil {
+	if err := runChanges(ctx, conn, k, changeMap); err != nil {
 		return err
 	}
 	return nil

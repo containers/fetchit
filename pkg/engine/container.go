@@ -9,8 +9,6 @@ import (
 	"github.com/containers/podman/v4/pkg/domain/entities"
 	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
-
-	"k8s.io/klog/v2"
 )
 
 const stopped = define.ContainerStateStopped
@@ -23,9 +21,36 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"sh", "-c", "cp " + copyFile}
+	s.Command = []string{"sh", "-c", "cp -rp" + " " + copyFile}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
-	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
+	return s
+}
+
+func generateDeviceSpec(method, file, copyFile, device string, name string) *specgen.SpecGenerator {
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = method + "-" + name + "-" + file
+	s.Privileged = true
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"sh", "-c", "mount" + " " + device + " " + "/mnt/ ; cp -rp" + " " + copyFile}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
+	s.Devices = []specs.LinuxDevice{{Path: device}}
+	return s
+}
+
+func generateDevicePresentSpec(method, file, device string, name string) *specgen.SpecGenerator {
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = method + "-" + name + "-" + file + "-" + "device-check"
+	s.Privileged = true
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"sh", "-c", "if [ ! -b " + device + " ]; then exit 1; fi"}
+	s.Devices = []specs.LinuxDevice{{Path: device}}
 	return s
 }
 
@@ -52,7 +77,6 @@ func createAndStartContainer(conn context.Context, s *specgen.SpecGenerator) (en
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return createResponse, err
 	}
-	klog.Infof("Container %s created.", s.Name)
 
 	return createResponse, nil
 }

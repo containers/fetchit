@@ -30,10 +30,15 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int)
 	defer target.mu.Unlock()
 
 	if ft.initialRun {
-		err := getClone(target, PAT)
+		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
-			return
+			if len(target.url) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
+				return
+			} else if len(target.localPath) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.localPath, target.name, err)
+				return
+			}
 		}
 
 		err = zeroToCurrent(ctx, conn, ft, target, nil)
@@ -68,7 +73,7 @@ func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredSt
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, ft, changeMap); err != nil {
+	if err := runChanges(ctx, conn, ft, changeMap); err != nil {
 		return err
 	}
 	return nil

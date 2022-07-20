@@ -88,7 +88,7 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 	tag := []string{".json", ".yaml", ".yml"}
 
 	if r.initialRun {
-		err := getClone(target, PAT)
+		err := getRepo(target, PAT)
 		if err != nil {
 			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
 			return
@@ -184,7 +184,7 @@ func (r *Raw) Apply(ctx, conn context.Context, currentState, desiredState plumbi
 	if err != nil {
 		return err
 	}
-	if err := runChangesConcurrent(ctx, conn, r, changeMap); err != nil {
+	if err := runChanges(ctx, conn, r, changeMap); err != nil {
 		return err
 	}
 	return nil

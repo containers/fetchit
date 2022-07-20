@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"k8s.io/klog/v2"
@@ -27,6 +28,8 @@ const configFileMethod = "config"
 type ConfigReload struct {
 	CommonMethod `mapstructure:",squash"`
 	ConfigURL    string `mapstructure:"configURL"`
+	Device       string `mapstructure:"device"`
+	ConfigPath   string `mapstructure:"configPath"`
 }
 
 func (c *ConfigReload) GetKind() string {
@@ -47,17 +50,27 @@ func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) 
 	}
 	os.Setenv("FETCHIT_CONFIG_URL", envURL)
 	// If ConfigURL is not populated, warn and leave
-	if envURL == "" {
+	if envURL == "" && c.Device == "" {
 		klog.Warningf("Fetchit ConfigReload found, but neither $FETCHIT_CONFIG_URL on system nor ConfigReload.ConfigURL are set, exiting without updating the config.")
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
-	restart := checkForConfigUpdates(envURL, true, false)
-	if !restart {
-		return
+	if envURL != "" {
+		restart := checkForConfigUpdates(envURL, true, false)
+		if !restart {
+			return
+		}
+		klog.Info("Updated config processed, restarting with new targets")
+		fetchitConfig.Restart()
+	} else if c.Device != "" {
+		restart := checkForDisconUpdates(c.Device, c.ConfigPath, true, false)
+		if !restart {
+			return
+		}
+		klog.Info("Updated config processed, restarting with new targets")
+		fetchitConfig.Restart()
 	}
-	klog.Info("Updated config processed, restarting with new targets")
-	fetchitConfig.Restart()
+
 }
 
 func (c *ConfigReload) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
@@ -82,6 +95,61 @@ func checkForConfigUpdates(envURL string, existsAlready bool, initial bool) bool
 		klog.Info(err)
 	}
 	return reset
+}
+
+// CheckForDisconUpdates identifies if the device is connected and if a cache file exists
+func checkForDisconUpdates(device, configPath string, existsAlready bool, initial bool) bool {
+	ctx := context.Background()
+	name := "fetchit-config"
+	cache := "/opt/.cache/" + name
+	dest := cache + "/" + "config.yaml"
+	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+	if err != nil {
+		klog.Error("Failed to create connection to podman")
+		return false
+	}
+	// Ensure that the device is present
+	_, exitCode, err := localDeviceCheck(name, device, "")
+	if err != nil {
+		klog.Error("Failed to check device")
+		return false
+	}
+	if exitCode != 0 {
+		// remove the diff file
+		err = os.Remove(dest)
+		klog.Info("Device not present...requeuing")
+		return false
+	} else if exitCode == 0 {
+		if _, err := os.Stat(dest); os.IsNotExist(err) {
+			// make the cache directory
+			err = os.MkdirAll(cache, 0755)
+			copyFile := ("/mnt/" + configPath + " " + dest)
+			s := generateDeviceSpec(filetransferMethod, "disconnected-", copyFile, device, name)
+			createResponse, err := createAndStartContainer(conn, s)
+			if err != nil {
+				return false
+			}
+			// Wait for the container to finish
+			waitAndRemoveContainer(conn, createResponse.ID)
+			klog.Info("container created", createResponse.ID)
+			currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
+			newBytes, err := ioutil.ReadFile(dest)
+			if err != nil {
+				klog.Error("Failed to read config file")
+			} else {
+				if bytes.Equal(newBytes, currentConfigBytes) {
+					return false
+				} else {
+					// Replace the old config file at defaultConfigPath with the new one from dest and restart
+					os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600)
+					os.WriteFile(defaultConfigPath, newBytes, 0600)
+					klog.Infof("Current config backup placed at %s", defaultConfigBackup)
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod

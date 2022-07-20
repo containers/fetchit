@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"k8s.io/klog/v2"
@@ -65,6 +64,11 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 }
 
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
+	if target.disconnected && len(target.url) > 0 {
+		extractZip(target.url, target.name)
+	} else if target.disconnected && len(target.device) > 0 {
+		localDevicePull(target.name, target.device, "", false)
+	}
 	latest, err := getLatest(target)
 	if err != nil {
 		return fmt.Errorf("Failed to get latest commit: %v", err)
@@ -90,19 +94,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	return nil
 }
 
-func runChangesConcurrent(ctx context.Context, conn context.Context, m Method, changeMap map[*object.Change]string) error {
-	ch := make(chan error)
+func runChanges(ctx context.Context, conn context.Context, m Method, changeMap map[*object.Change]string) error {
 	for change, changePath := range changeMap {
-		go func(ch chan<- error, changePath string, change *object.Change) {
-			if err := m.MethodEngine(ctx, conn, change, changePath); err != nil {
-				ch <- utils.WrapErr(err, "error running engine method for change from: %s to %s", change.From.Name, change.To.Name)
-			}
-			ch <- nil
-		}(ch, changePath, change)
-	}
-	for range changeMap {
-		err := <-ch
-		if err != nil {
+		if err := m.MethodEngine(ctx, conn, change, changePath); err != nil {
 			return err
 		}
 	}

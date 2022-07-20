@@ -19,7 +19,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
-	directory := filepath.Base(target.url)
+	directory := filepath.Base(target.name)
 
 	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
 	if err != nil {
@@ -41,8 +41,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 
 //getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
-	directory := filepath.Base(target.url)
-
+	directory := filepath.Base(target.name)
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository: %s", directory)
@@ -52,7 +51,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 	if err = repo.Fetch(&git.FetchOptions{
 		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Force:    true,
-	}); err != nil && err != git.NoErrAlreadyUpToDate {
+	}); err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}
 
@@ -75,7 +74,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 }
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
-	directory := filepath.Base(target.url)
+	directory := filepath.Base(target.name)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
@@ -94,7 +93,7 @@ func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, e
 }
 
 func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash, methodType, methodName string) error {
-	directory := filepath.Base(target.url)
+	directory := filepath.Base(target.name)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)

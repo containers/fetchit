@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -127,7 +129,7 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	// look for a ConfigURL, only find the first
 	// TODO: add logic to merge multiple configs
 	if config.ConfigReload != nil {
-		if config.ConfigReload.ConfigURL != "" {
+		if config.ConfigReload.ConfigURL != "" || config.ConfigReload.Device != "" {
 			// reset URL if necessary
 			// ConfigURL set in config file overrides env variable
 			// If the same, this is no change, if diff then the new config has updated the configURL
@@ -235,11 +237,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 	for _, tc := range targetConfigs {
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
-
 		internalTarget := &Target{
-			name:   tc.Name,
-			url:    tc.Url,
-			branch: tc.Branch,
+			name:         tc.Name,
+			url:          tc.Url,
+			device:       tc.Device,
+			branch:       tc.Branch,
+			disconnected: tc.Disconnected,
 		}
 
 		if tc.configReload != nil {
@@ -313,7 +316,7 @@ func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
-			if err := getClone(method.GetTarget(), f.pat); err != nil {
+			if err := getRepo(method.GetTarget(), f.pat); err != nil {
 				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().name, err)
 			}
 		}
@@ -335,9 +338,19 @@ func (f *Fetchit) RunTargets() {
 	s.StartAsync()
 	select {}
 }
-
+func getRepo(target *Target, PAT string) error {
+	if target.url != "" && !target.disconnected {
+		getClone(target, PAT)
+	} else if target.disconnected && len(target.url) > 0 {
+		getDisconnected(target)
+	} else if target.disconnected && len(target.device) > 0 {
+		getDeviceDisconnected(target)
+	}
+	return nil
+}
 func getClone(target *Target, PAT string) error {
-	directory := filepath.Base(target.url)
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	directory := filepath.Base(trimDir)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
 		return err
@@ -360,7 +373,7 @@ func getClone(target *Target, PAT string) error {
 			user = "fetchit"
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
-			Auth: &http.BasicAuth{
+			Auth: &githttp.BasicAuth{
 				Username: user, // the value of this field should not matter when using a PAT
 				Password: PAT,
 			},
@@ -371,6 +384,43 @@ func getClone(target *Target, PAT string) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func getDisconnected(target *Target) error {
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	directory := filepath.Base(trimDir)
+	var exists bool
+	if _, err := os.Stat(directory); err == nil {
+		exists = true
+		// if directory/.git does not exist, fail quickly
+		if _, err := os.Stat(directory + "/.git"); err != nil {
+			return fmt.Errorf("%s exists but is not a git repository", directory)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !exists {
+		extractZip(target.url, target.name)
+	}
+	return nil
+}
+
+func getDeviceDisconnected(target *Target) error {
+	directory := filepath.Base(target.name)
+	var exists bool
+	if _, err := os.Stat(directory); err == nil {
+		exists = true
+		// if directory/.git does not exist, fail quickly
+		if _, err := os.Stat(directory + "/.git"); err != nil {
+			return fmt.Errorf("%s exists but is not a git repository", directory)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if !exists {
+		localDevicePull(target.name, target.device, "", false)
 	}
 	return nil
 }

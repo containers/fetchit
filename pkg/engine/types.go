@@ -33,6 +33,8 @@ type FetchitConfig struct {
 type TargetConfig struct {
 	Name         string          `mapstructure:"name"`
 	Url          string          `mapstructure:"url"`
+	Device       string          `mapstructure:"device"`
+	Disconnected bool            `mapstructure:"disconnected"`
 	Branch       string          `mapstructure:"branch"`
 	Ansible      []*Ansible      `mapstructure:"ansible"`
 	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
@@ -47,10 +49,13 @@ type TargetConfig struct {
 }
 
 type Target struct {
-	name   string
-	url    string
-	branch string
-	mu     sync.Mutex
+	name         string
+	url          string
+	device       string
+	localPath    string
+	branch       string
+	mu           sync.Mutex
+	disconnected bool
 }
 
 type SchedInfo struct {

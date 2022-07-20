@@ -1,0 +1,26 @@
+targetConfigs:
+- name: fetchit
+  disconnected: true
+  url: http://localhost:9000/fetchit.zip
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw
+    schedule: "*/1 * * * *"
+    pullImage: false
+  systemd:
+  - name: sysd-ex
+    targetPath: examples/systemd
+    root: true
+    enable: false
+    schedule: "*/1 * * * *"
+  ansible:
+  - name: ans-ex
+    targetPath: examples/ansible
+    sshDirectory: /root/.ssh
+    schedule: "*/1 * * * *"
+  filetransfer:
+  - name: ft-ex
+    targetPath: examples/filetransfer
+    destinationDirectory: /tmp/ft
+    schedule: "*/1 * * * *"
+  branch: main
