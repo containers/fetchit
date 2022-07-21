@@ -245,11 +245,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			name:         tc.Name,
-			url:          tc.Url,
-			device:       tc.Device,
-			branch:       tc.Branch,
-			disconnected: tc.Disconnected,
+			name:            tc.Name,
+			url:             tc.Url,
+			device:          tc.Device,
+			branch:          tc.Branch,
+			disconnected:    tc.Disconnected,
+			trackBadCommits: tc.trackBadCommits,
 		}
 
 		if tc.configReload != nil {
