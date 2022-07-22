@@ -23,6 +23,8 @@ RUN mv $GOPATH/src/github.com/containers/fetchit/_output/bin/linux_$ARCH/fetchit
 # RUN STAGE
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
+RUN dnf -y install rsync && sudo dnf clean all
+
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 
 WORKDIR /opt
