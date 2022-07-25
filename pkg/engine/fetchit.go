@@ -408,7 +408,7 @@ func getDisconnected(target *Target) error {
 }
 
 func getDeviceDisconnected(target *Target) error {
-	directory := filepath.Base(target.name)
+	directory := filepath.Base(target.url)
 	var exists bool
 	if _, err := os.Stat(directory); err == nil {
 		exists = true
