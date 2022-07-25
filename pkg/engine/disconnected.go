@@ -16,11 +16,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func extractZip(url, name string) error {
-	cache := "/opt/.cache/" + name + "/"
-	dest := cache + "HEAD"
+func extractZip(url string) error {
 	trimDir := strings.TrimSuffix(url, path.Ext(url))
 	directory := filepath.Base(trimDir)
+	cache := "/opt/.cache/" + directory + "/"
+	dest := cache + "HEAD"
 	absPath, err := filepath.Abs(directory)
 
 	data, err := http.Get(url)
@@ -46,9 +46,9 @@ func extractZip(url, name string) error {
 			// Create the destination file
 			os.MkdirAll(directory, 0755)
 
-			outFile, err := os.Create(absPath + "/" + name + ".zip")
+			outFile, err := os.Create(absPath + "/" + directory + ".zip")
 			if err != nil {
-				klog.Error("Failed creating file ", absPath+"/"+name+".zip")
+				klog.Error("Failed creating file ", absPath+"/"+directory+".zip")
 				return err
 			}
 
@@ -95,7 +95,7 @@ func extractZip(url, name string) error {
 				klog.Error("Failed removing file ", outFile.Name())
 				return err
 			}
-			createDiffFile(name)
+			createDiffFile(directory)
 			return nil
 		} else {
 			klog.Info("No changes since last disonnected run...requeuing")

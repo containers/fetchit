@@ -1,6 +1,5 @@
 targetConfigs:
-- name: fetchit
-  url: https://github.com/josephsawaya/fetchit
+- url: https://github.com/josephsawaya/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw

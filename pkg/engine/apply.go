@@ -19,7 +19,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 	if desiredState.IsZero() {
 		return nil, errors.New("Cannot run Apply if desired state is empty")
 	}
-	directory := filepath.Base(target.url)
+	directory := getDirectory(target)
 
 	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
 	if err != nil {
@@ -41,7 +41,8 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 
 //getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
-	directory := filepath.Base(target.url)
+	directory := getDirectory(target)
+
 	repo, err := git.PlainOpen(directory)
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository %s to fetch latest commit", directory)
@@ -62,7 +63,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	wt, err := repo.Worktree()
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.name)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", directory)
 	}
 
 	if err := wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()}); err != nil {
@@ -73,7 +74,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 }
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
-	directory := filepath.Base(target.url)
+	directory := getDirectory(target)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
@@ -93,7 +94,7 @@ func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, e
 }
 
 func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash, methodType, methodName string) error {
-	directory := filepath.Base(target.url)
+	directory := getDirectory(target)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
 
 	repo, err := git.PlainOpen(directory)
@@ -125,17 +126,17 @@ func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string)
 
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting commit at hash %s from repo %s", hash, directory)
+		return nil, utils.WrapErr(err, "Error getting commit at hash %s from repository %s", hash, directory)
 	}
 
 	tree, err := commit.Tree()
 	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting tree from commit at hash %s from repo %s", hash, directory)
+		return nil, utils.WrapErr(err, "Error getting tree from commit at hash %s from repository %s", hash, directory)
 	}
 
 	subTree, err := tree.Tree(targetPath)
 	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting sub tree at %s from commit at %s from repo %s", targetPath, hash, directory)
+		return nil, utils.WrapErr(err, "Error getting sub tree at %s from commit at %s from repository %s", targetPath, hash, directory)
 	}
 
 	return subTree, nil

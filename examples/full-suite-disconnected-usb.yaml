@@ -1,6 +1,5 @@
 targetConfigs:
-- name: fetchit
-  disconnected: true
+- disconnected: true
   device: /dev/sda1
   raw:
   - name: raw-ex

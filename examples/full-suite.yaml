@@ -3,8 +3,7 @@ prune:
   Volumes: false
   schedule: "*/1 * * * *"
 targetConfigs:
-- name: fetchit
-  url: http://github.com/containers/fetchit
+- url: http://github.com/containers/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw

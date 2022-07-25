@@ -110,7 +110,7 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 		}
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
+			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 
