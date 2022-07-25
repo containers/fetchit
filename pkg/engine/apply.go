@@ -65,8 +65,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", target.name)
 	}
 
-	err = wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()})
-	if err != nil {
+	if err := wt.Checkout(&git.CheckoutOptions{Hash: branch.Hash()}); err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", branch.Hash(), target.branch)
 	}
 
@@ -83,9 +82,10 @@ func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, e
 	}
 
 	ref, err := repo.Tag(tagName)
-	if err == git.ErrTagNotFound {
-		return plumbing.Hash{}, nil
-	} else if err != nil {
+	if err != nil {
+		if err == git.ErrTagNotFound {
+			return plumbing.Hash{}, nil
+		}
 		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to current tag")
 	}
 
@@ -106,8 +106,7 @@ func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash
 		return utils.WrapErr(err, "Error deleting old current tag")
 	}
 
-	_, err = repo.CreateTag(tagName, newCurrent, nil)
-	if err != nil {
+	if _, err := repo.CreateTag(tagName, newCurrent, nil); err != nil {
 		return utils.WrapErr(err, "Error creating new current tag with hash %s", newCurrent)
 	}
 
