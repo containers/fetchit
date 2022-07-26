@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -118,6 +119,12 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 		if err != nil || conn == nil {
 			cobra.CheckErr(fmt.Errorf("error establishing connection to podman.sock: %v", err))
 		}
+		version, err := system.Version(conn, &system.VersionOptions{})
+		if err != nil {
+			cobra.CheckErr(fmt.Errorf("Error getting podman version: %v", err))
+		}
+		klog.Infof("Client Version: %+v", *version.Client)
+		klog.Infof("Server Version: %+v", *version.Server)
 		fc.conn = conn
 	}
 	fetchit.conn = fc.conn
@@ -238,11 +245,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			name:         tc.Name,
-			url:          tc.Url,
-			device:       tc.Device,
-			branch:       tc.Branch,
-			disconnected: tc.Disconnected,
+			name:            tc.Name,
+			url:             tc.Url,
+			device:          tc.Device,
+			branch:          tc.Branch,
+			disconnected:    tc.Disconnected,
+			trackBadCommits: tc.trackBadCommits,
 		}
 
 		if tc.configReload != nil {

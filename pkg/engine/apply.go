@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -16,9 +15,6 @@ import (
 )
 
 func applyChanges(ctx context.Context, target *Target, targetPath string, globPattern *string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
-	if desiredState.IsZero() {
-		return nil, errors.New("Cannot run Apply if desired state is empty")
-	}
 	directory := filepath.Base(target.name)
 
 	currentTree, err := getSubTreeFromHash(directory, currentState, targetPath)
@@ -37,6 +33,31 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 	}
 
 	return changeMap, nil
+}
+
+func checkout(target *Target, hash plumbing.Hash) error {
+	if hash == plumbing.ZeroHash {
+		return nil
+	}
+
+	directory := filepath.Base(target.url)
+
+	repo, err := git.PlainOpen(directory)
+	if err != nil {
+		return utils.WrapErr(err, "Error opening repository: %s", directory)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return utils.WrapErr(err, "Error getting reference to worktree for repository", target.name)
+	}
+
+	err = wt.Checkout(&git.CheckoutOptions{Hash: hash})
+	if err != nil {
+		return utils.WrapErr(err, "Error checking out %s on branch %s", hash, target.branch)
+	}
+
+	return nil
 }
 
 //getLatest will get the head of the branch in the repository specified by the target's url

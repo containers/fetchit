@@ -99,6 +99,8 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 			klog.Errorf("Error moving to current: %v", err)
 			return
 		}
+
+		r.initialRun = false
 	}
 
 	err := currentToLatest(ctx, conn, r, target, &tag)
@@ -107,52 +109,60 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 		return
 	}
 
-	r.initialRun = false
 }
 
 func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
-
-	klog.Infof("Creating podman container from %s", path)
-
-	rawFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
+	if prev != nil {
+		klog.Infof("Creating podman container from %s: %s", path, *prev)
+	} else {
+		klog.Infof("Creating podman container from %s", path)
 	}
 
-	raw, err := rawPodFromBytes(rawFile)
-	if err != nil {
-		return err
-	}
+	var raw *RawPod
 
-	klog.Infof("Identifying if image exists locally")
+	if path != deleteFile {
+		rawFile, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
 
-	err = detectOrFetchImage(conn, raw.Image, r.PullImage)
-	if err != nil {
-		return err
+		klog.Info("Done creating")
+
+		raw, err = rawPodFromBytes(rawFile)
+		if err != nil {
+			return err
+		}
+
+		klog.Infof("Identifying if image exists locally")
+
+		err = detectOrFetchImage(conn, raw.Image, r.PullImage)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Delete previous file's podxz
 	if prev != nil {
-		raw, err := rawPodFromBytes([]byte(*prev))
+		rawPrev, err := rawPodFromBytes([]byte(*prev))
 		if err != nil {
 			return err
 		}
 
-		err = deleteContainer(conn, raw.Name)
+		err = deleteContainer(conn, rawPrev.Name)
 		if err != nil {
 			return err
 		}
 
-		klog.Infof("Deleted podman container %s", raw.Name)
+		klog.Infof("Deleted podman container %s", rawPrev.Name)
 	}
 
 	if path == deleteFile {
 		return nil
 	}
 
-	err = removeExisting(conn, raw.Name)
+	err := removeExisting(conn, raw.Name)
 	if err != nil {
-		return err
+		return utils.WrapErr(err, "Error removing existing")
 	}
 
 	s := createSpecGen(*raw)
@@ -247,14 +257,32 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 }
 
 func deleteContainer(conn context.Context, podName string) error {
-	err := containers.Stop(conn, podName, nil)
+	filter := make(map[string][]string)
+	filter["name"] = []string{podName}
+
+	list, err := containers.List(conn, &containers.ListOptions{Filters: filter})
 	if err != nil {
-		return err
+		return utils.WrapErr(err, "Error listing containers")
 	}
 
-	containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
+	if len(list) == 0 {
+		klog.Infof("Container %s not found", podName)
+		return nil
+	}
+
+	err = containers.Stop(conn, podName, nil)
 	if err != nil {
-		return err
+		return utils.WrapErr(err, "Error stopping container %s", podName)
+	}
+
+	force := true
+	_, err = containers.Remove(conn, podName, &containers.RemoveOptions{Force: &force})
+	if err != nil {
+		// There's a podman bug somewhere that's causing this
+		if err.Error() == "unexpected end of JSON input" {
+			return nil
+		}
+		return utils.WrapErr(err, "Error removing container %s", podName)
 	}
 
 	return nil
