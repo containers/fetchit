@@ -49,7 +49,6 @@ type TargetConfig struct {
 }
 
 type Target struct {
-	name         string
 	url          string
 	device       string
 	localPath    string

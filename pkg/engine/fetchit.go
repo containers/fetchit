@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
@@ -136,7 +134,6 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 			os.Setenv("FETCHIT_CONFIG_URL", config.ConfigReload.ConfigURL)
 			// Convert configReload to a proper target for processing
 			reload := &TargetConfig{
-				Name:         configFileMethod,
 				configReload: config.ConfigReload,
 			}
 			config.TargetConfigs = append(config.TargetConfigs, reload)
@@ -144,7 +141,6 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	}
 	if config.Prune != nil {
 		prune := &TargetConfig{
-			Name:  pruneMethod,
 			prune: config.Prune,
 		}
 		config.TargetConfigs = append(config.TargetConfigs, prune)
@@ -152,7 +148,6 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	if config.Images != nil {
 		for _, i := range config.Images {
 			imageLoad := &TargetConfig{
-				Name:  i.Name,
 				image: i,
 			}
 			config.TargetConfigs = append(config.TargetConfigs, imageLoad)
@@ -161,7 +156,6 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	if config.PodmanAutoUpdate != nil {
 		sysds := config.PodmanAutoUpdate.AutoUpdateSystemd()
 		autoUp := &TargetConfig{
-			Name:    podmanAutoUpdate,
 			Systemd: sysds,
 		}
 		config.TargetConfigs = append(config.TargetConfigs, autoUp)
@@ -238,7 +232,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			name:         tc.Name,
 			url:          tc.Url,
 			device:       tc.Device,
 			branch:       tc.Branch,
@@ -317,7 +310,7 @@ func (f *Fetchit) RunTargets() {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
 			if err := getRepo(method.GetTarget(), f.pat); err != nil {
-				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget().name, err)
+				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget(), err)
 			}
 		}
 	}
@@ -331,7 +324,7 @@ func (f *Fetchit) RunTargets() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mt := method.GetKind()
-		klog.Infof("Processing Target: %s Method: %s Name: %s", method.GetTarget().name, mt, method.GetName())
+		klog.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
 		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, f.pat, skew)
 		s.StartImmediately()
 	}
@@ -349,8 +342,7 @@ func getRepo(target *Target, PAT string) error {
 	return nil
 }
 func getClone(target *Target, PAT string) error {
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := getDirectory(target)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
 		return err
@@ -389,8 +381,7 @@ func getClone(target *Target, PAT string) error {
 }
 
 func getDisconnected(target *Target) error {
-	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
-	directory := filepath.Base(trimDir)
+	directory := getDirectory(target)
 	var exists bool
 	if _, err := os.Stat(directory); err == nil {
 		exists = true
@@ -402,13 +393,13 @@ func getDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		extractZip(target.url, target.name)
+		extractZip(target.url)
 	}
 	return nil
 }
 
 func getDeviceDisconnected(target *Target) error {
-	directory := filepath.Base(target.name)
+	directory := getDirectory(target)
 	var exists bool
 	if _, err := os.Stat(directory); err == nil {
 		exists = true
@@ -420,7 +411,7 @@ func getDeviceDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		localDevicePull(target.name, target.device, "", false)
+		localDevicePull(directory, target.device, "", false)
 	}
 	return nil
 }

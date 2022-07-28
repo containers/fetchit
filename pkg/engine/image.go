@@ -41,14 +41,14 @@ func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
 	defer target.mu.Unlock()
 
 	if len(i.Url) > 0 {
-		err := i.loadHTTPPodman(ctx, conn, i.Url, target.name)
+		err := i.loadHTTPPodman(ctx, conn, i.Url)
 		if err != nil {
-			klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, imageMethod, err)
+			klog.Warningf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
 		}
 	} else if len(i.ImagePath) > 0 {
 		err := i.loadDevicePodman(ctx, conn)
 		if err != nil {
-			klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, imageMethod, err)
+			klog.Warningf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
 		}
 	}
 }
@@ -61,7 +61,7 @@ func (i *Image) Apply(ctx, conn context.Context, currentState, desiredState plum
 	return nil
 }
 
-func (i *Image) loadHTTPPodman(ctx, conn context.Context, url, target string) error {
+func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
 	imageName := (path.Base(url))
 	pathToLoad := "/opt/" + imageName
 	data, err := http.Get(url)

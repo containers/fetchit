@@ -1,6 +1,5 @@
 targetConfigs:
-- name: fetchit
-  url: http://github.com/containers/fetchit
+- url: http://github.com/containers/fetchit
   systemd:
   - name: httpd-root
     targetPath: examples/systemd

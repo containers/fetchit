@@ -3,6 +3,9 @@ package engine
 import (
 	"context"
 	"fmt"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -57,17 +60,25 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 
-		klog.Infof("Moved %s to %s for target %s", m.GetName(), current, target.name)
+		klog.Infof("Moved %s to commit %s for git target %s", m.GetName(), current, target.url)
 	}
 
 	return nil
 }
 
+func getDirectory(target *Target) string {
+	trimDir := strings.TrimSuffix(target.url, path.Ext(target.url))
+	return filepath.Base(trimDir)
+}
+
 func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[]string) error {
-	if target.disconnected && len(target.url) > 0 {
-		extractZip(target.url, target.name)
-	} else if target.disconnected && len(target.device) > 0 {
-		localDevicePull(target.name, target.device, "", false)
+	directory := getDirectory(target)
+	if target.disconnected {
+		if len(target.url) > 0 {
+			extractZip(target.url)
+		} else if len(target.device) > 0 {
+			localDevicePull(directory, target.device, "", false)
+		}
 	}
 	latest, err := getLatest(target)
 	if err != nil {
@@ -80,15 +91,13 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	}
 
 	if latest != current {
-		err = m.Apply(ctx, conn, current, latest, tag)
-		if err != nil {
+		if err := m.Apply(ctx, conn, current, latest, tag); err != nil {
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
-
 		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
-		klog.Infof("Moved %s from %s to %s for target %s", m.GetName(), current, latest, target.name)
+		klog.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current, latest, target.url)
 	} else {
-		klog.Infof("No changes applied to target %s this run, %s currently at %s", target.name, m.GetKind(), current)
+		klog.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current)
 	}
 
 	return nil

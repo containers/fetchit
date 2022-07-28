@@ -6,8 +6,7 @@ configReload:
   configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
   schedule: "*/2 * * * *"
 targetConfigs:
-- name: fetchit
-  url: https://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw

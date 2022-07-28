@@ -41,7 +41,7 @@ func (p *Prune) Process(ctx, conn context.Context, PAT string, skew int) {
 
 	err := p.prunePodman(ctx, conn, opts)
 	if err != nil {
-		klog.Warningf("Repo: %s Method: %s encountered error: %v, resetting...", target.name, pruneMethod, err)
+		klog.Warningf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, pruneMethod, err)
 	}
 
 }

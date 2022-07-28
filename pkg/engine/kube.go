@@ -47,7 +47,7 @@ func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
 	if initial {
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
+			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 

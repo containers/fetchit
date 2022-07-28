@@ -1,6 +1,5 @@
 targetConfigs:
-- name: fetchit
-  url: https://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/raw
