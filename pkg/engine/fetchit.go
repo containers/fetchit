@@ -300,11 +300,19 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		if len(tc.Systemd) > 0 {
-			fetchit.allMethodTypes[rawMethod] = struct{}{}
+			fetchit.allMethodTypes[systemdMethod] = struct{}{}
 			for _, sd := range tc.Systemd {
 				sd.initialRun = true
 				sd.target = internalTarget
 				fetchit.methodTargetScheds[sd] = sd.SchedInfo()
+			}
+		}
+		if len(tc.Kubernetes) > 0 {
+			fetchit.allMethodTypes[kubernetesMethod] = struct{}{}
+			for _, k := range tc.Kubernetes {
+				k.initialRun = true
+				k.target = internalTarget
+				fetchit.methodTargetScheds[k] = k.SchedInfo()
 			}
 		}
 	}

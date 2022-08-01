@@ -41,6 +41,19 @@ func generateDeviceSpec(method, file, copyFile, device string, name string) *spe
 	return s
 }
 
+func generateKubeSpec(method, file, kubeObject, name string) *specgen.SpecGenerator {
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = method + "-" + name + "-" + file
+	s.Privileged = true
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+	s.Command = []string{"sh", "kubectl apply -f" + " " + kubeObject}
+	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
+	return s
+}
+
 func generateDevicePresentSpec(method, file, device string, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file + "-" + "device-check"

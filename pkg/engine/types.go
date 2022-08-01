@@ -41,6 +41,7 @@ type TargetConfig struct {
 	Kube         []*Kube         `mapstructure:"kube"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
+	Kubernetes   []*Kubernetes   `mapstructure:"kubernetes"`
 
 	image        *Image
 	prune        *Prune
