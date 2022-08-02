@@ -1,6 +1,6 @@
 Configuration
 =============
-The YAML configuration file defines git targets and the method to use, how frequently to check the repository,
+The YAML configuration file defines git targets and the methods to use, how frequently to check the repository,
 and various configuration values that relate to that method.
 
 A target is a unique value that holds methods. Mutiple git targets (targetConfigs) can be defined. Methods that can be configured
@@ -16,11 +16,9 @@ pod is required to reload targetConfigs. The following fields are required with 
 
 .. code-block:: yaml
 
-    configReload:
-      name: config-reload
-      schedule: "*/5 * * * *"
-      configURL: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
-    targetConfigs:
+   configReload:
+     schedule: "*/5 * * * *"
+     configUrl: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
 
 Changes pushed to the ConfigURL will trigger a reloading of FetchIt target configs. It's recommended to include the ConfigReload
 in the FetchIt config to enable updates to target configs without requiring a restart.
@@ -39,14 +37,13 @@ In the examples directory, there is an Ansible playbook that is used to install 
 .. code-block:: yaml
 
    targetConfigs:
-   - name: fetchit
-     url: http://github.com/containers/fetchit
+   - url: http://github.com/containers/fetchit
+     branch: main
      ansible:
      - name: ans-ex
        targetPath: examples/ansible
        sshDirectory: /root/.ssh
        schedule: "*/5 * * * *"
-     branch: main
 
 The field sshDirectory is unique for this method. This directory should contain the private key used to connect to the host and the public key should be copied into the `.ssh/authorized_keys` file to allow for connectivity. The .ssh directory should be owned by root.
 
@@ -57,14 +54,13 @@ The RawTarget method will launch containers based upon their definition in a JSO
 .. code-block:: yaml
 
    targetConfigs:
-   - name: fetchit
-     url: http://github.com/containers/fetchit
+   - url: http://github.com/containers/fetchit
+     branch: main
      raw:
      - name: raw-ex
        targetPath: examples/raw
        schedule: "*/5 * * * *"
        pullImage: true
-     branch: main
 
 The pullImage field is useful if a container image uses the latest tag. This will ensure that the method will attempt to pull the container image every time.
 
@@ -88,7 +84,6 @@ A Raw JSON file can contain the following fields.
 
 Volume and host mounts can be provided in the JSON file.
 
-
 PodmanAutoUpdate
 -------
 If this method is present in the config file, podman-auto-update.service & podman-auto-update.timer
@@ -108,15 +103,14 @@ SystemdTarget is a method that will place, enable, and restart systemd unit file
 .. code-block:: yaml
 
    targetConfigs:
-   - name: fetchit
-     url: http://github.com/containers/fetchit
+   - url: http://github.com/containers/fetchit
+     branch: main
      systemd:
      - name: sysd-ex
        targetPath: examples/systemd
        root: true
        enable: true
        schedule: "*/5 * * * *"
-     branch: main
 
 File Transfer
 -------------
@@ -125,8 +119,7 @@ The File Transfer method will copy files from the container to the host. This me
 .. code-block:: yaml
 
    targetConfigs:
-   - name: fetchit
-     url: http://github.com/containers/fetchit
+   - url: http://github.com/containers/fetchit
      filetransfer:
      - name: ft-ex
        targetPath: examples/filetransfer
@@ -143,8 +136,7 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
 .. code-block:: yaml
 
    targetConfigs:
-   - name: fetchit
-     url: http://github.com/containers/fetchit
+   - url: http://github.com/containers/fetchit
      kube:
      - name: kube-ex
        targetPath: examples/kube
