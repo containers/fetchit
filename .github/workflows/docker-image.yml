@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: dump podman version
+        run: podman version
+
       - name: Install required packages
         run: sudo apt install curl
       
