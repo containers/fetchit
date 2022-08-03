@@ -10,7 +10,7 @@ jobs:
 
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v2
@@ -31,7 +31,7 @@ jobs:
           path: /tmp/fetchit.tar
 
   build-ansible-amd:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
 
@@ -51,7 +51,7 @@ jobs:
           path: /tmp/ansible-amd.tar
 
   build-ansible-arm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -78,7 +78,7 @@ jobs:
           path: /tmp/ansible-arm.tar
 
   pull-and-archive:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: pull the colors image
         run: podman pull docker.io/mmumshad/simple-webapp-color:latest
@@ -93,7 +93,7 @@ jobs:
           path: /tmp/colors.tar
 
   build-systemd-amd:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
 
@@ -113,7 +113,7 @@ jobs:
           path: /tmp/systemd-amd.tar
 
   build-systemd-arm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -140,7 +140,7 @@ jobs:
           path: /tmp/systemd-arm.tar
 
   fetchit-config-target-no-config-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -189,7 +189,7 @@ jobs:
         run: sudo podman ps
 
   fetchit-config-reload-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -238,7 +238,7 @@ jobs:
         run: sudo podman ps
 
   raw-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -290,7 +290,7 @@ jobs:
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   filetransfer-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -330,7 +330,7 @@ jobs:
         run: sudo podman ps -a
 
   filetransfer-validate-exact-file:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -367,7 +367,7 @@ jobs:
         run: sudo podman ps -a
 
   systemd-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -401,7 +401,7 @@ jobs:
         run: sudo podman ps -a
 
   systemd-autoupdate-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -471,7 +471,7 @@ jobs:
         run: sudo podman ps -a
 
   systemd-enable-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -520,7 +520,7 @@ jobs:
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   systemd-user-enable-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -576,7 +576,7 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(podman ps | grep httpd | wc -l); done'
 
   systemd-restart-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -628,7 +628,7 @@ jobs:
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   ansible-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, build-ansible-amd ]
     steps:
       - uses: actions/checkout@v2
@@ -678,7 +678,7 @@ jobs:
         run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh | wc -l); done'
 
   systemd-validate-exact-file:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -715,7 +715,7 @@ jobs:
         run: sudo podman ps -a
 
   kube-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -752,7 +752,7 @@ jobs:
         run: sudo podman ps
 
   clean-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -804,7 +804,7 @@ jobs:
         run: if [[ $(sudo podman image ls | grep alpine) ]] ; then exit 1; else echo "Image correctly removed" 1; fi
   
   glob-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -853,7 +853,7 @@ jobs:
         run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   multi-engine-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -920,7 +920,7 @@ jobs:
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | grep -v cap | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   multi-engine-skew-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -990,7 +990,7 @@ jobs:
         run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   make-change-to-repo:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1083,7 +1083,7 @@ jobs:
         run: sudo podman logs fetchit
 
   loader-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
@@ -1138,7 +1138,7 @@ jobs:
         run: sudo podman logs fetchit
 
   disconnected-validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, pull-and-archive ]
     steps:
       - name: checkout with token
@@ -1225,7 +1225,7 @@ jobs:
         run: sudo podman logs fetchit
 
   push-amd-image-to-registry:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -1252,7 +1252,7 @@ jobs:
 
 
   build-arm-and-manifest-list:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -1280,7 +1280,7 @@ jobs:
           path: /tmp/fetchit-arm.tar
 
   push-manifest-list-to-registry:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build-arm-and-manifest-list ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -1324,7 +1324,7 @@ jobs:
           podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest --format=docker
 
   publish-binary-to-github:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ build-arm-and-manifest-list ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -1367,7 +1367,7 @@ jobs:
             fetchit-amd
 
   create-ansible-manifest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ ansible-validate, build-ansible-arm ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -1411,7 +1411,7 @@ jobs:
           podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest --format=docker
 
   create-systemd-manifest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: [ systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, build-systemd-arm ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
