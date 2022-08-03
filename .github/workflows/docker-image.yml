@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: test
+        run: sudo apt-get -y podman
+
       - name: dump podman version
         run: podman version
 
