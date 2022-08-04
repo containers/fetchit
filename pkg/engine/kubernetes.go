@@ -22,56 +22,60 @@ type Kubernetes struct {
 	Kubeconfig string `mapstructure:"kubeconfig"`
 }
 
-func (kube *Kubernetes) GetKind() string {
+func (knetes *Kubernetes) GetKind() string {
 	return kubernetesMethod
 }
 
-func (kube *Kubernetes) Process(ctx, conn context.Context, PAT string, skew int) {
+func (knetes *Kubernetes) Process(ctx, conn context.Context, PAT string, skew int) {
+	target := knetes.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target := kube.GetTarget()
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
-	tag := []string{"yaml", "yml"}
-	if kube.initialRun {
+	if knetes.initialRun {
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
-			return
+			if len(target.url) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.url, target.name, err)
+				return
+			} else if len(target.localPath) > 0 {
+				klog.Errorf("Failed to clone repo at %s for target %s: %v", target.localPath, target.name, err)
+				return
+			}
 		}
 
-		err = zeroToCurrent(ctx, conn, kube, target, &tag)
+		err = zeroToCurrent(ctx, conn, knetes, target, nil)
 		if err != nil {
 			klog.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
-	err := currentToLatest(ctx, conn, kube, target, &tag)
+	err := currentToLatest(ctx, conn, knetes, target, nil)
 	if err != nil {
 		klog.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
-	kube.initialRun = false
+	knetes.initialRun = false
 }
 
-func (kube *Kubernetes) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
-	return kube.KubernetesPodman(ctx, conn, path)
+func (knetes *Kubernetes) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	return knetes.KubernetesPodman(ctx, conn, path)
 }
 
-func (kube *Kubernetes) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, kube.GetTarget(), kube.GetTargetPath(), kube.Glob, currentState, desiredState, tags)
+func (knetes *Kubernetes) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
+	changeMap, err := applyChanges(ctx, knetes.GetTarget(), knetes.GetTargetPath(), knetes.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
 	}
-	if err := runChanges(ctx, conn, kube, changeMap); err != nil {
+	if err := runChanges(ctx, conn, knetes, changeMap); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (kube *Kubernetes) KubernetesPodman(ctx, conn context.Context, path string) error {
+func (knetes *Kubernetes) KubernetesPodman(ctx, conn context.Context, path string) error {
 	// TODO: add logic to remove
 	if path == deleteFile {
 		return nil
@@ -87,7 +91,7 @@ func (kube *Kubernetes) KubernetesPodman(ctx, conn context.Context, path string)
 	}
 
 	s := specgen.NewSpecGenerator(kubeImage, false)
-	s.Name = "Kubernetes" + "-" + kube.Name
+	s.Name = "Kubernetes" + "-" + knetes.Name
 	s.Privileged = true
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
@@ -95,7 +99,7 @@ func (kube *Kubernetes) KubernetesPodman(ctx, conn context.Context, path string)
 	}
 
 	s.Command = []string{"sh", "-c", "kubectl apply -f " + kubectlObject}
-	s.Mounts = []specs.Mount{{Source: kube.Kubeconfig, Destination: "/root/.kube/config", Type: "bind", Options: []string{"rw"}}}
+	s.Mounts = []specs.Mount{{Source: knetes.Kubeconfig, Destination: "/root/.kube/config", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
