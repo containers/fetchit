@@ -94,7 +94,6 @@ func (kube *Kubernetes) KubernetesPodman(ctx, conn context.Context, path string)
 		Value:  "",
 	}
 
-	// TODO: Remove rcook entries
 	s.Command = []string{"sh", "-c", "kubectl apply -f " + kubectlObject}
 	s.Mounts = []specs.Mount{{Source: kube.Kubeconfig, Destination: "/root/.kube/config", Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
