@@ -283,9 +283,9 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 				fetchit.methodTargetScheds[ft] = ft.SchedInfo()
 			}
 		}
-		if len(tc.Kube) > 0 {
-			fetchit.allMethodTypes[kubeMethod] = struct{}{}
-			for _, k := range tc.Kube {
+		if len(tc.Kubernetes) > 0 {
+			fetchit.allMethodTypes[kubernetesMethod] = struct{}{}
+			for _, k := range tc.Kubernetes {
 				k.initialRun = true
 				k.target = internalTarget
 				fetchit.methodTargetScheds[k] = k.SchedInfo()

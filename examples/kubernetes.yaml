@@ -1,0 +1,9 @@
+targetConfigs:
+- name: fetchit
+  url: http://github.com/containers/fetchit
+  kubernetes:
+    - name: kubernetes
+      targetPath: examples/kubernetes
+      sshDirectory: /home/rcook/.kube/config
+      schedule: "*/1 * * * *"
+  branch: main

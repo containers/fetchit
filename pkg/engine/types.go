@@ -38,10 +38,9 @@ type TargetConfig struct {
 	Branch       string          `mapstructure:"branch"`
 	Ansible      []*Ansible      `mapstructure:"ansible"`
 	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
-	Kube         []*Kube         `mapstructure:"kube"`
+	Kubernetes   []*Kubernetes   `mapstructure:"kubernetes"`
 	Raw          []*Raw          `mapstructure:"raw"`
 	Systemd      []*Systemd      `mapstructure:"systemd"`
-	Kubernetes   []*Kubernetes   `mapstructure:"kubernetes"`
 
 	image        *Image
 	prune        *Prune
