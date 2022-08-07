@@ -304,7 +304,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 	return fetchit
 }
 
-// This assumes each Target has no more than 1 each of Raw, Systemd, FileTransfer
 func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
@@ -331,6 +330,7 @@ func (f *Fetchit) RunTargets() {
 	s.StartAsync()
 	select {}
 }
+
 func getRepo(target *Target, PAT string) error {
 	if target.url != "" && !target.disconnected {
 		getClone(target, PAT)
@@ -341,6 +341,7 @@ func getRepo(target *Target, PAT string) error {
 	}
 	return nil
 }
+
 func getClone(target *Target, PAT string) error {
 	directory := getDirectory(target)
 	absPath, err := filepath.Abs(directory)
