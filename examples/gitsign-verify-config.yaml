@@ -1,0 +1,10 @@
+targetConfigs:
+- url: https://github.com/sallyom/fetchit
+  verifyCommitsInfo:
+    GitsignVerify: true
+  filetransfer:
+  - name: ft-ex
+    targetPath: examples/filetransfer
+    destinationDirectory: /tmp/ft
+    schedule: "*/1 * * * *"
+  branch: gitsign
