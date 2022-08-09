@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"k8s.io/klog/v2"
 )
 
 const filetransferMethod = "filetransfer"
@@ -33,24 +32,24 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int)
 		err := getRepo(target, PAT)
 		if err != nil {
 			if len(target.url) > 0 {
-				klog.Errorf("Failed to clone repository at %s: %v", target.url, err)
+				logger.Errorf("Failed to clone repository at %s: %v", target.url, err)
 				return
 			} else if len(target.localPath) > 0 {
-				klog.Errorf("Failed to clone repository %s: %v", target.localPath, err)
+				logger.Errorf("Failed to clone repository %s: %v", target.localPath, err)
 				return
 			}
 		}
 
 		err = zeroToCurrent(ctx, conn, ft, target, nil)
 		if err != nil {
-			klog.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
 	err := currentToLatest(ctx, conn, ft, target, nil)
 	if err != nil {
-		klog.Errorf("Error moving current to latest: %v", err)
+		logger.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
@@ -98,7 +97,7 @@ func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest
 		return nil
 	}
 
-	klog.Infof("Deploying file(s) %s", path)
+	logger.Infof("Deploying file(s) %s", path)
 
 	file := filepath.Base(path)
 

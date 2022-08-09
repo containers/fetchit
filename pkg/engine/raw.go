@@ -15,8 +15,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gopkg.in/yaml.v3"
-
-	"k8s.io/klog/v2"
 )
 
 const rawMethod = "raw"
@@ -90,20 +88,20 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 	if r.initialRun {
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 
 		err = zeroToCurrent(ctx, conn, r, target, &tag)
 		if err != nil {
-			klog.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
 	err := currentToLatest(ctx, conn, r, target, &tag)
 	if err != nil {
-		klog.Errorf("Error moving current to latest: %v", err)
+		logger.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
@@ -112,7 +110,7 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 
 func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
 
-	klog.Infof("Creating podman container from %s", path)
+	logger.Infof("Creating podman container from %s", path)
 
 	rawFile, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -124,7 +122,7 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 		return err
 	}
 
-	klog.Infof("Identifying if image exists locally")
+	logger.Infof("Identifying if image exists locally")
 
 	err = detectOrFetchImage(conn, raw.Image, r.PullImage)
 	if err != nil {
@@ -143,7 +141,7 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 			return err
 		}
 
-		klog.Infof("Deleted podman container %s", raw.Name)
+		logger.Infof("Deleted podman container %s", raw.Name)
 	}
 
 	if path == deleteFile {
@@ -161,12 +159,12 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 	if err != nil {
 		return err
 	}
-	klog.Infof("Container %s created.", s.Name)
+	logger.Infof("Container %s created.", s.Name)
 
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
-	klog.Infof("Container %s started....Requeuing", s.Name)
+	logger.Infof("Container %s started....Requeuing", s.Name)
 
 	return nil
 }
@@ -281,7 +279,7 @@ func rawPodFromBytes(b []byte) (*RawPod, error) {
 func removeExisting(conn context.Context, podName string) error {
 	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
-		klog.Infof("A container named %s already exists. Removing the container before redeploy.", podName)
+		logger.Infof("A container named %s already exists. Removing the container before redeploy.", podName)
 		err := deleteContainer(conn, podName)
 		if err != nil {
 			return err

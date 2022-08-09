@@ -15,8 +15,6 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -97,7 +95,7 @@ func populateConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 
 	if err := v.ReadInConfig(); err == nil {
 		if err := v.Unmarshal(&config); err != nil {
-			klog.Info("Error with unmarshal of existing config file: %v", err)
+			logger.Info("Error with unmarshal of existing config file: %v", err)
 			return nil, false, err
 		}
 	}
@@ -173,7 +171,7 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 // If not initial, this may be overwritten with what is currently in FETCHIT_CONFIG_URL
 func isLocalConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 	if _, err := os.Stat(defaultConfigPath); err != nil {
-		klog.Infof("Local config file not found: %v", err)
+		logger.Infof("Local config file not found: %v", err)
 		return nil, false, err
 	}
 	return populateConfig(v)
@@ -181,6 +179,8 @@ func isLocalConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 
 // Initconfig reads in config file and env variables if set.
 func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
+	InitLogger()
+	defer logger.Sync()
 	v := viper.New()
 	var err error
 	var isLocal, exists bool
@@ -309,7 +309,7 @@ func (f *Fetchit) RunTargets() {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
 			if err := getRepo(method.GetTarget(), f.pat); err != nil {
-				klog.Warningf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget(), err)
+				logger.Debugf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget(), err)
 			}
 		}
 	}
@@ -323,7 +323,7 @@ func (f *Fetchit) RunTargets() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mt := method.GetKind()
-		klog.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
+		logger.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
 		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, f.pat, skew)
 		s.StartImmediately()
 	}
@@ -360,7 +360,7 @@ func getClone(target *Target, PAT string) error {
 	}
 
 	if !exists {
-		klog.Infof("git clone %s %s --recursive", target.url, target.branch)
+		logger.Infof("git clone %s %s --recursive", target.url, target.branch)
 		var user string
 		if PAT != "" {
 			user = "fetchit"

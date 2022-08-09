@@ -8,7 +8,6 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/system"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"k8s.io/klog/v2"
 )
 
 const pruneMethod = "prune"
@@ -41,7 +40,7 @@ func (p *Prune) Process(ctx, conn context.Context, PAT string, skew int) {
 
 	err := p.prunePodman(ctx, conn, opts)
 	if err != nil {
-		klog.Warningf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, pruneMethod, err)
+		logger.Debugf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, pruneMethod, err)
 	}
 
 }
@@ -55,28 +54,28 @@ func (p *Prune) Apply(ctx, conn context.Context, currentState, desiredState plum
 }
 
 func (p *Prune) prunePodman(ctx, conn context.Context, opts system.PruneOptions) error {
-	klog.Info("Pruning system")
+	logger.Info("Pruning system")
 	report, err := system.Prune(conn, &opts)
 	if err != nil {
 		return utils.WrapErr(err, "Error pruning system")
 	}
 	for _, report := range report.ContainerPruneReports {
-		klog.Infof("Pruned container of size %v with id: %s\n", report.Size, report.Id)
+		logger.Infof("Pruned container of size %v with id: %s", report.Size, report.Id)
 	}
 
 	for _, report := range report.ImagePruneReports {
-		klog.Infof("Pruned image of size %v with id: %s\n", report.Size, report.Id)
+		logger.Infof("Pruned image of size %v with id: %s", report.Size, report.Id)
 	}
 
 	for _, report := range report.PodPruneReport {
-		klog.Infof("Pruned pod with id: %s\n", report.Id)
+		logger.Infof("Pruned pod with id: %s", report.Id)
 	}
 
 	for _, report := range report.VolumePruneReports {
-		klog.Infof("Pruned volume of size %v with id: %s\n", report.Size, report.Id)
+		logger.Infof("Pruned volume of size %v with id: %s", report.Size, report.Id)
 	}
 
-	klog.Infof("Reclaimed %vB\n", report.ReclaimedSpace)
+	logger.Infof("Reclaimed %vB", report.ReclaimedSpace)
 
 	return nil
 }

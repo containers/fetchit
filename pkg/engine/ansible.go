@@ -9,8 +9,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/runtime-spec/specs-go"
-
-	"k8s.io/klog/v2"
 )
 
 const ansibleMethod = "ansible"
@@ -36,20 +34,20 @@ func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
 	if ans.initialRun {
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 
 		err = zeroToCurrent(ctx, conn, ans, target, &tag)
 		if err != nil {
-			klog.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
 	err := currentToLatest(ctx, conn, ans, target, &tag)
 	if err != nil {
-		klog.Errorf("Error moving current to latest: %v", err)
+		logger.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
@@ -76,12 +74,12 @@ func (ans *Ansible) ansiblePodman(ctx, conn context.Context, path string) error 
 	if path == deleteFile {
 		return nil
 	}
-	klog.Infof("Deploying Ansible playbook %s\n", path)
+	logger.Infof("Deploying Ansible playbook %s", path)
 
 	copyFile := ("/opt/" + path)
 	sshImage := "quay.io/fetchit/fetchit-ansible:latest"
 
-	klog.Infof("Identifying if fetchit-ansible image exists locally")
+	logger.Infof("Identifying if fetchit-ansible image exists locally")
 	if err := detectOrFetchImage(conn, sshImage, true); err != nil {
 		return err
 	}
@@ -106,7 +104,7 @@ func (ans *Ansible) ansiblePodman(ctx, conn context.Context, path string) error 
 	if err != nil {
 		return err
 	}
-	klog.Infof("Container created.")
+	logger.Infof("Container created.")
 	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
 		return err
 	}
@@ -115,6 +113,6 @@ func (ans *Ansible) ansiblePodman(ctx, conn context.Context, path string) error 
 	if err != nil {
 		return err
 	}
-	klog.Infof("Container started....Requeuing")
+	logger.Infof("Container started....Requeuing")
 	return nil
 }
