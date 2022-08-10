@@ -31,16 +31,17 @@ type FetchitConfig struct {
 }
 
 type TargetConfig struct {
-	Name         string          `mapstructure:"name"`
-	Url          string          `mapstructure:"url"`
-	Device       string          `mapstructure:"device"`
-	Disconnected bool            `mapstructure:"disconnected"`
-	Branch       string          `mapstructure:"branch"`
-	Ansible      []*Ansible      `mapstructure:"ansible"`
-	FileTransfer []*FileTransfer `mapstructure:"filetransfer"`
-	Kube         []*Kube         `mapstructure:"kube"`
-	Raw          []*Raw          `mapstructure:"raw"`
-	Systemd      []*Systemd      `mapstructure:"systemd"`
+	Name              string             `mapstructure:"name"`
+	Url               string             `mapstructure:"url"`
+	Device            string             `mapstructure:"device"`
+	Disconnected      bool               `mapstructure:"disconnected"`
+	VerifyCommitsInfo *VerifyCommitsInfo `mapstructure:"verifyCommitsInfo"`
+	Branch            string             `mapstructure:"branch"`
+	Ansible           []*Ansible         `mapstructure:"ansible"`
+	FileTransfer      []*FileTransfer    `mapstructure:"filetransfer"`
+	Kube              []*Kube            `mapstructure:"kube"`
+	Raw               []*Raw             `mapstructure:"raw"`
+	Systemd           []*Systemd         `mapstructure:"systemd"`
 
 	image        *Image
 	prune        *Prune
@@ -49,15 +50,25 @@ type TargetConfig struct {
 }
 
 type Target struct {
-	url          string
-	device       string
-	localPath    string
-	branch       string
-	mu           sync.Mutex
-	disconnected bool
+	url             string
+	device          string
+	localPath       string
+	branch          string
+	mu              sync.Mutex
+	disconnected    bool
+	gitsignVerify   bool
+	gitsignRekorURL string
 }
 
 type SchedInfo struct {
 	schedule string
 	skew     *int
+}
+
+type VerifyCommitsInfo struct {
+	// sigstore/gitsign verification with Rekor is available
+	// add other verification options as necessary
+	GitsignVerify bool
+	// default is https://rekor.sigstore.dev
+	GitsignRekorURL string
 }

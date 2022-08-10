@@ -59,7 +59,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 
-		logger.Infof("Moved %s to commit %s for git target %s", m.GetName(), current, target.url)
+		logger.Infof("Moved %s to commit %s for git target %s", m.GetName(), current.String()[:hashReportLen], target.url)
 	}
 
 	return nil
@@ -94,9 +94,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
-		logger.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current, latest, target.url)
+		logger.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current.String()[:hashReportLen], latest, target.url)
 	} else {
-		logger.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current)
+		logger.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current.String()[:hashReportLen])
 	}
 
 	return nil
