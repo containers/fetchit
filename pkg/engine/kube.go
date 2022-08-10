@@ -21,7 +21,6 @@ import (
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	k8syaml "sigs.k8s.io/yaml"
 )
 
@@ -47,20 +46,20 @@ func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
 	if initial {
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 
 		err = zeroToCurrent(ctx, conn, k, target, &tag)
 		if err != nil {
-			klog.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
 	err := currentToLatest(ctx, conn, k, target, &tag)
 	if err != nil {
-		klog.Errorf("Error moving current to latest: %v", err)
+		logger.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
@@ -88,7 +87,7 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 
 func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
 	if path != deleteFile {
-		klog.Infof("Creating podman container from %s using kube method", path)
+		logger.Infof("Creating podman container from %s using kube method", path)
 	}
 
 	if prev != nil {
@@ -158,7 +157,7 @@ func createPods(ctx context.Context, path string, specs []byte) error {
 		return utils.WrapErr(err, "Error playing kube spec")
 	}
 
-	klog.Infof("Created pods from spec in %s\n", path)
+	logger.Infof("Created pods from spec in %s", path)
 	return nil
 }
 

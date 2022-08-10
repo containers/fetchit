@@ -14,7 +14,6 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"k8s.io/klog/v2"
 )
 
 const configFileMethod = "config"
@@ -51,7 +50,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) 
 	os.Setenv("FETCHIT_CONFIG_URL", envURL)
 	// If ConfigURL is not populated, warn and leave
 	if envURL == "" && c.Device == "" {
-		klog.Warningf("Fetchit ConfigReload found, but neither $FETCHIT_CONFIG_URL on system nor ConfigReload.ConfigURL are set, exiting without updating the config.")
+		logger.Debugf("Fetchit ConfigReload found, but neither $FETCHIT_CONFIG_URL on system nor ConfigReload.ConfigURL are set, exiting without updating the config.")
 	}
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
@@ -60,14 +59,14 @@ func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) 
 		if !restart {
 			return
 		}
-		klog.Info("Updated config processed, restarting with new targets")
+		logger.Info("Updated config processed, restarting with new targets")
 		fetchitConfig.Restart()
 	} else if c.Device != "" {
 		restart := checkForDisconUpdates(c.Device, c.ConfigPath, true, false)
 		if !restart {
 			return
 		}
-		klog.Info("Updated config processed, restarting with new targets")
+		logger.Info("Updated config processed, restarting with new targets")
 		fetchitConfig.Restart()
 	}
 
@@ -92,7 +91,7 @@ func checkForConfigUpdates(envURL string, existsAlready bool, initial bool) bool
 	}
 	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial)
 	if err != nil {
-		klog.Info(err)
+		logger.Info(err)
 	}
 	return reset
 }
@@ -105,19 +104,19 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 	dest := cache + "/" + "config.yaml"
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
-		klog.Error("Failed to create connection to podman")
+		logger.Error("Failed to create connection to podman")
 		return false
 	}
 	// Ensure that the device is present
 	_, exitCode, err := localDeviceCheck(name, device, "")
 	if err != nil {
-		klog.Error("Failed to check device")
+		logger.Error("Failed to check device")
 		return false
 	}
 	if exitCode != 0 {
 		// remove the diff file
 		err = os.Remove(dest)
-		klog.Info("Device not present...requeuing")
+		logger.Info("Device not present...requeuing")
 		return false
 	} else if exitCode == 0 {
 		if _, err := os.Stat(dest); os.IsNotExist(err) {
@@ -131,11 +130,11 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 			}
 			// Wait for the container to finish
 			waitAndRemoveContainer(conn, createResponse.ID)
-			klog.Info("container created", createResponse.ID)
+			logger.Info("container created", createResponse.ID)
 			currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
 			newBytes, err := ioutil.ReadFile(dest)
 			if err != nil {
-				klog.Error("Failed to read config file")
+				logger.Error("Failed to read config file")
 			} else {
 				if bytes.Equal(newBytes, currentConfigBytes) {
 					return false
@@ -143,7 +142,7 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 					// Replace the old config file at defaultConfigPath with the new one from dest and restart
 					os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600)
 					os.WriteFile(defaultConfigPath, newBytes, 0600)
-					klog.Infof("Current config backup placed at %s", defaultConfigBackup)
+					logger.Infof("Current config backup placed at %s", defaultConfigBackup)
 					return true
 				}
 			}
@@ -182,7 +181,7 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 	if !initial {
 		currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
 		if err != nil {
-			klog.Infof("unable to read current config, will try with new downloaded config file: %v", err)
+			logger.Infof("unable to read current config, will try with new downloaded config file: %v", err)
 			existsAlready = false
 		} else {
 			if bytes.Equal(newBytes, currentConfigBytes) {
@@ -194,13 +193,13 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 			if err := os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600); err != nil {
 				return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
 			}
-			klog.Infof("Current config backup placed at %s", defaultConfigBackup)
+			logger.Infof("Current config backup placed at %s", defaultConfigBackup)
 		}
 	}
 	if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
 		return false, fmt.Errorf("unable to write new config contents, reverting to old config: %v", err)
 	}
 
-	klog.Infof("Config updates found from url: %s, will load new targets", urlStr)
+	logger.Infof("Config updates found from url: %s, will load new targets", urlStr)
 	return true, nil
 }

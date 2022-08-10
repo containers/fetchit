@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"k8s.io/klog/v2"
 )
 
 type CommonMethod struct {
@@ -60,7 +59,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 
-		klog.Infof("Moved %s to commit %s for git target %s", m.GetName(), current, target.url)
+		logger.Infof("Moved %s to commit %s for git target %s", m.GetName(), current, target.url)
 	}
 
 	return nil
@@ -95,9 +94,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
 		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
-		klog.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current, latest, target.url)
+		logger.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current, latest, target.url)
 	} else {
-		klog.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current)
+		logger.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current)
 	}
 
 	return nil

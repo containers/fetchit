@@ -13,7 +13,6 @@ import (
 	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"k8s.io/klog/v2"
 )
 
 func extractZip(url string) error {
@@ -29,17 +28,17 @@ func extractZip(url string) error {
 			// remove the diff file
 			err = os.Remove(dest)
 			if err != nil {
-				klog.Info("Failed to remove file ", dest)
+				logger.Info("Failed to remove file ", dest)
 				return err
 			}
 		}
-		klog.Info("URL not present...requeuing")
+		logger.Info("URL not present...requeuing")
 		return nil
 	} else if data.StatusCode == http.StatusOK {
 		if _, err := os.Stat(dest); os.IsNotExist(err) {
 			defer data.Body.Close()
 			// Check the http response code and if not present exit
-			klog.Infof("loading disconnected archive from %s", url)
+			logger.Infof("loading disconnected archive from %s", url)
 			// Place the data into the placeholder file
 
 			// Unzip the data from the http response
@@ -48,7 +47,7 @@ func extractZip(url string) error {
 
 			outFile, err := os.Create(absPath + "/" + directory + ".zip")
 			if err != nil {
-				klog.Error("Failed creating file ", absPath+"/"+directory+".zip")
+				logger.Error("Failed creating file ", absPath+"/"+directory+".zip")
 				return err
 			}
 
@@ -58,7 +57,7 @@ func extractZip(url string) error {
 			// Unzip the file
 			r, err := zip.OpenReader(outFile.Name())
 			if err != nil {
-				klog.Infof("error opening zip file: %s", err)
+				logger.Infof("error opening zip file: %s", err)
 			}
 			for _, f := range r.File {
 				rc, err := f.Open()
@@ -92,13 +91,13 @@ func extractZip(url string) error {
 			}
 			err = os.Remove(outFile.Name())
 			if err != nil {
-				klog.Error("Failed removing file ", outFile.Name())
+				logger.Error("Failed removing file ", outFile.Name())
 				return err
 			}
 			createDiffFile(directory)
 			return nil
 		} else {
-			klog.Info("No changes since last disonnected run...requeuing")
+			logger.Info("No changes since last disonnected run...requeuing")
 		}
 	}
 	return nil
@@ -109,13 +108,13 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 	ctx := context.Background()
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
-		klog.Error("Failed to create connection to podman")
+		logger.Error("Failed to create connection to podman")
 		return "", err
 	}
 	// Ensure that the device is present
 	_, exitCode, err := localDeviceCheck(name, device, trimDir)
 	if err != nil {
-		klog.Error("Failed to check device")
+		logger.Error("Failed to check device")
 		return "", err
 	}
 	if exitCode != 0 {
@@ -123,7 +122,7 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		cache := "/opt/.cache/" + name + "/"
 		dest := cache + "/" + "HEAD"
 		err = os.Remove(dest)
-		klog.Info("Device not present...requeuing")
+		logger.Info("Device not present...requeuing")
 		return "", nil
 	}
 	if exitCode == 0 {
@@ -131,7 +130,7 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + "-" + trimDir)
 		inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
 		if err == nil || inspectData == nil {
-			klog.Error("The container already exists..requeuing")
+			logger.Error("The container already exists..requeuing")
 			return "", err
 		}
 
@@ -158,14 +157,14 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 	ctx := context.Background()
 	conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
 	if err != nil {
-		klog.Error("Failed to create connection to podman")
+		logger.Error("Failed to create connection to podman")
 		return "", 0, err
 	}
 	// List currently running containers to ensure we don't create a duplicate
 	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
 	inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
 	if err == nil || inspectData == nil {
-		klog.Error("The container already exists..requeuing")
+		logger.Error("The container already exists..requeuing")
 		return "", 0, err
 	}
 
@@ -202,18 +201,18 @@ func createDiffFile(name string) error {
 	// Read the src file
 	srcFile, err := os.Open(src)
 	if err != nil {
-		klog.Error("Failed to open file ", src)
+		logger.Error("Failed to open file ", src)
 		return err
 	}
 	destination, err := os.Create(dest)
 	if err != nil {
-		klog.Error("Failed to create file ", dest)
+		logger.Error("Failed to create file ", dest)
 		return err
 	}
 	defer destination.Close()
 	_, err = io.Copy(destination, srcFile)
 	if err != nil {
-		klog.Error("Failed to copy file ", src)
+		logger.Error("Failed to copy file ", src)
 		return err
 	}
 	return nil

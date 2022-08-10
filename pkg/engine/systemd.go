@@ -14,8 +14,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/runtime-spec/specs-go"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -103,27 +101,27 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 	if sd.initialRun {
 		if sd.autoUpdateAll {
 			if err := sd.MethodEngine(ctx, conn, nil, ""); err != nil {
-				klog.Infof("Failed to start podman-auto-update.service: %v", err)
+				logger.Infof("Failed to start podman-auto-update.service: %v", err)
 			}
 			sd.initialRun = false
 			return
 		}
 		err := getRepo(target, PAT)
 		if err != nil {
-			klog.Errorf("Failed to clone repository %s: %v", target.url, err)
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return
 		}
 
 		err = zeroToCurrent(ctx, conn, sd, target, &tag)
 		if err != nil {
-			klog.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v", err)
 			return
 		}
 	}
 
 	err := currentToLatest(ctx, conn, sd, target, &tag)
 	if err != nil {
-		klog.Errorf("Error moving current to latest: %v", err)
+		logger.Errorf("Error moving current to latest: %v", err)
 		return
 	}
 
@@ -165,7 +163,7 @@ func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState p
 }
 
 func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path, dest string, prev *string) error {
-	klog.Infof("Deploying systemd file(s) %s", path)
+	logger.Infof("Deploying systemd file(s) %s", path)
 	if sd.autoUpdateAll {
 		if !sd.initialRun {
 			return nil
@@ -186,7 +184,7 @@ func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path
 		}
 	}
 	if !sd.Enable {
-		klog.Infof("Systemd target %s successfully processed", sd.Name)
+		logger.Infof("Systemd target %s successfully processed", sd.Name)
 		return nil
 	}
 	if (sd.Enable && !sd.Restart) || sd.initialRun {
@@ -205,7 +203,7 @@ func (sd *Systemd) enableRestartSystemdService(conn context.Context, action, des
 	if action == "autoupdate" {
 		act = "enable"
 	}
-	klog.Infof("Systemd target: %s, running systemctl %s %s", sd.Name, act, service)
+	logger.Infof("Systemd target: %s, running systemctl %s %s", sd.Name, act, service)
 	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
 		return err
 	}
@@ -260,6 +258,6 @@ func (sd *Systemd) enableRestartSystemdService(conn context.Context, action, des
 	if err != nil {
 		return err
 	}
-	klog.Infof("Systemd target %s-%s %s complete", sd.Name, act, service)
+	logger.Infof("Systemd target %s-%s %s complete", sd.Name, act, service)
 	return nil
 }
