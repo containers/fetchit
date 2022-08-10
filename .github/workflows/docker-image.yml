@@ -8,6 +8,18 @@ on:
 
 jobs:
 
+  podman:
+    runs-on: ubuntu-latest
+    steps:
+      - name: pull the release
+        run: curl -L https://github.com/liebig/podman/releases/download/v4.0.3-release/podman-release-v4.0.3-linux-amd64.tar.gz -o /tmp/podman.tar.gz
+
+      - name: archive podman
+        uses: actions/upload-artifact@v1
+        with:
+          name: podman
+          path: /tmp/podman.tar.gz
+
   build:
 
     runs-on: ubuntu-latest
@@ -144,6 +156,15 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman
+          path: /tmp
+
+      - name: install podman
+        run: sudo tar -xzvf /tmp/podman.tar.gz -C /
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
