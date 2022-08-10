@@ -164,7 +164,9 @@ jobs:
           path: /tmp
 
       - name: install podman
-        run: sudo tar -xzvf /tmp/podman.tar.gz -C / --strip-components=2
+        run: |
+         sudo tar -xzvf /tmp/podman.tar.gz -C / --strip-components=2
+         sudo apt --reinstall install libc6
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
