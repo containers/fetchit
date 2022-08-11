@@ -3,8 +3,8 @@ module github.com/containers/fetchit
 go 1.17
 
 require (
-	github.com/containers/common v0.47.4
-	github.com/containers/podman/v4 v4.0.0
+	github.com/containers/common v0.47.5
+	github.com/containers/podman/v4 v4.1.1
 	github.com/go-co-op/gocron v1.13.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/gobwas/glob v0.2.3
@@ -51,12 +51,12 @@ require (
 	github.com/containerd/cgroups v1.0.1 // indirect
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.12.0 // indirect
-	github.com/containers/buildah v1.24.1 // indirect
-	github.com/containers/image/v5 v5.19.1 // indirect
+	github.com/containers/buildah v1.24.3 // indirect
+	github.com/containers/image/v5 v5.19.2 // indirect
 	github.com/containers/libtrust v0.0.0-20190913040956-14b96171aa3b // indirect
 	github.com/containers/ocicrypt v1.1.2 // indirect
 	github.com/containers/psgo v1.7.2 // indirect
-	github.com/containers/storage v1.38.2 // indirect
+	github.com/containers/storage v1.38.3 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
