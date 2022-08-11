@@ -21,7 +21,6 @@ import (
 	rekorclient "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -145,12 +144,12 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	summary, err := Verify(ctx, hash, rekorClient, data, sig)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
-			klog.Infof("Bad Signature: GNUPG: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String())
+			logger.Infof("Bad Signature: GNUPG: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String())
 		}
 		return utils.WrapErr(err, "Failed to verify signature")
 	}
-	klog.Infof("Validated Git signature: GNUPG: %s SUBJECT/ISSUER: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String(), summary.Cert.Issuer)
-	klog.Infof("Validated Rekor entry: %d From: %s", summary.LogEntry.LogIndex, summary.Cert.EmailAddresses)
+	logger.Infof("Validated Git signature: GNUPG: %s SUBJECT/ISSUER: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String(), summary.Cert.Issuer)
+	logger.Infof("Validated Rekor entry: %d From: %s", summary.LogEntry.LogIndex, summary.Cert.EmailAddresses)
 	return nil
 }
 
