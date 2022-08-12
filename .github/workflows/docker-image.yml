@@ -6,7 +6,63 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  CGO_ENABLED: 0
+  PODMAN_VER: v4.1.1
+
 jobs:
+
+  build-podman-v4:
+    env:
+      CGO_ENABLED: 1 # CGO is required for podman
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cache podman bin
+        id: cache-podman-bin
+        uses: actions/cache@v3
+        with:
+          path: |
+            ./bin
+          key: ${{ runner.os }}-podman-${{ env.PODMAN_VER }}
+          restore-keys: |
+            ${{ runner.os }}-podman
+      - uses: actions/checkout@v3
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        with:
+          repository: containers/podman
+          ref: v4.1.1
+
+      - uses: actions/setup-go@v2
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        with:
+          go-version: ${{ env.GOVER }}
+
+      - name: Cache go modules
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        uses: actions/cache@v2
+        with:
+          # In order:
+          # * Module download cache
+          # * Build cache (Linux)
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-podman-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-podman
+      - name: Add build packages
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        run: sudo apt install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
+
+      - name: Build podman v4
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        run: make binaries
+
+      # store podman binary as artifact
+      - uses: actions/upload-artifact@v3
+        with:
+          name: podman-bins
+          path: bin
 
   build:
 
@@ -145,6 +201,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -194,6 +261,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -242,7 +320,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -295,6 +384,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -335,6 +435,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -371,6 +482,17 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -417,7 +539,18 @@ jobs:
     needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
- 
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -451,6 +584,17 @@ jobs:
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -522,6 +666,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -570,6 +725,17 @@ jobs:
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
 
       - name: enable podman.socket
         run: |
@@ -627,6 +793,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -679,6 +856,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -728,7 +916,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
- 
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -765,7 +964,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -802,7 +1012,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -854,7 +1075,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -903,7 +1135,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -970,7 +1213,18 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-        
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1051,6 +1305,17 @@ jobs:
         with:
           path: ci
           ref: ci
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1134,6 +1399,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1191,6 +1467,17 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: ci
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
