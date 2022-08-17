@@ -38,14 +38,15 @@ This example can be found in [./examples/readme-config.yaml](examples/readme-con
 
 ```
 targetConfigs:
-- name: fetchit
-  url: http://github.com/containers/fetchit
+- url: http://github.com/containers/fetchit
   branch: main
   fileTransfer:
-    targetPath: examples/fileTransfer/hello.txt
+  - name: ft-ex
+    targetPath: examples/fileTransfer
     destinationDirectory: /tmp
     schedule: "*/1 * * * *" 
   raw:
+  - name: raw-ex
     targetPath: examples/raw
     schedule: "*/1 * * * *"
 ```
