@@ -58,13 +58,13 @@ Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting 
 
 For root
 ```
-cp systemd/fetchit.root /etc/systemd/system/fetchit.service
+cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
 systemctl enable fetchit --now
 ```
 
 ```
 mkdir -p ~/.config/systemd/user/
-cp systemd/fetchit-user.service ~/.config/systemd/user/
+cp systemd/fetchit-user.service ~/.config/systemd/user/fetchit.service
 systemctl --user enable fetchit --now
 ```
 
