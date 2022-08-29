@@ -64,7 +64,7 @@ systemctl enable fetchit --now
 
 ```
 mkdir -p ~/.config/systemd/user/
-cp systemd/fetchit.user ~/.config/systemd/user/
+cp systemd/fetchit-user.service ~/.config/systemd/user/
 systemctl --user enable fetchit --now
 ```
 
