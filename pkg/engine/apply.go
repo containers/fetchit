@@ -17,10 +17,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/gobwas/glob"
 	gitsign "github.com/sigstore/gitsign/pkg/git"
-	gitrekor "github.com/sigstore/gitsign/pkg/rekor"
+	gitsignrekor "github.com/sigstore/gitsign/pkg/rekor"
 	rekorclient "github.com/sigstore/rekor/pkg/client"
-	"github.com/sigstore/rekor/pkg/generated/models"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
 )
 
 const (
@@ -97,14 +95,6 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 	return branch.Hash(), err
 }
 
-// borrowed from gitsign's internal git pkg https://github.com/sigstore/gitsign/blob/main/internal/git/git.go
-type Summary struct {
-	// Certificate used to sign the commit.
-	Cert *x509.Certificate
-	// Rekor log entry of the commit.
-	LogEntry *models.LogEntryAnon
-}
-
 // VerifyGitsign verifies any commit signed using sigstore/gitsign & rekor
 func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url string) error {
 	if commit.PGPSignature == "" {
@@ -136,65 +126,31 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	if rekorURL == "" {
 		rekorURL = defaultRekorURL
 	}
-	rekorClient, err := gitrekor.New(rekorURL, rekorclient.WithUserAgent("gitsign"))
+	client, err := gitsignrekor.New(rekorURL, rekorclient.WithUserAgent("gitsign"))
 	if err != nil {
 		return utils.WrapErr(err, "Error obtaining rekor client")
 	}
-
-	summary, err := Verify(ctx, hash, rekorClient, data, sig)
+	summary, err := gitsign.Verify(ctx, client, data, sig, true)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
-			logger.Infof("Bad Signature: GNUPG: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String())
+			logger.Infof("Bad Signature: GNUPG: %s %s", certHexFingerprint(summary.Cert), summary.Cert.Subject.String())
 		}
 		return utils.WrapErr(err, "Failed to verify signature")
 	}
-	logger.Infof("Validated Git signature: GNUPG: %s SUBJECT/ISSUER: %s %s", CertHexFpr(summary.Cert), summary.Cert.Subject.String(), summary.Cert.Issuer)
+	logger.Infof("Validated Git signature: GNUPG: %s SUBJECT/ISSUER: %s %s", certHexFingerprint(summary.Cert), summary.Cert.Subject.String(), summary.Cert.Issuer)
 	logger.Infof("Validated Rekor entry: %d From: %s", summary.LogEntry.LogIndex, summary.Cert.EmailAddresses)
 	return nil
 }
 
-// borrowed from gitsign internal git
-// certHexFingerprint calculated the hex SHA1 fingerprint of a certificate.
-func CertHexFpr(cert *x509.Certificate) string {
-	return hex.EncodeToString(certFingerprint(cert))
-}
-
-// borrowed from gitsign internal git
-// certFingerprint calculated the SHA1 fingerprint of a certificate.
-func certFingerprint(cert *x509.Certificate) []byte {
+// borrowed from sigstore/gitsign/internal/git
+// certHexFingerprint calculates the hex SHA1 fingerprint of a certificate.
+func certHexFingerprint(cert *x509.Certificate) string {
 	if len(cert.Raw) == 0 {
-		return nil
+		return ""
 	}
 
 	fpr := sha1.Sum(cert.Raw)
-	return fpr[:]
-}
-
-// modeled after gitsign's internal git package: https://github.com/sigstore/gitsign/blob/main/internal/git
-func Verify(ctx context.Context, hash string, rekorVer gitrekor.Verifier, data, sig []byte) (*Summary, error) {
-	root, err := fulcioroots.Get()
-	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting fulcio root certificate")
-	}
-	intermediates, err := fulcioroots.GetIntermediates()
-	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting fulcio intermediate certificates")
-	}
-
-	cert, err := gitsign.VerifySignature(data, sig, true, root, intermediates)
-	if err != nil {
-		return nil, utils.WrapErr(err, "Error obtaining certificate from commit signature")
-	}
-
-	tlog, err := rekorVer.Verify(ctx, hash, cert)
-	if err != nil {
-		return nil, utils.WrapErr(err, "Failed to validate rekor entry")
-	}
-
-	return &Summary{
-		Cert:     cert,
-		LogEntry: tlog,
-	}, nil
+	return hex.EncodeToString(fpr[:])
 }
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
