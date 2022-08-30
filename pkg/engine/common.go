@@ -58,7 +58,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 	if current != plumbing.ZeroHash {
 		err = m.Apply(ctx, conn, plumbing.ZeroHash, current, tag)
 		if err != nil {
-			return fmt.Errorf("Failed to apply changes: %v", err)
+			return fmt.Errorf("Failed to apply changes: %w", err)
 		}
 
 		logger.Infof("Moved %s to commit %s for git target %s", m.GetName(), current.String()[:hashReportLen], target.url)
@@ -94,8 +94,8 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	}
 
 	if latest != current {
-		if err := m.Apply(ctx, conn, current, latest, tag); err != nil {
-			return fmt.Errorf("Failed to apply changes: %v", err)
+		if err := applyWithRecovery(ctx, conn, m, current, latest, tag); err != nil {
+			return fmt.Errorf("Failed to apply changes: %w", err)
 		}
 		if err := updateCurrent(ctx, target, latest, m.GetKind(), m.GetName()); err != nil {
 			return err
