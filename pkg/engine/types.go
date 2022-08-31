@@ -13,7 +13,7 @@ type Method interface {
 	GetName() string
 	GetKind() string
 	GetTarget() *Target
-	Process(ctx context.Context, conn context.Context, PAT string, skew int)
+	Process(ctx context.Context, conn context.Context, skew int)
 	Apply(ctx context.Context, conn context.Context, currentState plumbing.Hash, desiredState plumbing.Hash, tags *[]string) error
 	MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error
 }
@@ -25,7 +25,6 @@ type FetchitConfig struct {
 	Prune            *Prune            `mapstructure:"prune"`
 	PodmanAutoUpdate *PodmanAutoUpdate `mapstructure:"podmanAutoUpdate"`
 	Images           []*Image          `mapstructure:"images"`
-	PAT              string            `mapstructure:"pat"`
 	conn             context.Context
 	scheduler        *gocron.Scheduler
 }
@@ -33,6 +32,7 @@ type FetchitConfig struct {
 type TargetConfig struct {
 	Name              string             `mapstructure:"name"`
 	Url               string             `mapstructure:"url"`
+	Pat               string             `mapstructure:"pat"`
 	Device            string             `mapstructure:"device"`
 	Disconnected      bool               `mapstructure:"disconnected"`
 	VerifyCommitsInfo *VerifyCommitsInfo `mapstructure:"verifyCommitsInfo"`
@@ -51,6 +51,7 @@ type TargetConfig struct {
 
 type Target struct {
 	url             string
+	pat             string
 	device          string
 	localPath       string
 	branch          string

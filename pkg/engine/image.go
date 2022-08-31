@@ -33,7 +33,7 @@ func (i *Image) GetKind() string {
 	return imageMethod
 }
 
-func (i *Image) Process(ctx, conn context.Context, PAT string, skew int) {
+func (i *Image) Process(ctx, conn context.Context, skew int) {
 	target := i.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()

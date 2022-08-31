@@ -39,7 +39,7 @@ func (c *ConfigReload) GetName() string {
 	return configFileMethod
 }
 
-func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) {
+func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	// configURL in config file will override the environment variable
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")

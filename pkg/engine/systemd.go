@@ -85,7 +85,7 @@ func (sd *Systemd) GetKind() string {
 	return systemdMethod
 }
 
-func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
+func (sd *Systemd) Process(ctx, conn context.Context, skew int) {
 	target := sd.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
@@ -106,7 +106,7 @@ func (sd *Systemd) Process(ctx, conn context.Context, PAT string, skew int) {
 			sd.initialRun = false
 			return
 		}
-		err := getRepo(target, PAT)
+		err := getRepo(target)
 		if err != nil {
 			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return

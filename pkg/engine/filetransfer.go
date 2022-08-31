@@ -22,14 +22,14 @@ func (ft *FileTransfer) GetKind() string {
 	return filetransferMethod
 }
 
-func (ft *FileTransfer) Process(ctx, conn context.Context, PAT string, skew int) {
+func (ft *FileTransfer) Process(ctx, conn context.Context, skew int) {
 	target := ft.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
 	if ft.initialRun {
-		err := getRepo(target, PAT)
+		err := getRepo(target)
 		if err != nil {
 			if len(target.url) > 0 {
 				logger.Errorf("Failed to clone repository at %s: %v", target.url, err)

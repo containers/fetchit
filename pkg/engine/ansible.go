@@ -24,7 +24,7 @@ func (ans *Ansible) GetKind() string {
 	return ansibleMethod
 }
 
-func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
+func (ans *Ansible) Process(ctx, conn context.Context, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target := ans.GetTarget()
 	target.mu.Lock()
@@ -32,7 +32,7 @@ func (ans *Ansible) Process(ctx, conn context.Context, PAT string, skew int) {
 
 	tag := []string{"yaml", "yml"}
 	if ans.initialRun {
-		err := getRepo(target, PAT)
+		err := getRepo(target)
 		if err != nil {
 			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return

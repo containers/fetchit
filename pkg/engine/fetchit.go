@@ -104,7 +104,6 @@ func populateConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 
 func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	fetchit = newFetchit()
-	fetchit.pat = fc.PAT
 	ctx := context.Background()
 	if fc.conn == nil {
 		// TODO: socket directory same for all platforms?
@@ -234,6 +233,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		internalTarget := &Target{
 			url:          tc.Url,
 			device:       tc.Device,
+			pat:          tc.Pat,
 			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
 		}
@@ -313,7 +313,7 @@ func (f *Fetchit) RunTargets() {
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
-			if err := getRepo(method.GetTarget(), f.pat); err != nil {
+			if err := getRepo(method.GetTarget()); err != nil {
 				logger.Debugf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget(), err)
 			}
 		}
@@ -329,16 +329,16 @@ func (f *Fetchit) RunTargets() {
 		defer cancel()
 		mt := method.GetKind()
 		logger.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
-		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, f.pat, skew)
+		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, skew)
 		s.StartImmediately()
 	}
 	s.StartAsync()
 	select {}
 }
 
-func getRepo(target *Target, PAT string) error {
+func getRepo(target *Target) error {
 	if target.url != "" && !target.disconnected {
-		getClone(target, PAT)
+		getClone(target)
 	} else if target.disconnected && len(target.url) > 0 {
 		getDisconnected(target)
 	} else if target.disconnected && len(target.device) > 0 {
@@ -347,7 +347,7 @@ func getRepo(target *Target, PAT string) error {
 	return nil
 }
 
-func getClone(target *Target, PAT string) error {
+func getClone(target *Target) error {
 	directory := getDirectory(target)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
@@ -365,15 +365,15 @@ func getClone(target *Target, PAT string) error {
 	}
 
 	if !exists {
-		logger.Infof("git clone %s %s --recursive", target.url, target.branch)
+		logger.Infof("git clone %s %s --recursive %s", target.url, target.branch, target.pat)
 		var user string
-		if PAT != "" {
+		if target.pat != "" {
 			user = "fetchit"
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
 			Auth: &githttp.BasicAuth{
 				Username: user, // the value of this field should not matter when using a PAT
-				Password: PAT,
+				Password: target.pat,
 			},
 			URL:           target.url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)),

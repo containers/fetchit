@@ -27,7 +27,7 @@ func (p *Prune) GetName() string {
 	return pruneMethod
 }
 
-func (p *Prune) Process(ctx, conn context.Context, PAT string, skew int) {
+func (p *Prune) Process(ctx, conn context.Context, skew int) {
 	target := p.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
