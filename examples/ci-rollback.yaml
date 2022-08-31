@@ -1,0 +1,10 @@
+targetConfigs:
+- name: fetchit
+  url: http://github.com/josephsawaya/fetchit
+  raw:
+  - name: raw
+    targetPath: examples/ci-rollback
+    schedule: "*/1 * * * *"
+  trackBadCommits: true
+  branch: ci-rollback 
+ 
