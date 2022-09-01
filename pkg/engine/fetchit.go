@@ -365,7 +365,7 @@ func getClone(target *Target) error {
 	}
 
 	if !exists {
-		logger.Infof("git clone %s %s --recursive %s", target.url, target.branch, target.pat)
+		logger.Infof("git clone %s %s --recursive", target.url, target.branch)
 		var user string
 		if target.pat != "" {
 			user = "fetchit"
