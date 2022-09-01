@@ -168,8 +168,10 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat st
 	if err != nil {
 		return false, fmt.Errorf("unable to create request: %v", err)
 	}
-	req.Header.Add("Authorization", "token "+pat)
-	req.Header.Add("Accept", "application/vnd.github.v3+json")
+	if pat != "" {
+		req.Header.Add("Authorization", "token "+pat)
+		req.Header.Add("Accept", "application/vnd.github.v3+json")
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
