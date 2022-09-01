@@ -185,6 +185,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 	var isLocal, exists bool
 	var config *FetchitConfig
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
+	pat := ""
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
@@ -202,7 +203,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 		// Only run this from initial startup and only after trying to populate the config from a local file.
 		// because CheckForConfigUpdates also runs with each processConfig, so if !initial this is already done
 		// If configURL is passed in, a config file on disk has priority on the initial run.
-		_ = checkForConfigUpdates(envURL, false, true)
+		_ = checkForConfigUpdates(envURL, false, true, pat)
 	}
 
 	// if config is not yet populated, fc.CheckForConfigUpdates has placed the config
