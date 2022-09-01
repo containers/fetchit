@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/gobwas/glob"
 	gitsign "github.com/sigstore/gitsign/pkg/git"
 	gitsignrekor "github.com/sigstore/gitsign/pkg/rekor"
@@ -60,10 +61,25 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository %s to fetch latest commit", directory)
 	}
 
+	var user string
+	if target.pat != "" {
+		user = "fetchit"
+	}
+
 	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.branch, target.branch))
 	if err = repo.Fetch(&git.FetchOptions{
-		RefSpecs: []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
-		Force:    true,
+		RemoteName: "",
+		RefSpecs:   []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
+		Depth:      0,
+		Auth: &githttp.BasicAuth{
+			Username: user,
+			Password: target.pat,
+		},
+		Progress:        nil,
+		Tags:            0,
+		Force:           true,
+		InsecureSkipTLS: false,
+		CABundle:        []byte{},
 	}); err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}

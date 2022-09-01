@@ -35,7 +35,7 @@ func (k *Kube) GetKind() string {
 	return kubeMethod
 }
 
-func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
+func (k *Kube) Process(ctx, conn context.Context, skew int) {
 	target := k.GetTarget()
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target.mu.Lock()
@@ -44,7 +44,7 @@ func (k *Kube) Process(ctx, conn context.Context, PAT string, skew int) {
 	initial := k.initialRun
 	tag := []string{"yaml", "yml"}
 	if initial {
-		err := getRepo(target, PAT)
+		err := getRepo(target)
 		if err != nil {
 			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return

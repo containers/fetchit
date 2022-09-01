@@ -29,6 +29,7 @@ type ConfigReload struct {
 	ConfigURL    string `mapstructure:"configURL"`
 	Device       string `mapstructure:"device"`
 	ConfigPath   string `mapstructure:"configPath"`
+	Pat          string `mapstructure:"pat"`
 }
 
 func (c *ConfigReload) GetKind() string {
@@ -39,7 +40,7 @@ func (c *ConfigReload) GetName() string {
 	return configFileMethod
 }
 
-func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) {
+func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	// configURL in config file will override the environment variable
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
@@ -55,7 +56,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, PAT string, skew int) 
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
 	if envURL != "" {
-		restart := checkForConfigUpdates(envURL, true, false)
+		restart := checkForConfigUpdates(envURL, true, false, c.Pat)
 		if !restart {
 			return
 		}
@@ -84,12 +85,12 @@ func (c *ConfigReload) Apply(ctx, conn context.Context, currentState, desiredSta
 // in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
 // This runs with the initial startup as well as with scheduled ConfigReload runs,
 // if $FETCHIT_CONFIG_URL is set.
-func checkForConfigUpdates(envURL string, existsAlready bool, initial bool) bool {
+func checkForConfigUpdates(envURL string, existsAlready bool, initial bool, pat string) bool {
 	// envURL is either set by user or set to match a configURL in a configReload
 	if envURL == "" {
 		return false
 	}
-	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial)
+	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial, pat)
 	if err != nil {
 		logger.Info(err)
 	}
@@ -152,7 +153,7 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod
-func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool, error) {
+func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat string) (bool, error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
 		return false, fmt.Errorf("unable to parse config file url %s: %v", urlStr, err)
@@ -163,7 +164,15 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool) (bool,
 			return nil
 		},
 	}
-	resp, err := client.Get(urlStr)
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return false, fmt.Errorf("unable to create request: %v", err)
+	}
+	if pat != "" {
+		req.Header.Add("Authorization", "token "+pat)
+		req.Header.Add("Accept", "application/vnd.github.v3+json")
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err
 	}

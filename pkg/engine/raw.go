@@ -77,7 +77,7 @@ type RawPod struct {
 	CapDrop []string          `json:"CapDrop" yaml:"CapDrop"`
 }
 
-func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, skew int) {
+func (r *Raw) Process(ctx context.Context, conn context.Context, skew int) {
 	time.Sleep(time.Duration(skew) * time.Millisecond)
 	target := r.GetTarget()
 	target.mu.Lock()
@@ -86,7 +86,7 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, PAT string, ske
 	tag := []string{".json", ".yaml", ".yml"}
 
 	if r.initialRun {
-		err := getRepo(target, PAT)
+		err := getRepo(target)
 		if err != nil {
 			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
 			return

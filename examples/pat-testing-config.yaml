@@ -1,0 +1,17 @@
+# for this test, start with this config, then wait to be sure the
+# targetConfigs from .fetchit/config.yaml are populated
+# and for follow-up test, push a change to the config and confirm
+# new targetConfigs are fetched & run
+configReload:
+  configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+  schedule: "*/2 * * * *"
+  pat: CHANGEME
+targetConfigs:
+- url: https://github.com/containers/fetchit
+  pat: CHANGEME
+  raw:
+  - name: raw-ex
+    targetPath: examples/raw
+    schedule: "*/1 * * * *"
+    pullImage: false
+  branch: main
