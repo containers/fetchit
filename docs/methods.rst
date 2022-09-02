@@ -64,6 +64,37 @@ Various methods are available to lifecycle and manage the container environment 
 allow for files or directories of files to be deployed to the container host to be used by containers.
 
 
+All methods are defined within specific targetConfiguration sections. These sections are demonstrated below. For private repositories, a PAT token or a username/password combination is required.
+
+An example of using a PAT token is shown below.
+
+.. code-block:: yaml
+
+   targetConfigs:
+   - url: http://github.com/containers/fetchit
+     pat: github-alphanumeric-token
+     branch: main
+     ansible:
+     - name: ans-ex
+       targetPath: examples/ansible
+       sshDirectory: /root/.ssh
+       schedule: "*/5 * * * *"
+
+An example of using username/password is shown below.
+
+.. code-block:: yaml
+
+   targetConfigs:
+   - url: http://github.com/containers/fetchit
+     username: bob
+     password: bobpassword
+     branch: main
+     ansible:
+     - name: ans-ex
+       targetPath: examples/ansible
+       sshDirectory: /root/.ssh
+       schedule: "*/5 * * * *"
+
 Ansible
 -------
 The AnsibleTarget method allows for an Ansible playbook to be run on the host. A container is created containing the Ansible playbook, and the container will run the playbook. This playbook can be used to install software, configure the host, or perform other tasks.
