@@ -30,6 +30,8 @@ type ConfigReload struct {
 	Device       string `mapstructure:"device"`
 	ConfigPath   string `mapstructure:"configPath"`
 	Pat          string `mapstructure:"pat"`
+	Username     string `mapstructure:"username"`
+	Password     string `mapstructure:"password"`
 }
 
 func (c *ConfigReload) GetKind() string {
@@ -56,7 +58,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
 	if envURL != "" {
-		restart := checkForConfigUpdates(envURL, true, false, c.Pat)
+		restart := checkForConfigUpdates(envURL, true, false, c.Pat, c.Username, c.Password)
 		if !restart {
 			return
 		}
@@ -85,12 +87,12 @@ func (c *ConfigReload) Apply(ctx, conn context.Context, currentState, desiredSta
 // in defaultConfigPath in fetchit container (/opt/mount/config.yaml).
 // This runs with the initial startup as well as with scheduled ConfigReload runs,
 // if $FETCHIT_CONFIG_URL is set.
-func checkForConfigUpdates(envURL string, existsAlready bool, initial bool, pat string) bool {
+func checkForConfigUpdates(envURL string, existsAlready bool, initial bool, pat, username, password string) bool {
 	// envURL is either set by user or set to match a configURL in a configReload
 	if envURL == "" {
 		return false
 	}
-	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial, pat)
+	reset, err := downloadUpdateConfigFile(envURL, existsAlready, initial, pat, username, password)
 	if err != nil {
 		logger.Info(err)
 	}
@@ -153,7 +155,7 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod
-func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat string) (bool, error) {
+func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, username, password string) (bool, error) {
 	_, err := url.Parse(urlStr)
 	if err != nil {
 		return false, fmt.Errorf("unable to parse config file url %s: %v", urlStr, err)
@@ -171,6 +173,9 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat st
 	if pat != "" {
 		req.Header.Add("Authorization", "token "+pat)
 		req.Header.Add("Accept", "application/vnd.github.v3+json")
+	}
+	if username != "" && password != "" {
+		req.SetBasicAuth(username, password)
 	}
 	resp, err := client.Do(req)
 	if err != nil {

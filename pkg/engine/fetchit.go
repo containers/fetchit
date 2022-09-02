@@ -186,6 +186,8 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 	var config *FetchitConfig
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
 	pat := ""
+	username := ""
+	password := ""
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
@@ -203,7 +205,7 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 		// Only run this from initial startup and only after trying to populate the config from a local file.
 		// because CheckForConfigUpdates also runs with each processConfig, so if !initial this is already done
 		// If configURL is passed in, a config file on disk has priority on the initial run.
-		_ = checkForConfigUpdates(envURL, false, true, pat)
+		_ = checkForConfigUpdates(envURL, false, true, pat, username, password)
 	}
 
 	// if config is not yet populated, fc.CheckForConfigUpdates has placed the config
@@ -235,6 +237,8 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			url:          tc.Url,
 			device:       tc.Device,
 			pat:          tc.Pat,
+			username:     tc.Username,
+			password:     tc.Password,
 			branch:       tc.Branch,
 			disconnected: tc.Disconnected,
 		}
@@ -367,14 +371,14 @@ func getClone(target *Target) error {
 
 	if !exists {
 		logger.Infof("git clone %s %s --recursive", target.url, target.branch)
-		var user string
 		if target.pat != "" {
-			user = "fetchit"
+			target.username = "fetchit"
+			target.password = target.pat
 		}
 		_, err = git.PlainClone(absPath, false, &git.CloneOptions{
 			Auth: &githttp.BasicAuth{
-				Username: user, // the value of this field should not matter when using a PAT
-				Password: target.pat,
+				Username: target.username, // the value of this field should not matter when using a PAT
+				Password: target.password,
 			},
 			URL:           target.url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)),

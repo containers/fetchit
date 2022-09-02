@@ -61,9 +61,9 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository %s to fetch latest commit", directory)
 	}
 
-	var user string
 	if target.pat != "" {
-		user = "fetchit"
+		target.username = "fetchit"
+		target.password = target.pat
 	}
 
 	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.branch, target.branch))
@@ -72,8 +72,8 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		RefSpecs:   []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Depth:      0,
 		Auth: &githttp.BasicAuth{
-			Username: user,
-			Password: target.pat,
+			Username: target.username,
+			Password: target.password,
 		},
 		Progress:        nil,
 		Tags:            0,
