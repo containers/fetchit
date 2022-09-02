@@ -4,6 +4,7 @@ The purpose of FetchIt is to allow for GitOps management of podman managed conta
 This project is currently under development. For a more detailed explanation of the project visit the docs page.
 https://fetchit.readthedocs.io/
 
+A quickstart example is available at https://github.com/containers/fetchit/blob/main/docs/quick_start.rst
 
 ##  Running
 FetchIt requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
