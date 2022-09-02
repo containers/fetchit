@@ -6,7 +6,7 @@
 
 FetchIt
 =======
-FetchIt was designed to allow for the hands off management of containers running on system running podman. Check out the :ref:`Quick Start <quickstart>` for a quick example of FetchIt.
+FetchIt was designed to allow for the hands off management of containers running on system running podman. Check out the :ref:`Quick Start` for a quick example of FetchIt.
 
 .. toctree::
    :maxdepth: 2
