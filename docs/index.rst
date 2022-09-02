@@ -9,9 +9,7 @@ FetchIt
 FetchIt was designed to allow for the hands off management of containers running on system running podman. Check out the :ref:`Quick Start` for a quick example of FetchIt.
 
 .. toctree::
-   :maxdepth: 2
-
-   quick_start.rst
-   purpose.rst
-   methods.rst
-   running.rst
+   quick_start
+   purpose
+   methods
+   running
