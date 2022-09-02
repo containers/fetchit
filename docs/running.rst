@@ -40,7 +40,7 @@ For root
 
 .. code-block:: bash
    
-   cp systemd/fetchit.root /etc/systemd/system/fetchit.service
+   cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
    systemctl enable fetchit --now
 
 
@@ -49,7 +49,7 @@ For user ensure that the path for the configuration file `/home/fetchiter/config
 .. code-block:: bash
    
    mkdir -p ~/.config/systemd/user/
-   cp systemd/fetchit.user ~/.config/systemd/user/
+   cp systemd/fetchit-user.service ~/.config/systemd/user/
    systemctl --user enable fetchit --now
 
 Manually
