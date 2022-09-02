@@ -36,6 +36,7 @@ The ConfigReload method can be used to reload target configs from a private regi
 the repository is not public. The config.yaml will need to include the credentials to access the private registry.
 
 When using a GitHub PAT token, the config.yaml will need to include the following fields:
+
 .. code-block:: yaml
 
    configReload:
