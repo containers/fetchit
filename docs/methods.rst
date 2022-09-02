@@ -9,7 +9,7 @@ include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Prune`, and `Confi
 Examples of all methods are located in the `FetchIt repository <https://github.com/containers/fetchit/tree/main/examples>`_
 
 Dynamic Configuration Reload
-=============
+----------------------------
 
 There are a few ways currently to trigger FetchIt to reload its targets without requiring a restart. The first is to
 pass the environment variable `$FETCHIT_CONFIG_URL` to the `podman run` command running the FetchIt image.
@@ -30,7 +30,7 @@ The YAML above demonstrates the minimal required objects to start FetchIt. Once 
 that is stored in git will be used.
 
 Dynamic Configuration Reload Using a Private Registry
-=====================================================
+-----------------------------------------------------
 
 The ConfigReload method can be used to reload target configs from a private registry but this comes with the warning to ensure that
 the repository is not public. The config.yaml will need to include the credentials to access the private registry.
