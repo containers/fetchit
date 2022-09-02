@@ -184,23 +184,23 @@ An example Kube play YAML file will look similiar to the following. This will la
    apiVersion: v1
    kind: ConfigMap
    metadata:
-   name: env
+     name: env
    data:
-   APP_COLOR: red 
-   tree: trunk
+     APP_COLOR: red
+     tree: trunk
    ---
    apiVersion: v1
    kind: Pod
    metadata:
-   name: colors_pod
+     name: colors_pod
    spec:
    containers:
    - name: colors-kubeplay
-      image: docker.io/mmumshad/simple-webapp-color:latest
-      ports:
-      - containerPort: 8080
-         hostPort: 7080
-      envFrom:
-      - configMapRef:
+     image: docker.io/mmumshad/simple-webapp-color:latest
+     ports:
+     - containerPort: 8080
+       hostPort: 7080
+     envFrom:
+     - configMapRef:
          name: env
          optional: false
