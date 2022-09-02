@@ -6,6 +6,8 @@ and various configuration values that relate to that method.
 A target is a unique value that holds methods. Mutiple git targets (targetConfigs) can be defined. Methods that can be configured
 include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Prune`, and `ConfigReload`.
 
+Examples of all methods are located in the `FetchIt repository <https://github.com/containers/fetchit/tree/main/examples>`_
+
 Dynamic Configuration Reload
 =============
 
@@ -18,10 +20,42 @@ pod is required to reload targetConfigs. The following fields are required with 
 
    configReload:
      schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/sallyom/fetchit-config/main/config.yaml
+     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
 
 Changes pushed to the ConfigURL will trigger a reloading of FetchIt target configs. It's recommended to include the ConfigReload
 in the FetchIt config to enable updates to target configs without requiring a restart.
+
+The configuration above will pull in the file from the repository and reload the FetchIt config. 
+The YAML above demonstrates the minimal required objects to start FetchIt. Once FetchIt is running, the full configuration file 
+that is stored in git will be used.
+
+Dynamic Configuration Reload Using a Private Registry
+=====================================================
+
+The ConfigReload method can be used to reload target configs from a private registry but this comes with the warning to ensure that
+the repository is not public. The config.yaml will need to include the credentials to access the private registry.
+
+When using a GitHub PAT token, the config.yaml will need to include the following fields:
+.. code-block:: yaml
+
+   configReload:
+     schedule: "*/5 * * * *"
+     pat: github-alphanumeric-token
+     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+
+When using basic authentication the config.yaml will need to include the following fields:
+
+.. code-block:: yaml
+
+   configReload:
+     schedule: "*/5 * * * *"
+     username: bob
+     passwords: bobpassword
+     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+
+NOTE: This is not recommended for public repositories. As your credentials will need to be in clear text in the config.yaml.
+
+PAT is the preferred method of authentication when available as the credentials can be reissued or locked.
 
 Methods
 =======
