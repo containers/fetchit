@@ -36,6 +36,7 @@ The ConfigReload method can be used to reload target configs from a private regi
 the repository is not public. The config.yaml will need to include the credentials to access the private registry.
 
 When using a GitHub PAT token, the config.yaml will need to include the following fields:
+
 .. code-block:: yaml
 
    configReload:
@@ -62,6 +63,37 @@ Methods
 Various methods are available to lifecycle and manage the container environment on a host. Funcionality also exists to
 allow for files or directories of files to be deployed to the container host to be used by containers.
 
+
+All methods are defined within specific targetConfiguration sections. These sections are demonstrated below. For private repositories, a PAT token or a username/password combination is required.
+
+An example of using a PAT token is shown below.
+
+.. code-block:: yaml
+
+   targetConfigs:
+   - url: http://github.com/containers/fetchit
+     pat: github-alphanumeric-token
+     branch: main
+     ansible:
+     - name: ans-ex
+       targetPath: examples/ansible
+       sshDirectory: /root/.ssh
+       schedule: "*/5 * * * *"
+
+An example of using username/password is shown below.
+
+.. code-block:: yaml
+
+   targetConfigs:
+   - url: http://github.com/containers/fetchit
+     username: bob
+     password: bobpassword
+     branch: main
+     ansible:
+     - name: ans-ex
+       targetPath: examples/ansible
+       sshDirectory: /root/.ssh
+       schedule: "*/5 * * * *"
 
 Ansible
 -------
