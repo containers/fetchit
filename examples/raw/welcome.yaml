@@ -1,6 +1,0 @@
-Image: quay.io/fetchit/fetchit-sample-app:latest
-Name: welcome
-Ports:
-  - container_port: 80
-    host_port: 9080
-    range: 0
