@@ -122,9 +122,11 @@ Container started....Requeuing
 podman ps
 
 CONTAINER ID  IMAGE                                          COMMAND               CREATED        STATUS            PORTS                   NAMES
-dcc546457aa2  quay.io/fetchit/fetchit:latest                 /usr/local/bin/ha...  3 minutes ago  Up 3 minutes ago                          fetchit
-392a39209622  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:8080->8080/tcp  colors1
-9e50cd3bdab5  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       2 minutes ago  Up 2 minutes ago  0.0.0.0:9080->8080/tcp  colors2
+edefaf7c3139  quay.io/fetchit/fetchit:latest                 /usr/local/bin/fe...  25 seconds ago  Up 26 seconds ago                          fetchit
+508106ff37c1  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       25 seconds ago  Up 25 seconds ago  0.0.0.0:7070->8080/tcp  cap1
+90556a8725db  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       24 seconds ago  Up 25 seconds ago  0.0.0.0:9090->8080/tcp  cap2
+8ce0f010231a  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       24 seconds ago  Up 25 seconds ago  0.0.0.0:8080->8080/tcp  colors1
+be95a69686e8  docker.io/mmumshad/simple-webapp-color:latest  python ./app.py       24 seconds ago  Up 25 seconds ago  0.0.0.0:9080->8080/tcp  colors2
 ```
 
 Also, view applications at `localhost:8080` and `localhost:9080`
