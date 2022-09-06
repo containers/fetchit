@@ -42,7 +42,7 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, skew int) {
 
 		err = zeroToCurrent(ctx, conn, ft, target, nil)
 		if err != nil {
-			logger.Errorf("Error moving to current: %v", err)
+			logger.Errorf("Error moving to current: %v target url is: %s ", err, target.url)
 			return
 		}
 	}

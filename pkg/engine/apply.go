@@ -16,6 +16,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gobwas/glob"
 	gitsign "github.com/sigstore/gitsign/pkg/git"
 	gitsignrekor "github.com/sigstore/gitsign/pkg/rekor"
@@ -67,7 +68,9 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 	}
 
 	refSpec := config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/heads/%s", target.branch, target.branch))
-	if err = repo.Fetch(&git.FetchOptions{
+
+	// default to using existing http method
+	fOptions := &git.FetchOptions{
 		RemoteName: "",
 		RefSpecs:   []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Depth:      0,
@@ -80,7 +83,18 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		Force:           true,
 		InsecureSkipTLS: false,
 		CABundle:        []byte{},
-	}); err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
+	}
+	// if using ssh, change auth to use ssh key
+	if target.ssh {
+		logger.Infof("git clone %s ", target.url)
+		authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
+		if err != nil {
+			logger.Infof("generate publickeys failed: %s", err.Error())
+			return plumbing.Hash{}, err
+		}
+		fOptions.Auth = authValue
+	}
+	if err = repo.Fetch(fOptions); err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}
 

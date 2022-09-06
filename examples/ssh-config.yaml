@@ -1,0 +1,11 @@
+gitAuth:
+  ssh: true
+  sshKeyFile: id_rsa
+targetConfigs:
+- url: git@github.com:containers/fetchit
+  filetransfer:
+  - name: ft-ex
+    targetPath: examples/filetransfer
+    destinationDirectory: /tmp
+    schedule: "*/1 * * * *"
+  branch: main
