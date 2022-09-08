@@ -1,4 +1,8 @@
 FROM registry.access.redhat.com/ubi8/ubi:latest
 USER root
+
+RUN dnf -y update && dnf clean all
+
 COPY ./method_containers/systemd/systemd-script /opt/systemd-script
+
 ENTRYPOINT ["/opt/systemd-script"]
