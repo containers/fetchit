@@ -23,7 +23,7 @@ RUN mv $GOPATH/src/github.com/containers/fetchit/_output/bin/linux_$ARCH/fetchit
 # RUN STAGE
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf update && microdnf install --nodocs rsync && microdnf clean all
+RUN microdnf -y update && microdnf install -y --nodocs rsync && microdnf clean all
 
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 
