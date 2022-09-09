@@ -50,7 +50,7 @@ jobs:
           format: 'github'
           output: 'dependency-results.sbom.json'
           exit-code: '1'
-          github-token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          github-pat: ${{ secrets.BOT_GITHUB_TOKEN }}
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
