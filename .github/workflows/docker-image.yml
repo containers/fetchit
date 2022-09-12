@@ -1625,7 +1625,7 @@ jobs:
       - name: "Build Ansible Image"
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: "./method_containers/ansible"
           file: "./method_containers/ansible/Dockerfile"
           platforms: "linux/amd64,linux/arm64"
           push: true
@@ -1659,7 +1659,7 @@ jobs:
       - name: "Build Systemd Image"
         uses: docker/build-push-action@v2
         with:
-          context: .
+          context: "./method_containers/systemd"
           file: "./method_containers/systemd/Dockerfile"
           platforms: "linux/amd64,linux/arm64,linux/arm/v7"
           push: true

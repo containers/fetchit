@@ -1,9 +1,6 @@
 # BUILD STAGE
 FROM registry.access.redhat.com/ubi8/go-toolset as builder
 
-ARG ARCH=amd64
-ARG MAKE_TARGET=cross-build-linux-$ARCH
-
 USER root
 
 LABEL name=fetchit-build
