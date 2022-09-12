@@ -23,7 +23,7 @@ const (
 	podmanServicePath       = "/usr/lib/systemd/system"
 	systemdPathRoot         = "/etc/systemd/system"
 	systemdMethod           = "systemd"
-	systemdImage            = "quay.io/fetchit/fetchit-systemd-amd:latest"
+	systemdImage            = "quay.io/fetchit/fetchit-systemd:latest"
 )
 
 // Systemd to place and/or enable systemd unit files on host
