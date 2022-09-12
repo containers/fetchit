@@ -1585,8 +1585,7 @@ jobs:
         run: |
           [[ "${CONTROLLER_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="quay.io"
           echo "Attempting docker login to: ${REGISTRY}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USER }}" --password-stdin ${REGISTRY}
-
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
    
       - name: Build FetchIt
         uses: docker/build-push-action@v2
@@ -1619,8 +1618,7 @@ jobs:
         run: |
           [[ "${CONTROLLER_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="quay.io"
           echo "Attempting docker login to: ${REGISTRY}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USER }}" --password-stdin ${REGISTRY}
-
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
    
       - name: "Build Ansible Image"
         uses: docker/build-push-action@v2
@@ -1653,8 +1651,7 @@ jobs:
         run: |
           [[ "${CONTROLLER_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="quay.io"
           echo "Attempting docker login to: ${REGISTRY}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USER }}" --password-stdin ${REGISTRY}
-
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
 
       - name: "Build Systemd Image"
         uses: docker/build-push-action@v2
