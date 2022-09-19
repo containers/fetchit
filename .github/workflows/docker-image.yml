@@ -1496,12 +1496,12 @@ jobs:
 
       - name: generate ssh assets
         run: |
-          mkdir -p ~/.fetchit/.ssh
+          mkdir ~/.ssh
+          echo "${{secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan github.com > ~/.ssh/known_hosts
+          mkdir ~/.fetchit
+          mv ~/.ssh ~/.fetchit/
           cp ./examples/ssh-config.yaml ~/.fetchit/config.yaml
-          # sudo cat ${{ secrets.SSH_PRIVATE_KEY }} > ~/.fetchit/.ssh/id_rsa
-          sudo cat /root/.ssh/id_rsa > ~/.fetchit/.ssh/id_rsa
-          sudo ssh-keyscan github.com > ~/.fetchit/.ssh/known_hosts
-          sudo chmod 0600 -R ~/.fetchit/.ssh 
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/.fetchit:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
@@ -1513,10 +1513,10 @@ jobs:
         run: sudo ls -la ~/.fetchit/.ssh
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
+        run: timeout 150 bash -c "until [ -f /tmp/hello.txt ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done" 
+        run: timeout 150 bash -c "until [ -f /tmp/anotherfile.txt ]; do sleep 2; done" 
                 
       - name: Logs
         if: always()
