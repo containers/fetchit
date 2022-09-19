@@ -29,9 +29,7 @@ type ConfigReload struct {
 	ConfigURL    string `mapstructure:"configURL"`
 	Device       string `mapstructure:"device"`
 	ConfigPath   string `mapstructure:"configPath"`
-	Pat          string `mapstructure:"pat"`
-	Username     string `mapstructure:"username"`
-	Password     string `mapstructure:"password"`
+	GitAuth      `mapstructure:",squash"`
 }
 
 func (c *ConfigReload) GetKind() string {
@@ -58,7 +56,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
 	if envURL != "" {
-		restart := checkForConfigUpdates(envURL, true, false, c.Pat, c.Username, c.Password)
+		restart := checkForConfigUpdates(envURL, true, false, c.PAT, c.Username, c.Password)
 		if !restart {
 			return
 		}
