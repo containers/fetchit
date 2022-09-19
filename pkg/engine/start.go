@@ -32,7 +32,7 @@ func InitLogger() {
 	syncer := zap.CombineWriteSyncers(os.Stdout, getLogWriter())
 	encoder := getEncoder()
 	core := zapcore.NewCore(encoder, syncer, zap.NewAtomicLevelAt(zap.InfoLevel))
-	l := zap.New(core)
+	l := zap.New(core, zap.AddCaller())
 	logger = l.Sugar()
 }
 
