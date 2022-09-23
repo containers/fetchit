@@ -21,6 +21,9 @@ Next, create a configuration file.
 .. code-block:: bash
    
    vi ~/.fetchit/config.yaml
+   
+.. code-block:: yaml
+
    targetConfigs:
    - url: https://github.com/containers/fetchit
      raw:
@@ -34,7 +37,7 @@ Finally, run FetchIt.
 
 .. code-block:: bash
    
-   podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/mount -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit:latest
+   podman run -d --rm --name fetchit -v fetchit-volume:/opt -v $HOME/.fetchit:/opt/mount -v /run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit:latest
 
 
 To view the running containers, run the following command.
