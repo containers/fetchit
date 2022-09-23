@@ -27,7 +27,7 @@ Next, create a configuration file.
      - name: welcome-to-fetchit
        targetPath: examples/single-raw
        schedule: "*/1 * * * *"
-       pullImage: false
+       pullImage: true
      branch: main
 
 Finally, run FetchIt.
