@@ -1,4 +1,4 @@
-# Fetchit
+# Fetchit 
 The purpose of FetchIt is to allow for GitOps management of podman managed containers.
 
 This project is currently under development. For a more detailed explanation of the project visit the docs page.
