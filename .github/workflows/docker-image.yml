@@ -326,7 +326,9 @@ jobs:
         with:
           name: podman-bins
           path: bin
-
+      - name: hack
+        run: sudo apt-get install -yqq libdevmapper1.02.1
+        
       - name: replace
         run: |
           chmod +x bin/podman
