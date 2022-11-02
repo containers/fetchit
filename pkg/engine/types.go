@@ -54,8 +54,10 @@ type Target struct {
 	sshKey          string
 	url             string
 	pat             string
+	secret_pat      string
 	username        string
 	password        string
+	secret_password string
 	device          string
 	localPath       string
 	branch          string

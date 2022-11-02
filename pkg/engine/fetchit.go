@@ -104,10 +104,69 @@ func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 			return nil, false, err
 		}
 	}
+	logger.Debugf("Read in config:\n%+v", config)
+	logger.Sync()
 	return config, true, nil
 }
 
+func handleGitAuthString(name string, secretName string, field string, secretField string,
+	secretEnvVar string) string {
+	defer logger.Sync()
+	logger.Debugf("Trying to setup a git %s", name)
+	// Check input sources in order from most-secure to least-secure, and
+	// from most-specific to least-specific.
+	if &secretField != nil && secretField != "" {
+		logger.Debugf("Found a %s configured, checking indirect env. var. $%s", secretName, secretField)
+		indirectSecret := os.Getenv(secretField)
+		if indirectSecret != "" {
+			logger.Debugf("Using $%s value for %s", secretField, name)
+			return indirectSecret
+		}
+		logger.Warnf("Expecting non-empty $%s value for %s", secretField, secretName)
+	}
+
+	logger.Debugf("Checking indirect value from $%s", secretEnvVar)
+	if &secretEnvVar != nil && secretEnvVar != "" {
+		// Username not actually indirect or secret just take direct value.
+		// This is only here out of convenience.
+		if name == "username" {
+			username := os.Getenv(secretEnvVar)
+			if username != "" {
+				logger.Debugf("Found a non-empty $%s value %s", secretEnvVar, username)
+				return username
+			}
+		}
+		envVarName := os.Getenv(secretEnvVar)
+		if envVarName != "" {
+			logger.Debugf("Found a non-empty indirect $%s value $%s", secretEnvVar, envVarName)
+			derefEnvVarName := os.Getenv(envVarName)
+			if derefEnvVarName != "" {
+				logger.Debugf("Using indirect env. var. value from $%s for %s", envVarName, name)
+				return derefEnvVarName
+			}
+		}
+	}
+
+	logger.Debugf("Checking for clear-text config. value %s", name)
+	if &field != nil && field != "" {
+		usernameMsg := "Using clear-text %s value from configuration."
+		if name == "username" {
+			logger.Debugf(usernameMsg, name)
+		} else {
+			logger.Warnf(usernameMsg+
+				" Please consider using a podman secret + indirect %s attribute, or indirect $%s env. var. + secret.",
+				name, secretName, secretEnvVar)
+		}
+		return field
+	}
+
+	logger.Debugf("Not using any %s", name)
+	return ""
+}
+
 func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
+	defer logger.Sync()
+	logger.Debugf("Setting up fetchit configuration")
 	fetchit = newFetchit()
 	ctx := context.Background()
 	if fc.conn == nil {
@@ -143,8 +202,9 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	}
 
 	// Check for GitAuth field
+	logger.Debug("Trying to handle git auth")
 	if config.GitAuth != nil {
-		// Check for SSH usage
+		logger.Debug("Trying SSH auth")
 		if config.GitAuth.SSH {
                 	if err := os.Setenv("SSH_KNOWN_HOSTS", "/opt/mount/.ssh/known_hosts"); err != nil {
                         	cobra.CheckErr(err)
@@ -152,6 +212,7 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 			keyPath := defaultSSHKey
 			// Check for unique ssh key file
 			if config.GitAuth.SSHKeyFile != "" {
+				// TODO: Check & prefer a secret (/var/run/secrets/<name>) first.
 				keyPath = filepath.Join("/opt", "mount", ".ssh", config.GitAuth.SSHKeyFile)
 			}
 			if err := checkForPrivateKey(keyPath); err != nil {
@@ -160,10 +221,24 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 			fetchit.ssh = true
 			fetchit.sshKey = keyPath
 		}
-		fetchit.username = config.GitAuth.Username
-		fetchit.password = config.GitAuth.Password
-		fetchit.pat = config.GitAuth.PAT
+
+		logger.Debugf("Starting GitAuth settings: %+v", config.GitAuth)
+		fetchit.username = handleGitAuthString("username", "", config.GitAuth.Username, "", "FETCHIT_USERNAME")
+		fetchit.pat = handleGitAuthString("pat", "secret_pat", config.GitAuth.PAT, config.GitAuth.SecretPAT, "FETCHIT_SECRET_PAT")
+		if fetchit.pat == "" {
+			fetchit.password = handleGitAuthString("password", "secret_password", config.GitAuth.Password, config.GitAuth.SecretPassword, "FETCHIT_SECRET_PASSWORD")
+		}
+	} else {
+		logger.Debug("Empty/missing gitAuth config, trying FETCHIT_* auth env. vars.")
+		fetchit.username = handleGitAuthString("username", "", "", "", "FETCHIT_USERNAME")
+		fetchit.pat = handleGitAuthString("pat", "secret_pat", "", "", "FETCHIT_SECRET_PAT")
+		if fetchit.pat == "" {
+			fetchit.password = handleGitAuthString("password", "secret_password", "", "", "FETCHIT_SECRET_PASSWORD")
+		}
 	}
+
+	// Uncomment if you need to debug raw password/pat/username values
+	// logger.Debugf("Processed GitAuth config:\n%+v", fetchit)
 
 	if config.Prune != nil {
 		prune := &TargetConfig{
@@ -214,6 +289,9 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 	var isLocal, exists bool
 	var config *FetchitConfig
 	envURL := os.Getenv("FETCHIT_CONFIG_URL")
+	if envURL != "" {
+		logger.Debugf("Using '%s' from $FETCHIT_CONFIG_URL", envURL)
+	}
 
 	// user will pass path on local system, but it must be mounted at the defaultConfigPath in fetchit pod
 	// regardless of where the config file is on the host, fetchit will read the configFile from within
@@ -251,7 +329,6 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 	if config == nil {
 		cobra.CheckErr("no fetchit targets found, exiting")
 	}
-
 	return fc.populateFetchit(config)
 }
 
