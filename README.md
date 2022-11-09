@@ -11,15 +11,15 @@ To develop and test changes of FetchIt, the FetchIt image can be built locally a
 
 ```
 go mod tidy
-podman build . --file Dockerfile --tag quay.io/harpoon/harpoon-amd:latest
-podman tag quay.io/harpoon/harpoon-amd:latest quay.io/harpoon/harpoon:latest
+podman build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
+podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 ```
 
 Once the image has been successfully built the image can be ran using the following command.
 
 ```
 
-podman run -d --rm --name harpoon --security-opt label=disable -v harpoon-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/harpoon/harpoon:latest
+podman run -d --rm --name fetchit --security-opt label=disable -v fetchit-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
 ```
 
 ##  Running
