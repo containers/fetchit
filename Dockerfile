@@ -10,11 +10,11 @@ LABEL name=fetchit-build
 
 ENV GOPATH=/opt/app-root GOCACHE=/mnt/cache GO111MODULE=on
 
+RUN dnf -y install gpgme-devel device-mapper-devel
+
 WORKDIR $GOPATH/src/github.com/containers/fetchit
 
 COPY . .
-
-RUN dnf -y install gpgme-devel device-mapper-devel
 
 RUN GOPATH=/opt/app-root GOCACHE=/mnt/cache make $MAKE_TARGET
 
