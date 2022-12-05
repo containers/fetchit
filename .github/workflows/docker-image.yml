@@ -437,6 +437,24 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      
+      - name: 'Check that the "owned-by:fetchit" label is applied' 
+        run: |
+          declare -i numContainers=$(sudo podman ps --filter label=owned-by=fetchit | wc -l)
+          if (( numContainers > 1 )); then
+            echo 'Successfully applied labels'
+          else
+            exit 1
+          fi
+
+          # check against a garbage label
+          declare -i checkAgainst=$(sudo podman ps --filter label=owned-by=abcdefghijklmnopqrstuvwxyz | wc -l)
+          if (( checkAgainst == numContainers )); then
+            echo 'container amount with label cannot equal container amount with nonexistent label'
+            exit 1
+          else
+            echo 'Label was applied correctly'
+          fi
 
   config-env-raw-validate:
     runs-on: ubuntu-latest
