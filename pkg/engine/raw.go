@@ -17,7 +17,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const rawMethod = "raw"
+const (
+	rawMethod    = "raw"
+	FetchItLabel = "fetchit"
+)
 
 // Raw to deploy pods from json or yaml files
 type Raw struct {
@@ -241,6 +244,10 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 	s.CapAdd = []string(raw.CapAdd)
 	s.CapDrop = []string(raw.CapDrop)
 	s.RestartPolicy = "always"
+	// add a label to signify ownership of fetchit <--> this container
+	s.Labels = map[string]string{
+		"owned-by": FetchItLabel,
+	}
 	return s
 }
 
