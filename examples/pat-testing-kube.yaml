@@ -1,0 +1,12 @@
+# for this test, start with this config, then wait to be sure the
+# targetConfigs from .fetchit/config.yaml are populated
+# and for follow-up test, push a change to the config and confirm
+# new targetConfigs are fetched & run
+targetConfigs:
+- url: https://github.com/containers/fetchit
+  pat: CHANGEME
+  kube:
+  - name: kube-ex
+    targetPath: examples/kube
+    schedule: "*/1 * * * *"
+  branch: main
