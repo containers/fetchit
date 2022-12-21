@@ -8,7 +8,7 @@ on:
 
 env:
   CGO_ENABLED: 0
-  PODMAN_VER: v4.1.1
+  PODMAN_VER: v4.2.1
 
 jobs:
 
@@ -30,7 +30,7 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         with:
           repository: containers/podman
-          ref: v4.1.1
+          ref: v4.2.1
 
       - uses: actions/setup-go@v2
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
