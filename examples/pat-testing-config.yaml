@@ -6,9 +6,10 @@ configReload:
   configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
   schedule: "*/2 * * * *"
   pat: CHANGEME
+gitAuth:
+  pat: CHANGEME
 targetConfigs:
 - url: https://github.com/containers/fetchit
-  pat: CHANGEME
   raw:
   - name: raw-ex
     targetPath: examples/raw

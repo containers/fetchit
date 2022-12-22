@@ -77,9 +77,10 @@ An example of using a PAT token is shown below.
 
 .. code-block:: yaml
 
+   gitAuth:
+     pat: CHANGEME
    targetConfigs:
    - url: http://github.com/containers/fetchit
-     pat: github-alphanumeric-token
      branch: main
      ansible:
      - name: ans-ex
