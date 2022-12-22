@@ -2,9 +2,10 @@
 # targetConfigs from .fetchit/config.yaml are populated
 # and for follow-up test, push a change to the config and confirm
 # new targetConfigs are fetched & run
+gitAuth:
+  pat: CHANGEME
 targetConfigs:
 - url: https://github.com/containers/fetchit
-  pat: CHANGEME
   kube:
   - name: kube-ex
     targetPath: examples/kube
