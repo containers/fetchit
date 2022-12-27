@@ -6,6 +6,22 @@ https://fetchit.readthedocs.io/
 
 A quickstart example is available at https://github.com/containers/fetchit/blob/main/docs/quick_start.rst
 
+## Developing
+To develop and test changes of FetchIt, the FetchIt image can be built locally and then run on the development system.
+
+```
+go mod tidy
+podman build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
+podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+```
+
+Once the image has been successfully built the image can be ran using the following command.
+
+```
+
+podman run -d --rm --name fetchit --security-opt label=disable -v fetchit-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
+```
+
 ##  Running
 FetchIt requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
 

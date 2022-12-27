@@ -58,6 +58,13 @@ NOTE: This is not recommended for public repositories. As your credentials will 
 
 PAT is the preferred method of authentication when available as the credentials can be reissued or locked.
 
+Configuring FetchIt Using Environment Variables
+-----------------------------------------------
+
+FetchIt can also be configured by providing the FetchIt config through the `FETCHIT_CONFIG` environment variable. 
+This approach will use the contents of `FETCHIT_CONFIG` to configure the FetchIt application.
+This variable takes precedence over the FetchIt config file and will overwrite its contents if both are provided. 
+
 Methods
 =======
 Various methods are available to lifecycle and manage the container environment on a host. Funcionality also exists to
@@ -70,9 +77,10 @@ An example of using a PAT token is shown below.
 
 .. code-block:: yaml
 
+   gitAuth:
+     pat: CHANGEME
    targetConfigs:
    - url: http://github.com/containers/fetchit
-     pat: github-alphanumeric-token
      branch: main
      ansible:
      - name: ans-ex

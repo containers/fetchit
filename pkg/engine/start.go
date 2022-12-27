@@ -31,9 +31,14 @@ func init() {
 func InitLogger() {
 	syncer := zap.CombineWriteSyncers(os.Stdout, getLogWriter())
 	encoder := getEncoder()
-	core := zapcore.NewCore(encoder, syncer, zap.NewAtomicLevelAt(zap.InfoLevel))
+	level := zap.InfoLevel
+	if os.Getenv("FETCHIT_DEBUG") != "" {
+		level = zap.DebugLevel
+	}
+	core := zapcore.NewCore(encoder, syncer, zap.NewAtomicLevelAt(level))
 	l := zap.New(core, zap.AddCaller())
 	logger = l.Sugar()
+	logger.Debug("Fetchit debug logging enabled.")
 }
 
 func getEncoder() zapcore.Encoder {
