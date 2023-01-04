@@ -42,6 +42,7 @@ type Fetchit struct {
 	username           string
 	password           string
 	pat                string
+	envSecret          string
 	restartFetchit     bool
 	scheduler          *gocron.Scheduler
 	methodTargetScheds map[Method]SchedInfo
@@ -146,9 +147,9 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	if config.GitAuth != nil {
 		// Check for SSH usage
 		if config.GitAuth.SSH {
-                	if err := os.Setenv("SSH_KNOWN_HOSTS", "/opt/mount/.ssh/known_hosts"); err != nil {
-                        	cobra.CheckErr(err)
-                	}
+			if err := os.Setenv("SSH_KNOWN_HOSTS", "/opt/mount/.ssh/known_hosts"); err != nil {
+				cobra.CheckErr(err)
+			}
 			keyPath := defaultSSHKey
 			// Check for unique ssh key file
 			if config.GitAuth.SSHKeyFile != "" {
@@ -163,6 +164,7 @@ func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 		fetchit.username = config.GitAuth.Username
 		fetchit.password = config.GitAuth.Password
 		fetchit.pat = config.GitAuth.PAT
+		fetchit.envSecret = config.GitAuth.EnvSecret
 	}
 
 	if config.Prune != nil {
@@ -261,9 +263,11 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			url:          tc.Url,
-			device:       tc.Device,
-			pat:          fetchit.pat,
+			url:    tc.Url,
+			device: tc.Device,
+			pat:    fetchit.pat,
+			// define the environment variable for envSecret
+			envSecret:    fetchit.envSecret,
 			ssh:          fetchit.ssh,
 			sshKey:       fetchit.sshKey,
 			username:     fetchit.username,
@@ -399,6 +403,12 @@ func getClone(target *Target) error {
 	}
 	if !exists {
 		logger.Infof("git clone %s %s --recursive", target.url, target.branch)
+		// if the envSecret is set, use it as variable target.PAT
+		if target.envSecret != "" {
+			target.pat = os.Getenv(target.envSecret)
+			logger.Infof("Using the envSecret to clone the repo")
+		}
+		logger.Infof("Using PAT: %s", target.pat)
 		if target.pat != "" {
 			target.username = "fetchit"
 			target.password = target.pat
