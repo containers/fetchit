@@ -406,9 +406,8 @@ func getClone(target *Target) error {
 		// if the envSecret is set, use it as variable target.PAT
 		if target.envSecret != "" {
 			target.pat = os.Getenv(target.envSecret)
-			logger.Infof("Using the envSecret to clone the repo")
+			logger.Infof("Using the envSecret %s", target.envSecret)
 		}
-		logger.Infof("Using PAT: %s", target.pat)
 		if target.pat != "" {
 			target.username = "fetchit"
 			target.password = target.pat

@@ -48,15 +48,25 @@ When using basic authentication the config.yaml will need to include the followi
 
 .. code-block:: yaml
 
+  gitAuth:
+    username: bob
+    password: bobpassword
    configReload:
      schedule: "*/5 * * * *"
-     username: bob
-     passwords: bobpassword
      configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
 
 NOTE: This is not recommended for public repositories. As your credentials will need to be in clear text in the config.yaml.
 
-PAT is the preferred method of authentication when available as the credentials can be reissued or locked.
+PAT is the preferred method of authentication when available as the credentials can be reissued or locked. The PAT will be used both for the configuration file and the repo
+
+.. code-block:: yaml
+
+    gitAuth:
+      pat: github-alphanumeric-token
+   configReload:
+     schedule: "*/5 * * * *"
+     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+
 
 Configuring FetchIt Using Environment Variables
 -----------------------------------------------
@@ -92,16 +102,26 @@ An example of using username/password is shown below.
 
 .. code-block:: yaml
 
+    gitAuth:
+      username: bob
+      password: bobpassword
    targetConfigs:
    - url: http://github.com/containers/fetchit
-     username: bob
-     password: bobpassword
      branch: main
      ansible:
      - name: ans-ex
        targetPath: examples/ansible
        sshDirectory: /root/.ssh
        schedule: "*/5 * * * *"
+
+Podman secrets can also be used but FetchIt must be started with the secret defined as an environment variable.
+This variable is defined as `--secret GH_PAT,type=env` in the `podman run` command.
+
+.. code-block:: bash
+
+   export GH_PAT_TOKEN=CHANGEME
+   podman secret create --env GH_PAT GH_PAT_TOKEN 
+   podman run -d --name fetchit     -v fetchit-volume:/opt     -v $HOME/.fetchit:/opt/mount     -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock --secret GH_PAT,type=env --security-opt label=disable --secret GH_PAT,type=env quay.io/fetchit/fetchit:latest
 
 Ansible
 -------

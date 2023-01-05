@@ -63,7 +63,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository %s to fetch latest commit", directory)
 	}
 	if target.envSecret != "" {
-		logger.Infof("Using environment variable as PAT")
+		logger.Infof("Using the envSecret %s", target.envSecret)
 		target.pat = os.Getenv(target.envSecret)
 	}
 	if target.pat != "" {
