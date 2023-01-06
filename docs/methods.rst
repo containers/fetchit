@@ -100,9 +100,12 @@ An example of using a PAT token is shown below.
 
 A SSH key can also be used for the cloning of a repository. An example of using an SSH key is shown below.
 
+NOTE: The key must be defined within your git provider to be able to be used for pulling.
+
 .. code-block:: bash
 
    mkdir -p ~/.fetchit/.ssh
+   cp -rp ~/.ssh/id_rsa ~/.fetchit/.ssh/id_rsa
    chmod 0600 -R ~/.fetchit/.ssh
    ssh-keyscan -t ecdsa github.com >> ~/.fetchit/.ssh/known_hosts
    ssh-keyscan -t rsa github.com > ~/.fetchit/.ssh/known_hosts
