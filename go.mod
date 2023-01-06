@@ -190,7 +190,7 @@ require (
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
-	github.com/sylabs/sif/v2 v2.7.1 // indirect
+	github.com/sylabs/sif/v2 v2.8.1 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tchap/go-patricia v2.3.0+incompatible // indirect
