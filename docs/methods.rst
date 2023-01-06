@@ -92,11 +92,40 @@ An example of using a PAT token is shown below.
    targetConfigs:
    - url: http://github.com/containers/fetchit
      branch: main
-     ansible:
-     - name: ans-ex
-       targetPath: examples/ansible
-       sshDirectory: /root/.ssh
+     raw:
+     - name: raw-ex
+       targetPath: examples/raw
        schedule: "*/5 * * * *"
+       pullImage: true
+
+A SSH key can also be used for the cloning of a repository. An example of using an SSH key is shown below.
+
+NOTE: The key must be defined within your git provider to be able to be used for pulling.
+
+.. code-block:: bash
+
+   mkdir -p ~/.fetchit/.ssh
+   cp -rp ~/.ssh/id_rsa ~/.fetchit/.ssh/id_rsa
+   chmod 0600 -R ~/.fetchit/.ssh
+   ssh-keyscan -t ecdsa github.com >> ~/.fetchit/.ssh/known_hosts
+   ssh-keyscan -t rsa github.com > ~/.fetchit/.ssh/known_hosts
+
+
+The configuration file to use the key is shown below.
+
+.. code-block:: yaml
+
+   gitAuth:
+     ssh: true
+     sshKeyFile: id_rsa
+   targetConfigs:
+   - url: git@github.com:containers/fetchit
+     raw:
+     - name: raw-ex
+       targetPath: examples/raw
+       schedule: "*/5 * * * *"
+       pullImage: true
+
 
 An example of using username/password is shown below.
 
@@ -108,11 +137,11 @@ An example of using username/password is shown below.
    targetConfigs:
    - url: http://github.com/containers/fetchit
      branch: main
-     ansible:
-     - name: ans-ex
-       targetPath: examples/ansible
-       sshDirectory: /root/.ssh
+     raw:
+     - name: raw-ex
+       targetPath: examples/raw
        schedule: "*/5 * * * *"
+       pullImage: true
 
 Podman secrets can also be used but FetchIt must be started with the secret defined as an environment variable.
 This variable is defined as `--secret GH_PAT,type=env` in the `podman run` command.

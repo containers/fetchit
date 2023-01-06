@@ -424,7 +424,7 @@ func getClone(target *Target) error {
 		}
 		// if using ssh, change auth to use ssh key
 		if target.ssh {
-			logger.Infof("git clone %s ", target.url)
+			logger.Infof("git clone %s using SSH key %s ", target.url, target.sshKey)
 			authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 			if err != nil {
 				logger.Infof("generate publickeys failed: %s", err.Error())
@@ -432,11 +432,9 @@ func getClone(target *Target) error {
 			}
 			cOptions.Auth = authValue
 		}
-		if err := cOptions.Validate(); err != nil {
-			return err
-		}
-		_, err = git.PlainClone(absPath, false, cOptions)
+		_, err := git.PlainClone(absPath, false, cOptions)
 		if err != nil {
+			logger.Infof("git clone failed: %s", err.Error())
 			return err
 		}
 	}
