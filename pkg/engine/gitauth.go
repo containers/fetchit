@@ -14,6 +14,7 @@ type GitAuth struct {
 	Username   string `mapstructure:"username"`
 	Password   string `mapstructure:"password"`
 	PAT        string `mapstructure:"pat"`
+	EnvSecret  string `mapstructure:"envSecret"`
 }
 
 // Checks to see if private key exists on given path

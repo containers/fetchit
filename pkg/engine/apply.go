@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -61,7 +62,10 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 	if err != nil {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error opening repository %s to fetch latest commit", directory)
 	}
-
+	if target.envSecret != "" {
+		logger.Infof("Using the envSecret %s", target.envSecret)
+		target.pat = os.Getenv(target.envSecret)
+	}
 	if target.pat != "" {
 		target.username = "fetchit"
 		target.password = target.pat

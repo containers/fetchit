@@ -48,7 +48,12 @@ func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	if c.ConfigURL != "" {
 		envURL = c.ConfigURL
 	}
-	os.Setenv("FETCHIT_CONFIG_URL", envURL)
+	pat := fetchit.pat
+	if fetchit.envSecret != "" {
+		pat = os.Getenv(fetchit.envSecret)
+	}
+	username := fetchit.username
+	password := fetchit.password
 	// If ConfigURL is not populated, warn and leave
 	if envURL == "" && c.Device == "" {
 		logger.Debugf("Fetchit ConfigReload found, but neither $FETCHIT_CONFIG_URL on system nor ConfigReload.ConfigURL are set, exiting without updating the config.")
@@ -56,7 +61,7 @@ func (c *ConfigReload) Process(ctx, conn context.Context, skew int) {
 	// CheckForConfigUpdates downloads & places config file in defaultConfigPath
 	// if the downloaded config file differs from what's currently on the system.
 	if envURL != "" {
-		restart := checkForConfigUpdates(envURL, true, false, c.PAT, c.Username, c.Password)
+		restart := checkForConfigUpdates(envURL, true, false, pat, username, password)
 		if !restart {
 			return
 		}

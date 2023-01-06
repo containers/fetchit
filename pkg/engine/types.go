@@ -54,6 +54,7 @@ type Target struct {
 	sshKey          string
 	url             string
 	pat             string
+	envSecret       string
 	username        string
 	password        string
 	device          string
