@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora:35
+FROM quay.io/fedora/fedora:36
 
 ARG ARCH=$ARCH
 ARG MAKE_TARGET=cross-build-linux-$ARCH-ansible
