@@ -1670,7 +1670,7 @@ jobs:
         
       - name: set values relating to the current env
         run: | 
-          sed -i 's|  url: http://github.com/containers/fetchit|  url: http://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
+          sed -i 's|  url: https://github.com/containers/fetchit|  url: https://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
           sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
 
       - name: Start fetchit

@@ -1,6 +1,6 @@
 targetConfigs:
 - disconnected: true
-  url: http://localhost:9000/fetchit.zip
+  url: https://localhost:9000/fetchit.zip
   raw:
   - name: raw-ex
     targetPath: examples/raw

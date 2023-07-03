@@ -55,7 +55,7 @@ This example can be found in [./examples/readme-config.yaml](examples/readme-con
 
 ```
 targetConfigs:
-- url: http://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   branch: main
   fileTransfer:
   - name: ft-ex
@@ -106,7 +106,7 @@ The container will be started and will run in the background. To view the logs:
 ```
 podman logs -f fetchit
 
-git clone http://github.com/containers/fetchit main --recursive
+git clone https://github.com/containers/fetchit main --recursive
 Creating podman container from ./fetchit/examples/raw/example.json
 Trying to pull docker.io/mmumshad/simple-webapp-color:latest...
 Getting image source signatures

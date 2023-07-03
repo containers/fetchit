@@ -1,6 +1,6 @@
 images:
   - name: httpd-ex
-    url: http://localhost:8080/httpd.tar
+    url: https://localhost:8080/httpd.tar
     schedule: "*/1 * * * *"
 targetConfigs:
 - url: https://github.com/containers/fetchit
