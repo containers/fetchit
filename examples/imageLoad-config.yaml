@@ -3,7 +3,7 @@ images:
     url: https://localhost:8080/httpd.tar
     schedule: "*/1 * * * *"
 targetConfigs:
-- url: https://github.com/containers/fetchit
+- url: http://github.com/containers/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/imageLoad
