@@ -1,9 +1,9 @@
 images:
   - name: httpd-ex
-    url: https://localhost:8080/httpd.tar
+    url: http://localhost:8080/httpd.tar
     schedule: "*/1 * * * *"
 targetConfigs:
-- url: http://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   raw:
   - name: raw-ex
     targetPath: examples/imageLoad
