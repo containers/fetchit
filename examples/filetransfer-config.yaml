@@ -1,5 +1,5 @@
 targetConfigs:
-- url: http://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   filetransfer:
   - name: ft-ex
     targetPath: examples/filetransfer

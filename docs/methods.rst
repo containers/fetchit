@@ -90,7 +90,7 @@ An example of using a PAT token is shown below.
    gitAuth:
      pat: CHANGEME
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      branch: main
      raw:
      - name: raw-ex
@@ -135,7 +135,7 @@ An example of using username/password is shown below.
       username: bob
       password: bobpassword
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      branch: main
      raw:
      - name: raw-ex
@@ -160,7 +160,7 @@ In the examples directory, there is an Ansible playbook that is used to install 
 .. code-block:: yaml
 
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      branch: main
      ansible:
      - name: ans-ex
@@ -177,7 +177,7 @@ The RawTarget method will launch containers based upon their definition in a JSO
 .. code-block:: yaml
 
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      branch: main
      raw:
      - name: raw-ex
@@ -226,7 +226,7 @@ SystemdTarget is a method that will place, enable, and restart systemd unit file
 .. code-block:: yaml
 
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      branch: main
      systemd:
      - name: sysd-ex
@@ -242,7 +242,7 @@ The File Transfer method will copy files from the container to the host. This me
 .. code-block:: yaml
 
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      filetransfer:
      - name: ft-ex
        targetPath: examples/filetransfer
@@ -259,7 +259,7 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
 .. code-block:: yaml
 
    targetConfigs:
-   - url: http://github.com/containers/fetchit
+   - url: https://github.com/containers/fetchit
      kube:
      - name: kube-ex
        targetPath: examples/kube

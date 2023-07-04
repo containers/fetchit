@@ -1,7 +1,7 @@
 podmanAutoUpdate:
   root: true
 targetConfigs:
-- url: http://github.com/containers/fetchit
+- url: https://github.com/containers/fetchit
   systemd:
   - name: sysd-ex
     targetPath: examples/systemd
