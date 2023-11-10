@@ -44,6 +44,7 @@ func (r *Raw) GetKind() string {
     "Range":         0,
     "Protocol":      ""}]
 "CapAdd": []
+"Network": "private"
 "CapDrop": []
 }
 */
