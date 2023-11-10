@@ -1227,6 +1227,75 @@ jobs:
       - name: list packages
         run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh | wc -l); done'
 
+  ssh-validate:
+    runs-on: ubuntu-latest
+    needs: [ build, pull-and-archive ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: generate ssh assets
+        run: |
+          mkdir ~/.ssh
+          echo "${{secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan github.com > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_rsa
+          mkdir ~/.fetchit
+          cp -rp ~/.ssh ~/.fetchit/
+          cp ./examples/ssh-config.yaml ~/.fetchit/config.yaml
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/.fetchit:/opt/mount -v ~/.ssh:/opt/mount/.ssh -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+
+      - name: List fetchit files
+        run: sudo ls -la ~/.fetchit
+
+      - name: List ssh files
+        run: sudo ls -la ~/.fetchit/.ssh
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/anotherfile.txt ]; do sleep 2; done" 
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+    
+
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
     needs: [ build , pull-and-archive ]
