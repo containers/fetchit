@@ -1277,7 +1277,7 @@ jobs:
           cp -rp ~/.ssh ~/.fetchit/
           cp ./examples/ssh-config.yaml ~/.fetchit/config.yaml
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/.fetchit:/opt/mount -v /home/runnner/.ssh:/opt/mount/.ssh -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/.fetchit:/opt/mount -v ~/.ssh:/opt/mount/.ssh -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: List fetchit files
         run: sudo ls -la ~/.fetchit
