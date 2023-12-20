@@ -1446,6 +1446,106 @@ jobs:
       - name: Check the capabilities of cap1
         run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
+  rollback-validate:
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [ build , pull-and-archive ]
+    steps:
+      - name: pull in podman
+        uses: actions/download-artifact@v1
+        with:
+          name: podman-bins
+          path: bin
+
+      - name: replace
+        run: |
+          chmod +x bin/podman
+          sudo mv bin/podman /usr/bin/podman
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - uses: actions/checkout@v3
+        with:
+          path: main
+
+      - name: checkout with token
+        uses: actions/checkout@v3
+        with:
+          path: ci-rollback
+          ref: ci-rollback
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: reset and commit working
+        run: |
+          cd ci-rollback
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          rm -rf ./examples/ci-rollback || true
+          mkdir ./examples/ci-rollback
+          cp ./examples/rollback/working.yaml ./examples/ci-rollback/working.yaml
+          git add ./examples
+          git commit -m "add working" -a || true
+          git push -f || true
+      
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: set values relating to the current env
+        run: | 
+          cd ci-rollback
+          sed -i 's|  url: http://github.com/containers/fetchit|  url: http://github.com/${{ github.repository }}|g' ./examples/ci-rollback.yaml
+          sed -i 's|   branch: ci-rollback|  branch: "{{ github.ref }}"|g' ./examples/ci-rollback.yaml
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/work/fetchit/fetchit/ci-rollback/examples/ci-rollback.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+
+      - name: identify rollback1 container
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do sudo podman ps; c=$(sudo podman ps | grep rollback | wc -l); done'
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
+      - name: commit working
+        run: |
+          cd ci-rollback
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          ls
+          cp ./examples/rollback/1-working.yaml ./examples/ci-rollback/1-working.yaml
+          cp ./examples/rollback/2-broken.yaml ./examples/ci-rollback/2-broken.yaml
+          git add ./examples
+          git commit -m "add 1-working and 2-broken" -a
+          git push -f
+      
+      - name: Wait for 2 pods
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do sudo podman ps; c=$(sudo podman ps | grep rollback | wc -l); done'
+
+      - name: Check rollback succeeded
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman ps | grep rollback | wc -l); done'
+
   multi-engine-validate:
     runs-on: ubuntu-latest
     needs: [ build , pull-and-archive ]

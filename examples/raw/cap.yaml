@@ -1,14 +1,11 @@
-{
-    "Image":"docker.io/mmumshad/simple-webapp-color:latest",
-    "Name": "cap2",
-    "Env": {"APP_COLOR": "blue", "tree": "trunk"},
-    "Mounts": [],
-    "Volumes": [],
-    "CapDrop": ["all"],
-    "Ports": [{
-        "host_ip":        "",
-        "container_port": 8080,
-        "host_port":      9090,
-        "range":         0,
-        "protocol":      ""}]
-}
+Image: docker.io/mmumshad/simple-webapp-color:latest
+Name: cap2
+Env: 
+  APP_COLOR": blue
+  tree: trunk
+CapDrop: 
+  - all
+Ports: 
+  - container_port: 8080
+    host_port:      9091
+    range:         0
