@@ -79,7 +79,7 @@ cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
 systemctl enable fetchit --now
 ```
 
-For user
+For $USER
 ```
 mkdir -p ~/.config/systemd/user/
 cp systemd/fetchit-user.service ~/.config/systemd/user/fetchit.service
