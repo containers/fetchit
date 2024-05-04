@@ -11,6 +11,7 @@ To develop and test changes of FetchIt, the FetchIt image can be built locally a
 
 ```
 go mod tidy
+go mod vendor
 podman build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
 podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 ```

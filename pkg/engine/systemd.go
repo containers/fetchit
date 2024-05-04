@@ -129,10 +129,28 @@ func (sd *Systemd) Process(ctx, conn context.Context, skew int) {
 }
 
 func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	var changeType string = "unknown"
+	var curr *string = nil
 	var prev *string = nil
 	if change != nil {
+		if change.From.Name != "" {
+			prev = &change.From.Name
+		}
 		if change.To.Name != "" {
-			prev = &change.To.Name
+			curr = &change.To.Name
+		}
+		if change.From.Name == "" && change.To.Name != "" {
+			changeType = "create"
+		}
+		if change.From.Name != "" && change.To.Name != "" {
+			if change.From.Name == change.To.Name {
+				changeType = "update"
+			} else {
+				changeType = "rename"
+			}
+		}
+		if change.From.Name != "" && change.To.Name == "" {
+			changeType = "delete"
 		}
 	}
 	nonRootHomeDir := os.Getenv("HOME")
@@ -148,7 +166,7 @@ func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, chang
 	if change != nil {
 		sd.initialRun = true
 	}
-	return sd.systemdPodman(ctx, conn, path, dest, prev)
+	return sd.systemdPodman(ctx, conn, path, dest, prev, curr, &changeType)
 }
 
 func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
@@ -162,7 +180,7 @@ func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState p
 	return nil
 }
 
-func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path, dest string, prev *string) error {
+func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path, dest string, prev *string, curr *string, changeType *string) error {
 	logger.Infof("Deploying systemd file(s) %s", path)
 	if sd.autoUpdateAll {
 		if !sd.initialRun {
@@ -187,14 +205,20 @@ func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path
 		logger.Infof("Systemd target %s successfully processed", sd.Name)
 		return nil
 	}
-	if (sd.Enable && !sd.Restart) || sd.initialRun {
-		if sd.Enable {
-			return sd.enableRestartSystemdService(conn, "enable", dest, filepath.Base(path))
+	if *changeType == "create" {
+		return sd.enableRestartSystemdService(conn, "enable", dest, filepath.Base(*curr))
+	}
+	if *changeType == "update" {
+		if sd.Restart {
+			return sd.enableRestartSystemdService(conn, "restart", dest, filepath.Base(*curr))
+		} else {
+			return sd.enableRestartSystemdService(conn, "enable", dest, filepath.Base(*curr))
 		}
 	}
-	if sd.Restart {
-		return sd.enableRestartSystemdService(conn, "restart", dest, filepath.Base(path))
+	if *changeType == "delete" {
+		return sd.enableRestartSystemdService(conn, "stop", dest, filepath.Base(*prev))
 	}
+	logger.Infof("Systemd target %s %s not processed", sd.Name, *changeType)
 	return nil
 }
 
