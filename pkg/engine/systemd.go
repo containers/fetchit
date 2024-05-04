@@ -215,6 +215,12 @@ func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path
 			return sd.enableRestartSystemdService(conn, "enable", dest, filepath.Base(*curr))
 		}
 	}
+	if *changeType == "rename" {
+		if err := sd.enableRestartSystemdService(conn, "stop", dest, filepath.Base(*prev)); err != nil {
+			return err
+		}
+		return sd.enableRestartSystemdService(conn, "enable", dest, filepath.Base(*curr))
+	}
 	if *changeType == "delete" {
 		return sd.enableRestartSystemdService(conn, "stop", dest, filepath.Base(*prev))
 	}
