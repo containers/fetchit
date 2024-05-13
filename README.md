@@ -70,7 +70,7 @@ targetConfigs:
 ```
 
 #### Launch using systemd
-Two systemd files are provided to allow for FetchIt to run as a user or as root. The files are differentiated by fetchit-root and fetchit-user.
+Two systemd files are provided to allow for FetchIt to run as a user or as root. The files are under the systemd folder, differentiated by fetchit-root and fetchit-user.
 
 Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting to start the service.
 
@@ -80,6 +80,7 @@ cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
 systemctl enable fetchit --now
 ```
 
+For $USER
 ```
 mkdir -p ~/.config/systemd/user/
 cp systemd/fetchit-user.service ~/.config/systemd/user/fetchit.service
