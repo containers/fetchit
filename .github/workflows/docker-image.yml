@@ -8,64 +8,9 @@ on:
 
 env:
   CGO_ENABLED: 0
-  PODMAN_VER: v4.2.1
 
 jobs:
-
-  build-podman-v4:
-    env:
-      CGO_ENABLED: 1 # CGO is required for podman
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Cache podman bin
-        id: cache-podman-bin
-        uses: actions/cache@v3
-        with:
-          path: |
-            ./bin
-          key: ${{ runner.os }}-podman-${{ env.PODMAN_VER }}
-          restore-keys: |
-            ${{ runner.os }}-podman
-      - uses: actions/checkout@v3
-        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        with:
-          repository: containers/podman
-          ref: v4.2.1
-
-      - uses: actions/setup-go@v2
-        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        with:
-          go-version: ${{ env.GOVER }}
-
-      - name: Cache go modules
-        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        uses: actions/cache@v2
-        with:
-          # In order:
-          # * Module download cache
-          # * Build cache (Linux)
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-podman-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-podman
-      - name: Add build packages
-        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        run: sudo apt install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
-
-      - name: Build podman v4
-        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        run: make binaries
-
-      # store podman binary as artifact
-      - uses: actions/upload-artifact@v3
-        with:
-          name: podman-bins
-          path: bin
-
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -73,10 +18,10 @@ jobs:
 
       - name: Install required packages
         run: sudo apt install curl
-      
+
       - name: Build the image
         run: go mod tidy -compat=1.17 && go mod vendor && docker build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
-    
+
       - name: Export image
         run: docker save -o /tmp/fetchit.tar quay.io/fetchit/fetchit-amd:latest
 
@@ -201,17 +146,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -261,17 +195,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -301,7 +224,7 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v "${HOME}"/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
@@ -320,17 +243,6 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -361,7 +273,7 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/pat-testing-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
 
@@ -380,17 +292,6 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -421,10 +322,10 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/pat-testing-kube.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: Wait for fetchit to deploy
         run: sleep 1m
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -440,17 +341,6 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -475,13 +365,13 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -497,8 +387,8 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
-      
-      - name: 'Check that the "owned-by:fetchit" label is applied' 
+
+      - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
           declare -i numContainers=$(sudo podman ps --filter label=owned-by=fetchit | wc -l)
           if (( numContainers > 1 )); then
@@ -522,17 +412,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -556,7 +435,7 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: generate podman secret
         run: |
          export GH_PAT=${{ secrets.GITHUB_TOKEN }}
@@ -564,10 +443,10 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/podman-secret-raw.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -583,8 +462,8 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
-      
-      - name: 'Check that the "owned-by:fetchit" label is applied' 
+
+      - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
           declare -i numContainers=$(sudo podman ps --filter label=owned-by=fetchit | wc -l)
           if (( numContainers > 1 )); then
@@ -608,17 +487,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -642,7 +510,7 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: generate podman secret
         run: |
          export GH_PAT=${{ secrets.GITHUB_TOKEN }}
@@ -650,10 +518,10 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/podman-secret-raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -669,8 +537,8 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
-      
-      - name: 'Check that the "owned-by:fetchit" label is applied' 
+
+      - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
           declare -i numContainers=$(sudo podman ps --filter label=owned-by=fetchit | wc -l)
           if (( numContainers > 1 )); then
@@ -694,17 +562,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -728,14 +585,14 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit with environment variable config
         run: |
           sudo podman run -d --name fetchit -v fetchit-volume:/opt -e FETCHIT_CONFIG="$(cat ./examples/raw-config.yaml)" -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -756,17 +613,6 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -808,17 +654,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -856,17 +691,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -884,7 +708,7 @@ jobs:
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: Wait for fetchit to deploy
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
@@ -900,17 +724,6 @@ jobs:
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -982,17 +795,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1041,17 +843,6 @@ jobs:
     needs: [ build , build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: enable podman.socket
         run: |
@@ -1109,17 +900,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1172,17 +952,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1200,7 +969,7 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
-  
+
       - name: Pull ansible artifact
         uses: actions/download-artifact@v1
         with:
@@ -1212,37 +981,85 @@ jobs:
           sudo podman load -i /tmp/ansible-amd.tar
 
       - name: tag the image
-        run: sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest 
+        run: sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/ansible.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-    
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
-      
+
       - name: list packages
         run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh | wc -l); done'
+
+  ssh-validate:
+    runs-on: ubuntu-latest
+    needs: [ build, pull-and-archive ]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Enable the podman socket
+        run: sudo systemctl enable --now podman.socket
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: fetchit-image
+          path: /tmp
+
+      - name: pull artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: colors
+          path: /tmp
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/fetchit.tar
+
+      - name: Load the image
+        run: sudo podman load -i /tmp/colors.tar
+
+      - name: tag the image
+        run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+
+      - name: generate ssh assets
+        run: |
+          mkdir ~/.ssh
+          echo "${{secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan github.com > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_rsa
+          mkdir ~/.fetchit
+          cp -rp ~/.ssh ~/.fetchit/
+          cp ./examples/ssh-config.yaml ~/.fetchit/config.yaml
+      - name: Start fetchit
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /home/runner/.fetchit:/opt/mount -v ~/.ssh:/opt/mount/.ssh -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+
+      - name: List fetchit files
+        run: sudo ls -la ~/.fetchit
+
+      - name: List ssh files
+        run: sudo ls -la ~/.fetchit/.ssh
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/hello.txt ]; do sleep 2; done"
+
+      - name: check for file
+        run: timeout 150 bash -c "until [ -f /tmp/anotherfile.txt ]; do sleep 2; done"
+
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1255,16 +1072,16 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
- 
+
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/systemd-config-single-file.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
- 
+
       - name: Wait for fetchit to deploy
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
- 
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -1281,17 +1098,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1306,13 +1112,13 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: Wait for fetchit to deploy
         run: sleep 1m
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -1329,17 +1135,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1351,7 +1146,7 @@ jobs:
 
       - name: Create unused volume
         run: sudo podman volume create test
-        
+
       - name: Pull an image
         run: sudo podman image pull alpine:latest
 
@@ -1360,10 +1155,10 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/clean-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify fetchit container
         run: timeout 150 bash -c -- 'f=0 ; until [ $f -eq 1 ]; do f=$(sudo podman ps | grep fetchit | wc -l); done'
 
@@ -1372,9 +1167,9 @@ jobs:
 
       - name: wait until image is removed
         run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | grep -v REPOSITORY | wc -l); done'
-  
+
       - name: Wait for fetchit to clean these up
-        run: sleep 30s 
+        run: sleep 30s
 
       - name: Logs
         if: always()
@@ -1385,23 +1180,12 @@ jobs:
 
       - name: verify image is deleted
         run: if [[ $(sudo podman image ls | grep alpine) ]] ; then exit 1; else echo "Image correctly removed" 1; fi
-  
+
   glob-validate:
     runs-on: ubuntu-latest
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1426,13 +1210,13 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/glob-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -1451,17 +1235,6 @@ jobs:
     needs: [ build , pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1501,15 +1274,15 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-  
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: Wait for fetchit to deploy
         run: timeout 150 bash -c "until [ -f /etc/systemd/system/httpd.service ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"     
+        run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -1530,17 +1303,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1567,7 +1329,7 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
-        
+
       - name: pull artifact
         uses: actions/download-artifact@v1
         with:
@@ -1579,10 +1341,10 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-  
+
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/full-suite-with-skew.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -1594,7 +1356,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"       
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -1622,24 +1384,13 @@ jobs:
           path: ci
           ref: ci
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
       - name: ensure value and commit
         run: |
           if [[ $( grep pink ./ci/examples/raw/color1.json | wc -l ) = "1" ]] ; then
-            cat <<< $(jq '.Env.APP_COLOR |= "blue"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json 
+            cat <<< $(jq '.Env.APP_COLOR |= "blue"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json
             cd ci
             git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
@@ -1667,9 +1418,9 @@ jobs:
 
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-        
+
       - name: set values relating to the current env
-        run: | 
+        run: |
           sed -i 's|  url: https://github.com/containers/fetchit|  url: https://github.com/${{ github.repository }}|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
           sed -i 's|   branch: ci|  branch: "{{ github.ref }}"|g' /home/runner/work/fetchit/fetchit/main/examples/ci-config.yaml
 
@@ -1688,7 +1439,7 @@ jobs:
 
       - name: update variable
         run: |
-          cat <<< $(jq '.Env.APP_COLOR |= "pink"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json 
+          cat <<< $(jq '.Env.APP_COLOR |= "pink"' ./ci/examples/raw/color1.json) > ./ci/examples/raw/color1.json
 
       - name: Commit files
         run: |
@@ -1704,7 +1455,7 @@ jobs:
 
       - name: get environment variable
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman exec colors1 env | grep pink| wc -l); done'
-        
+
       - name: Logs
         if: always()
         run: sudo podman logs fetchit
@@ -1714,17 +1465,6 @@ jobs:
     needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
-
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1752,7 +1492,7 @@ jobs:
           sudo mkdir -p /tmp/image
           sudo podman save -o /tmp/image/httpd.tar quay.io/notreal/httpd:latest
           sudo podman image rm quay.io/notreal/httpd:latest
-      
+
       - name: start httpd and serve the httpd.tar image
         run: sudo podman run -d --name httpd -p 8080:8080 -v /tmp/image:/var/www/html registry.access.redhat.com/ubi8/httpd-24
 
@@ -1784,17 +1524,6 @@ jobs:
         with:
           path: ci
 
-      - name: pull in podman
-        uses: actions/download-artifact@v1
-        with:
-          name: podman-bins
-          path: bin
-
-      - name: replace
-        run: |
-          chmod +x bin/podman
-          sudo mv bin/podman /usr/bin/podman
-
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
 
@@ -1812,7 +1541,7 @@ jobs:
 
       - name: Load the image
         run: sudo podman load -i /tmp/fetchit.tar
-  
+
       - name: Pull ansible artifact
         uses: actions/download-artifact@v1
         with:
@@ -1864,7 +1593,7 @@ jobs:
         run: timeout 150 bash -c "until [ -f /tmp/ft/hello.txt ]; do sleep 2; done"
 
       - name: check for file
-        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done" 
+        run: timeout 150 bash -c "until [ -f /tmp/ft/anotherfile.txt ]; do sleep 2; done"
 
       - name: ensure only required containers are running (cap colors and fetchit)
         run: if [[ $(sudo podman ps -a | grep -v CON | grep -v httpd | grep -v fetchit | grep -v cap | grep -v colors | wc -l) > "0" ]] ; then exit 1; else echo "Containers properly cleaned"; fi
@@ -1909,12 +1638,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-        
+
       - name: update system
         run: sudo apt-get update
 
       - name: Install required packages
-        run: sudo apt install podman build-essential qemu-user qemu-user-static  
+        run: sudo apt install podman build-essential qemu-user qemu-user-static
 
       - name: Build the arm image
         run: go mod tidy -compat=1.17 && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
@@ -2049,7 +1778,7 @@ jobs:
 
       - name: podman login to quay.io
         run: podman login --authfile ~/.docker/config.json quay.io
-        
+
       - name: create manifest
         run: podman manifest create quay.io/fetchit/fetchit-ansible:latest
 
