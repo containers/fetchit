@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
-	"github.com/containers/podman/v4/pkg/bindings"
-	"github.com/containers/podman/v4/pkg/bindings/play"
-	"github.com/containers/podman/v4/pkg/domain/entities"
+	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/play"
+	"github.com/containers/podman/v5/pkg/domain/entities"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
-	"github.com/containers/podman/v4/libpod/define"
-	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -259,7 +259,8 @@ func (sd *Systemd) enableRestartSystemdService(conn context.Context, action, des
 		runMountsd = xdg + "/systemd"
 		runMounttmp = xdg
 	}
-	s.Privileged = true
+	privileged := true
+	s.Privileged = &privileged
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",

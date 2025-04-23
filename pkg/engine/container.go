@@ -3,20 +3,24 @@ package engine
 import (
 	"context"
 
-	"github.com/containers/podman/v4/libpod/define"
-	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/bindings/images"
-	"github.com/containers/podman/v4/pkg/domain/entities"
-	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/domain/entities"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const stopped = define.ContainerStateStopped
 
+var (
+	truePtr = func(b bool) *bool { return &b }(true)
+)
+
 func generateSpec(method, file, copyFile, dest string, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file
-	s.Privileged = true
+	s.Privileged = truePtr
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
@@ -30,7 +34,7 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 func generateDeviceSpec(method, file, copyFile, device string, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file
-	s.Privileged = true
+	s.Privileged = truePtr
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
@@ -44,7 +48,7 @@ func generateDeviceSpec(method, file, copyFile, device string, name string) *spe
 func generateDevicePresentSpec(method, file, device string, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file + "-" + "device-check"
-	s.Privileged = true
+	s.Privileged = truePtr
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
@@ -57,7 +61,7 @@ func generateDevicePresentSpec(method, file, device string, name string) *specge
 func generateSpecRemove(method, file, pathToRemove, dest, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = method + "-" + name + "-" + file
-	s.Privileged = true
+	s.Privileged = truePtr
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
