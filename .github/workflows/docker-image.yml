@@ -1227,6 +1227,10 @@ jobs:
       - name: list packages
         run: timeout 150 bash -c -- 'z=0 ; until [ $z -ge 1 ]; do z=$(sudo apt list --installed | grep zsh | wc -l); done'
 
+      - name: Logs
+        if: always()
+        run: sudo podman logs fetchit
+
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
     needs: [ build , pull-and-archive ]
