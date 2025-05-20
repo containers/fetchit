@@ -53,7 +53,7 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 	return changeMap, nil
 }
 
-//getLatest will get the head of the branch in the repository specified by the target's url
+// getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
 	ctx := context.Background()
 	directory := getDirectory(target)
@@ -160,11 +160,18 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	if rekorURL == "" {
 		rekorURL = defaultRekorURL
 	}
-	client, err := gitsignrekor.New(rekorURL, rekorclient.WithUserAgent("gitsign"))
+	client, err := gitsignrekor.NewWithOptions(ctx, rekorURL,
+		gitsignrekor.WithClientOption(rekorclient.WithUserAgent("gitsign")))
 	if err != nil {
 		return utils.WrapErr(err, "Error obtaining rekor client")
 	}
-	summary, err := gitsign.Verify(ctx, client, data, sig, true)
+
+	verifier, err := gitsign.NewCertVerifier()
+	if err != nil {
+		return utils.WrapErr(err, "Error creating git verifier")
+	}
+
+	summary, err := gitsign.Verify(ctx, verifier, client, data, sig, true)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			logger.Infof("Bad Signature: GNUPG: %s %s", certHexFingerprint(summary.Cert), summary.Cert.Subject.String())
