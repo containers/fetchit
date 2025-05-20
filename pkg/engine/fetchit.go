@@ -276,10 +276,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			disconnected: tc.Disconnected,
 		}
 
-		if tc.VerifyCommitsInfo != nil {
-			internalTarget.gitsignVerify = tc.VerifyCommitsInfo.GitsignVerify
-			internalTarget.gitsignRekorURL = tc.VerifyCommitsInfo.GitsignRekorURL
-		}
+		// Verification functionality is disabled in this build
+		// TODO: Re-enable when compatibility issues are resolved
+		//if tc.VerifyCommitsInfo != nil {
+		//	internalTarget.gitsignVerify = tc.VerifyCommitsInfo.GitsignVerify
+		//	internalTarget.gitsignRekorURL = tc.VerifyCommitsInfo.GitsignRekorURL
+		//}
 
 		if tc.configReload != nil {
 			tc.configReload.target = internalTarget

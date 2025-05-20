@@ -2,9 +2,10 @@ package engine
 
 import (
 	"context"
-	"crypto/sha1"
-	"crypto/x509"
-	"encoding/hex"
+	// Verification functionality is disabled in this build
+	// "crypto/sha1"
+	// "crypto/x509"
+	// "encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -19,9 +20,11 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gobwas/glob"
-	gitsign "github.com/sigstore/gitsign/pkg/git"
-	gitsignrekor "github.com/sigstore/gitsign/pkg/rekor"
-	rekorclient "github.com/sigstore/rekor/pkg/client"
+	// Verification functionality is disabled in this build
+	// TODO: Re-enable when compatibility issues are resolved
+	// gitsign "github.com/sigstore/gitsign/pkg/git"
+	// gitsignrekor "github.com/sigstore/gitsign/pkg/rekor"
+	// rekorclient "github.com/sigstore/rekor/pkg/client"
 )
 
 const (
@@ -55,7 +58,10 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 
 //getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
-	ctx := context.Background()
+	// Verification functionality is disabled in this build
+	// TODO: Re-enable when compatibility issues are resolved
+	// Context variable is only used for gitsign verification
+	// ctx := context.Background()
 	directory := getDirectory(target)
 
 	repo, err := git.PlainOpen(directory)
@@ -117,6 +123,10 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", hashStr, target.branch)
 	}
 
+	// Verification functionality is disabled in this build
+	// TODO: Re-enable when compatibility issues are resolved
+	// gitsignVerify functionality is disabled
+	/*
 	if target.gitsignVerify {
 		commit, err := repo.CommitObject(branch.Hash())
 		if err != nil {
@@ -126,9 +136,13 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 			return plumbing.Hash{}, utils.WrapErr(err, "Requested verified commit signatures, but commit %s from repository %s failed verification", hashStr, directory)
 		}
 	}
+	*/
 	return branch.Hash(), err
 }
 
+// Verification functionality is disabled in this build
+// TODO: Re-enable when compatibility issues are resolved
+/*
 // VerifyGitsign verifies any commit signed using sigstore/gitsign & rekor
 func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url string) error {
 	if commit.PGPSignature == "" {
@@ -186,6 +200,7 @@ func certHexFingerprint(cert *x509.Certificate) string {
 	fpr := sha1.Sum(cert.Raw)
 	return hex.EncodeToString(fpr[:])
 }
+*/
 
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
 	directory := getDirectory(target)

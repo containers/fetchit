@@ -62,8 +62,10 @@ type Target struct {
 	branch          string
 	mu              sync.Mutex
 	disconnected    bool
-	gitsignVerify   bool
-	gitsignRekorURL string
+	// Verification functionality is disabled in this build
+	// TODO: Re-enable when compatibility issues are resolved
+	//gitsignVerify   bool
+	//gitsignRekorURL string
 }
 
 type SchedInfo struct {
@@ -72,9 +74,8 @@ type SchedInfo struct {
 }
 
 type VerifyCommitsInfo struct {
-	// sigstore/gitsign verification with Rekor is available
-	// add other verification options as necessary
-	GitsignVerify bool
-	// default is https://rekor.sigstore.dev
-	GitsignRekorURL string
+	// Verification functionality is disabled in this build
+	// TODO: Re-enable when compatibility issues are resolved
+	GitsignVerify bool `json:"-"`
+	GitsignRekorURL string `json:"-"`
 }
