@@ -49,7 +49,7 @@ CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
 
 
 ### FetchIt launch options
-FetchIt and can be started manually or launched via systemd. 
+FetchIt and can be started manually or launched via systemd.
 
 Define the parameters in your `$HOME/.fetchit/config.yaml` to relate to your git repository.
 This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
@@ -62,7 +62,7 @@ targetConfigs:
   - name: ft-ex
     targetPath: examples/fileTransfer
     destinationDirectory: /tmp
-    schedule: "*/1 * * * *" 
+    schedule: "*/1 * * * *"
   raw:
   - name: raw-ex
     targetPath: examples/raw
