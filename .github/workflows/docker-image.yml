@@ -12,7 +12,7 @@ env:
 
 jobs:
 
-  build-podman-v4:
+  build-podman-v5:
     env:
       CGO_ENABLED: 1 # CGO is required for podman
     runs-on: ubuntu-latest
@@ -30,7 +30,7 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         with:
           repository: containers/podman
-          ref: v5.4.2
+          ref: ${{ env.PODMAN_VER }}
 
       - uses: actions/setup-go@v4
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
@@ -54,7 +54,7 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: sudo apt install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
 
-      - name: Build podman v4
+      - name: Build podman v5
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: make binaries
 
