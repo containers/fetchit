@@ -9,8 +9,8 @@ import (
 
 	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/fetchit/pkg/engine/utils"
-	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/opencontainers/runtime-spec/specs-go"
