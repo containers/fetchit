@@ -1,0 +1,9 @@
+Image: "docker.io/mmumshad/simple-webapp-color:latest"
+Name: "rollback1"
+Env:
+  APP_COLOR: "pink"
+  tree: "trunk"
+Ports:
+  - container_port: 8080
+    host_port: 8080
+    range: 0

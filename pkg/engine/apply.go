@@ -187,6 +187,31 @@ func certHexFingerprint(cert *x509.Certificate) string {
 	return hex.EncodeToString(fpr[:])
 }
 
+func checkout(target *Target, hash plumbing.Hash) error {
+	if hash == plumbing.ZeroHash {
+		return nil
+	}
+
+	directory := getDirectory(target)
+
+	repo, err := git.PlainOpen(directory)
+	if err != nil {
+		return utils.WrapErr(err, "Error opening repository: %s", directory)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return utils.WrapErr(err, "Error getting reference to worktree for repository", directory)
+	}
+
+	err = wt.Checkout(&git.CheckoutOptions{Hash: hash})
+	if err != nil {
+		return utils.WrapErr(err, "Error checking out %s on branch %s", hash, target.branch)
+	}
+
+	return nil
+}
+
 func getCurrent(target *Target, methodType, methodName string) (plumbing.Hash, error) {
 	directory := getDirectory(target)
 	tagName := fmt.Sprintf("current-%s-%s", methodType, methodName)
