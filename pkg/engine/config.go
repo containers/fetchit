@@ -187,7 +187,7 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("received non-200 HTTP status: %d %s", resp.StatusCode, resp.Status)
+		return false, fmt.Errorf("received non-200 HTTP status from %s: %d %s", urlStr, resp.StatusCode, resp.Status)
 	}
 
 	newBytes, err := io.ReadAll(resp.Body)
