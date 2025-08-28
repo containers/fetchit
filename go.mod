@@ -200,7 +200,7 @@ require (
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/transparency-dev/merkle v0.0.1 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/ulikunitz/xz v0.5.14 // indirect
 	github.com/urfave/cli v1.22.7 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
 	github.com/vbauerster/mpb/v7 v7.4.2 // indirect
