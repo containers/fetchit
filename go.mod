@@ -181,7 +181,7 @@ require (
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sigstore/cosign v1.12.0 // indirect
 	github.com/sigstore/sigstore v1.4.1-0.20220908204944-ec922cf4f1c2 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.1 // indirect
 	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
