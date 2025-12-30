@@ -4,6 +4,10 @@
 
 set -e
 
+# Determine script directory and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -119,7 +123,7 @@ test_raw_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/raw-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/raw-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -194,7 +198,7 @@ test_config_env_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -e FETCHIT_CONFIG="$(cat ./examples/raw-config.yaml)" \
+        -e FETCHIT_CONFIG="$(cat $REPO_ROOT/examples/raw-config.yaml)" \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -220,7 +224,7 @@ test_kube_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/kube-play-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -247,7 +251,7 @@ test_filetransfer_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/filetransfer-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/filetransfer-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -280,7 +284,7 @@ test_filetransfer_exact_file() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/filetransfer-config-single-file.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -312,7 +316,7 @@ test_systemd_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/systemd-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/systemd-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -342,7 +346,7 @@ test_clean_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/clean-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/clean-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -376,7 +380,7 @@ test_glob_validate() {
 
     if ! sudo podman run -d --name fetchit \
         -v fetchit-volume:/opt \
-        -v ./examples/glob-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/glob-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         --security-opt label=disable \
         "$FETCHIT_IMAGE"; then
@@ -431,7 +435,7 @@ test_imageload_validate() {
     sleep 5
 
     if ! sudo podman run -d --name fetchit --network=host \
-        -v ./examples/imageLoad-config.yaml:/opt/mount/config.yaml \
+        -v $REPO_ROOT/examples/imageLoad-config.yaml:/opt/mount/config.yaml \
         -v /run/podman/podman.sock:/run/podman/podman.sock \
         "$FETCHIT_IMAGE"; then
         show_logs
@@ -464,7 +468,7 @@ build_fetchit_image() {
     fi
 
     print_info "Building fetchit container image..."
-    if ! (cd .. && go mod tidy -compat=1.21 && go mod vendor && \
+    if ! (cd "$REPO_ROOT" && go mod tidy -compat=1.21 && go mod vendor && \
           docker build . --file Dockerfile --tag "$FETCHIT_IMAGE"); then
         print_error "Failed to build fetchit image"
         return 1
@@ -499,7 +503,7 @@ build_systemd_image() {
     fi
 
     print_info "Building systemd container image..."
-    if ! (cd .. && CTR_CMD=docker make build-systemd-cross-build-linux-amd64 && \
+    if ! (cd "$REPO_ROOT" && CTR_CMD=docker make build-systemd-cross-build-linux-amd64 && \
           docker tag quay.io/fetchit/fetchit-systemd-amd:latest "$SYSTEMD_IMAGE"); then
         print_warning "Failed to build systemd image (optional)"
         return 1
@@ -517,7 +521,7 @@ build_ansible_image() {
     fi
 
     print_info "Building ansible container image..."
-    if ! (cd .. && CTR_CMD=docker make build-ansible-cross-build-linux-amd64 && \
+    if ! (cd "$REPO_ROOT" && CTR_CMD=docker make build-ansible-cross-build-linux-amd64 && \
           docker tag quay.io/fetchit/fetchit-ansible-amd:latest "$ANSIBLE_IMAGE"); then
         print_warning "Failed to build ansible image (optional)"
         return 1
