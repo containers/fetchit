@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const quadletMethod = "quadlet"
@@ -125,19 +127,36 @@ func GetQuadletDirectory(root bool) (QuadletDirectoryPaths, error) {
 	}, nil
 }
 
-// ensureQuadletDirectory creates the Quadlet directory with proper permissions if it doesn't exist
-func (q *Quadlet) ensureQuadletDirectory() error {
+// ensureQuadletDirectory creates the Quadlet directory on the HOST filesystem using a temporary container
+// This is necessary because the fetchit container cannot create directories on the host directly
+func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 	paths, err := GetQuadletDirectory(q.Root)
 	if err != nil {
 		return fmt.Errorf("failed to get Quadlet directory: %w", err)
 	}
 
-	// Create directory with 0755 permissions (drwxr-xr-x)
-	if err := os.MkdirAll(paths.InputDirectory, 0755); err != nil {
-		return fmt.Errorf("failed to create Quadlet directory %s: %w", paths.InputDirectory, err)
+	// Create a temporary container to create the directory on the host
+	// This uses the same approach as fileTransferPodman - bind mount the parent directory
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = "quadlet-mkdir-" + q.Name
+	privileged := true
+	s.Privileged = &privileged
+
+	// Command to create the directory with proper permissions
+	s.Command = []string{"sh", "-c", "mkdir -p " + paths.InputDirectory}
+
+	// Bind mount the parent directory so we can create subdirectories
+	parentDir := filepath.Dir(paths.InputDirectory)
+	s.Mounts = []specs.Mount{{Source: parentDir, Destination: parentDir, Type: "bind", Options: []string{"rw"}}}
+
+	// Create and start the container
+	createResponse, err := createAndStartContainer(conn, s)
+	if err != nil {
+		return fmt.Errorf("failed to create directory container: %w", err)
 	}
 
-	return nil
+	// Wait for the container to exit and remove it
+	return waitAndRemoveContainer(conn, createResponse.ID)
 }
 
 // systemdDaemonReload triggers systemd to reload configuration via D-Bus
@@ -421,8 +440,8 @@ func (q *Quadlet) MethodEngine(ctx context.Context, conn context.Context, change
 		return fmt.Errorf("failed to get Quadlet directory: %w", err)
 	}
 
-	// Ensure directory exists (must be done before fileTransferPodman)
-	if err := q.ensureQuadletDirectory(); err != nil {
+	// Ensure directory exists on HOST (must be done before fileTransferPodman)
+	if err := q.ensureQuadletDirectory(conn); err != nil {
 		return err
 	}
 
