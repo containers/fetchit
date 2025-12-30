@@ -1,4 +1,12 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env bash
+
+if [ "$ACTION" == "daemon-reload" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl daemon-reload
+  else
+    systemctl --user daemon-reload
+  fi
+fi
 
 if [ "$ACTION" == "enable" ]; then
   if [ "$ROOT" == "true" ]; then
@@ -13,6 +21,22 @@ if [ "$ACTION" == "enable" ]; then
     systemctl --user daemon-reload
     sleep 2
     systemctl --user enable "${SERVICE}" --now
+    sleep 2
+    if ! systemctl --user is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  fi
+fi
+
+if [ "$ACTION" == "start" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl start "${SERVICE}"
+    sleep 2
+    if ! systemctl is-active --quiet "${SERVICE}"; then
+      exit 1
+    fi
+  else
+    systemctl --user start "${SERVICE}"
     sleep 2
     if ! systemctl --user is-active --quiet "${SERVICE}"; then
       exit 1
