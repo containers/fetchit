@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
@@ -254,12 +255,12 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 func deleteContainer(conn context.Context, podName string) error {
 	err := containers.Stop(conn, podName, nil)
 	if err != nil {
-		return err
+		return utils.WrapErr(err, "Failed to stop container %s", podName)
 	}
 
-	containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
+	_, err = containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
 	if err != nil {
-		return err
+		return utils.WrapErr(err, "Failed to remove container %s", podName)
 	}
 
 	return nil
@@ -285,11 +286,18 @@ func rawPodFromBytes(b []byte) (*RawPod, error) {
 // Using this might not be necessary
 func removeExisting(conn context.Context, podName string) error {
 	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
-	if err == nil || inspectData == nil {
-		logger.Infof("A container named %s already exists. Removing the container before redeploy.", podName)
-		err := deleteContainer(conn, podName)
-		if err != nil {
-			return err
+	if err != nil {
+		// Container doesn't exist or inspect failed
+		if strings.Contains(err.Error(), "no such container") {
+			return nil // Container doesn't exist, nothing to remove
+		}
+		return utils.WrapErr(err, "Failed to inspect container %s", podName)
+	}
+
+	if inspectData != nil {
+		logger.Infof("Container %s already exists. Removing before redeploy.", podName)
+		if err := deleteContainer(conn, podName); err != nil {
+			return utils.WrapErr(err, "Failed to delete existing container %s", podName)
 		}
 	}
 

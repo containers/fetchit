@@ -50,9 +50,13 @@ jobs:
           key: ${{ runner.os }}-go-podman-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-podman
+      - name: Update apt cache
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        run: sudo apt-get update
+
       - name: Add build packages
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
-        run: sudo apt install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
+        run: sudo apt-get install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
 
       - name: Build podman v5
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'

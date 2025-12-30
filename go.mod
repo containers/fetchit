@@ -1,9 +1,8 @@
 module github.com/containers/fetchit
 
-go 1.25.0
+go 1.24.2
 
 require (
-	github.com/containers/common v0.62.2
 	github.com/containers/podman/v5 v5.7.0
 	github.com/go-co-op/gocron v1.13.0
 	github.com/go-git/go-git/v5 v5.14.0
@@ -15,6 +14,7 @@ require (
 	github.com/sigstore/rekor v1.3.10
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
+	go.podman.io/common v0.66.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.3
@@ -74,7 +74,6 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/containers/psgo v1.9.1-0.20250826150930-4ae76f200c86 // indirect
-	github.com/containers/storage v1.57.2 // indirect
 	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
@@ -244,7 +243,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
-	go.podman.io/common v0.66.0 // indirect
 	go.podman.io/image/v5 v5.38.0 // indirect
 	go.podman.io/storage v1.61.0 // indirect
 	go.step.sm/crypto v0.74.0 // indirect
