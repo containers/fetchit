@@ -6,6 +6,12 @@ https://fetchit.readthedocs.io/
 
 A quickstart example is available at https://github.com/containers/fetchit/blob/main/docs/quick_start.rst
 
+## Requirements
+
+- **Podman v5.0+** (tested with v5.7.0)
+- **Go 1.21+** (for building from source)
+- **Linux Kernel 5.2+** (required by Podman v5)
+
 ## Developing
 To develop and test changes of FetchIt, the FetchIt image can be built locally and then run on the development system.
 

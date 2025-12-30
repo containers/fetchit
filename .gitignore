@@ -11,3 +11,22 @@ fetchit
 !fetchit/
 config.yaml
 *.env
+
+# Go build artifacts
+*.exe
+*.test
+*.out
+*.prof
+
+# IDE and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Test coverage
+coverage.out
+*.coverprofile

@@ -109,7 +109,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	wt, err := repo.Worktree()
 	if err != nil {
-		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository", directory)
+		return plumbing.Hash{}, utils.WrapErr(err, "Error getting reference to worktree for repository %s", directory)
 	}
 
 	hashStr := branch.Hash().String()[:hashReportLen]
@@ -164,7 +164,12 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	if err != nil {
 		return utils.WrapErr(err, "Error obtaining rekor client")
 	}
-	summary, err := gitsign.Verify(ctx, client, data, sig, true)
+	// Create certificate verifier
+	verifier, err := gitsign.NewCertVerifier()
+	if err != nil {
+		return utils.WrapErr(err, "Error creating certificate verifier")
+	}
+	summary, err := gitsign.Verify(ctx, verifier, client, data, sig, true)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			logger.Infof("Bad Signature: GNUPG: %s %s", certHexFingerprint(summary.Cert), summary.Cert.Subject.String())
@@ -267,19 +272,19 @@ func getFilteredChangeMap(
 
 	changes, err := currentTree.Diff(desiredTree)
 	if err != nil {
-		return nil, utils.WrapErr(err, "Error getting diff between current and latest", targetPath)
+		return nil, utils.WrapErr(err, "Error getting diff between current and latest in %s", targetPath)
 	}
 
 	var g glob.Glob
 	if globPattern == nil {
 		g, err = glob.Compile("**")
 		if err != nil {
-			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern **")
 		}
 	} else {
 		g, err = glob.Compile(*globPattern)
 		if err != nil {
-			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", globPattern)
+			return nil, utils.WrapErr(err, "Error compiling glob for pattern %s", *globPattern)
 		}
 	}
 

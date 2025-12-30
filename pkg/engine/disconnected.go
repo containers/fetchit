@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/podman/v4/libpod/define"
-	"github.com/containers/podman/v4/pkg/bindings"
-	"github.com/containers/podman/v4/pkg/bindings/containers"
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
 )
 
 func extractZip(url string) error {
@@ -67,6 +67,14 @@ func extractZip(url string) error {
 				defer rc.Close()
 
 				fpath := filepath.Join(directory, f.Name)
+			// Prevent path traversal attacks
+			cleanPath := filepath.Clean(fpath)
+			cleanDir := filepath.Clean(directory)
+			if !strings.HasPrefix(cleanPath, cleanDir) {
+				logger.Errorf("Illegal file path in ZIP archive (path traversal attempt): %s", f.Name)
+				return err
+			}
+
 				if f.FileInfo().IsDir() {
 					os.MkdirAll(fpath, f.Mode())
 				} else {
@@ -163,8 +171,8 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 	// List currently running containers to ensure we don't create a duplicate
 	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
 	inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
-	if err == nil || inspectData == nil {
-		logger.Error("The container already exists..requeuing")
+	if err == nil && inspectData != nil {
+		logger.Errorf("Container %s already exists, cannot proceed", containerName)
 		return "", 0, err
 	}
 
@@ -182,8 +190,17 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 
 	_, err = containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
 	if err != nil {
-		// There's a podman bug somewhere that's causing this
-		if err.Error() == "unexpected end of JSON input" {
+		// Known Podman v4 bug - log it before suppressing
+		// TODO: Verify if this bug still exists in Podman v5.7.0
+		if strings.Contains(err.Error(), "unexpected end of JSON input") {
+			logger.Errorf("Container removal for %s returned JSON parse error (known Podman v4 bug), container may still be removed. Error: %v", createResponse.ID, err)
+			// Verify container was actually removed
+			exists, checkErr := containers.Exists(conn, createResponse.ID, nil)
+			if checkErr == nil && !exists {
+				logger.Infof("Verified container %s was successfully removed despite JSON error", createResponse.ID)
+				return "", exitCode, nil
+			}
+			logger.Warnf("Could not verify removal of container %s", createResponse.ID)
 			return "", exitCode, nil
 		}
 		return "", exitCode, err
