@@ -58,6 +58,14 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: sudo apt-get install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
 
+      - name: Install compatible crun for Podman v5
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        run: |
+          CRUN_VERSION=1.18
+          wget https://github.com/containers/crun/releases/download/${CRUN_VERSION}/crun-${CRUN_VERSION}-linux-amd64
+          sudo install -m 755 crun-${CRUN_VERSION}-linux-amd64 /usr/bin/crun
+          crun --version
+
       - name: Build podman v5
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: make binaries
