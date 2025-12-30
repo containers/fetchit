@@ -6,6 +6,18 @@ https://fetchit.readthedocs.io/
 
 A quickstart example is available at https://github.com/containers/fetchit/blob/main/docs/quick_start.rst
 
+## Deployment Methods
+
+Fetchit supports multiple deployment methods:
+- **Quadlet** - Declarative container management using Podman Quadlet (recommended for new deployments)
+- **Kube** - Deploy using Kubernetes YAML manifests
+- **Raw** - Execute raw podman commands
+- **systemd** - Legacy systemd service file deployment (deprecated, use Quadlet instead)
+- **FileTransfer** - Copy files from Git to host
+- **Ansible** - Run Ansible playbooks
+
+See [examples/](examples/) for configuration examples of each method.
+
 ## Requirements
 
 - **Podman v5.0+** (tested with v5.7.0)

@@ -1,0 +1,21 @@
+[Unit]
+Description=Apache HTTP Server
+Documentation=https://httpd.apache.org/docs/
+After=httpd-network.service httpd.volume.service
+Requires=httpd-network.service
+Wants=httpd-volume.service
+
+[Container]
+Image=docker.io/library/httpd:latest
+ContainerName=httpd
+PublishPort=8080:80
+Volume=httpd.volume:/usr/local/apache2/htdocs:Z
+Network=httpd.network
+Environment=HTTPD_LOG_LEVEL=info
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target default.target

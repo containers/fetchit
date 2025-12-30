@@ -1,0 +1,10 @@
+[Unit]
+Description=Network for Apache HTTP Server
+
+[Network]
+Subnet=172.20.0.0/16
+Gateway=172.20.0.1
+Label=app=httpd
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -1,0 +1,30 @@
+# Fetchit Quadlet Deployment Example (Rootful)
+#
+# This configuration demonstrates deploying containers using Quadlet files
+# in rootful mode (system-wide, requires root privileges).
+#
+# Quadlet files will be placed in: /etc/containers/systemd/
+# Services will be enabled and started automatically.
+# Services will NOT be restarted on updates (restart: false).
+
+targetConfigs:
+  - name: quadlet-examples
+    url: file:///Users/rcook/git/fetchit
+    branch: 002-quadlet-support
+
+    quadlet:
+      - name: simple-nginx
+        targetPath: examples/quadlet/
+        schedule: "*/5 * * * *"
+        glob: "simple.container"
+        root: true
+        enable: true
+        restart: false
+
+      - name: httpd-stack
+        targetPath: examples/quadlet/
+        schedule: "*/5 * * * *"
+        glob: "httpd.{container,volume,network}"
+        root: true
+        enable: true
+        restart: false

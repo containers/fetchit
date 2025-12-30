@@ -1,0 +1,35 @@
+# Fetchit Quadlet Deployment Example (Rootless)
+#
+# This configuration demonstrates deploying containers using Quadlet files
+# in rootless mode (user-level, no root privileges required).
+#
+# Quadlet files will be placed in: ~/.config/containers/systemd/
+# Services will be enabled and started automatically.
+# Services WILL be restarted on updates (restart: true).
+#
+# Prerequisites for rootless:
+# 1. Enable lingering: sudo loginctl enable-linger $USER
+# 2. XDG_RUNTIME_DIR must be set (usually automatic)
+# 3. HOME environment variable must be set
+
+targetConfigs:
+  - name: quadlet-dev-examples
+    url: file:///Users/rcook/git/fetchit
+    branch: 002-quadlet-support
+
+    quadlet:
+      - name: dev-nginx
+        targetPath: examples/quadlet/
+        schedule: "*/2 * * * *"
+        glob: "simple.container"
+        root: false
+        enable: true
+        restart: true
+
+      - name: dev-httpd-stack
+        targetPath: examples/quadlet/
+        schedule: "*/2 * * * *"
+        glob: "httpd.{container,volume,network}"
+        root: false
+        enable: true
+        restart: true

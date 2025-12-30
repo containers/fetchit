@@ -1,0 +1,12 @@
+[Unit]
+Description=Colors demo pod (Kubernetes YAML)
+Documentation=https://github.com/containers/podman/tree/main/test/e2e/testdata
+
+[Kube]
+Yaml=/Users/rcook/git/fetchit/examples/quadlet/colors-pod.yaml
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target
