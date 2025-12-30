@@ -70,6 +70,12 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: make binaries
 
+      - name: Copy crun to bin directory for caching
+        if: steps.cache-podman-bin.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p bin
+          cp /usr/bin/crun bin/crun
+
       # store podman binary as artifact
       - uses: actions/upload-artifact@v4
         with:
@@ -209,7 +215,7 @@ jobs:
 
   fetchit-config-target-no-config-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v4
 
@@ -219,10 +225,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -269,7 +276,7 @@ jobs:
 
   fetchit-config-reload-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v4
 
@@ -279,10 +286,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -329,7 +337,7 @@ jobs:
 
   fetchit-config-PAT-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -339,10 +347,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -389,7 +398,7 @@ jobs:
 
   fetchit-PAT-kube-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -399,10 +408,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -434,8 +444,8 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/pat-testing-kube.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for fetchit to deploy
-        run: sleep 1m
+      - name: Wait for pod to be ready
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman pod ps | grep -v CON= | grep colors_pod | wc -l); sleep 2; done'
 
       - name: Logs
         if: always()
@@ -449,7 +459,7 @@ jobs:
 
   raw-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -459,10 +469,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -530,7 +541,7 @@ jobs:
 
   podman-secret-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -540,10 +551,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -616,7 +628,7 @@ jobs:
 
   podman-config-secret-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -626,10 +638,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -702,7 +715,7 @@ jobs:
 
   config-env-raw-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -712,10 +725,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -765,7 +779,7 @@ jobs:
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
   filetransfer-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -775,10 +789,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -816,7 +831,7 @@ jobs:
 
   filetransfer-validate-exact-file:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -826,10 +841,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -864,7 +880,7 @@ jobs:
 
   systemd-validate:
     runs-on: ubuntu-latest
-    needs: [ build, build-systemd-amd ]
+    needs: [ build, build-podman-v5, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -874,10 +890,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -909,7 +926,7 @@ jobs:
 
   systemd-autoupdate-validate:
     runs-on: ubuntu-latest
-    needs: [ build , build-systemd-amd ]
+    needs: [ build, build-podman-v5, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -919,10 +936,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -990,7 +1008,7 @@ jobs:
 
   systemd-enable-validate:
     runs-on: ubuntu-latest
-    needs: [ build , build-systemd-amd ]
+    needs: [ build, build-podman-v5, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1000,10 +1018,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1050,7 +1069,7 @@ jobs:
 
   systemd-user-enable-validate:
     runs-on: ubuntu-latest
-    needs: [ build , build-systemd-amd ]
+    needs: [ build, build-podman-v5, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1117,7 +1136,7 @@ jobs:
 
   systemd-restart-validate:
     runs-on: ubuntu-latest
-    needs: [ build , build-systemd-amd ]
+    needs: [ build, build-podman-v5, build-systemd-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1127,10 +1146,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1180,7 +1200,7 @@ jobs:
 
   ansible-validate:
     runs-on: ubuntu-latest
-    needs: [ build, build-ansible-amd ]
+    needs: [ build, build-podman-v5, build-ansible-amd ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1190,10 +1210,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1246,7 +1267,7 @@ jobs:
 
   systemd-validate-exact-file:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1256,10 +1277,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1294,7 +1316,7 @@ jobs:
 
   kube-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1304,10 +1326,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1327,8 +1350,8 @@ jobs:
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/kube-play-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
-      - name: Wait for fetchit to deploy
-        run: sleep 1m
+      - name: Wait for pod to be ready
+        run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(sudo podman pod ps | grep -v CON= | grep colors_pod | wc -l); sleep 2; done'
 
       - name: Logs
         if: always()
@@ -1342,7 +1365,7 @@ jobs:
 
   clean-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1352,10 +1375,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1388,10 +1412,10 @@ jobs:
         run: sudo podman image ls
 
       - name: wait until image is removed
-        run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | grep -v REPOSITORY | wc -l); done'
+        run: timeout 150 bash -c -- 'i=0 ; until [ $i -eq 0 ]; do i=$(sudo podman image ls alpine | grep -v REPOSITORY | wc -l); sleep 2; done'
 
-      - name: Wait for fetchit to clean these up
-        run: sleep 30s
+      - name: Wait for volume to be cleaned up
+        run: timeout 150 bash -c -- 'v=1 ; until [ $v -eq 0 ]; do v=$(sudo podman volume ls | grep test | wc -l); sleep 2; done'
 
       - name: Logs
         if: always()
@@ -1405,7 +1429,7 @@ jobs:
 
   glob-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1415,10 +1439,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1465,7 +1490,7 @@ jobs:
 
   multi-engine-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1475,10 +1500,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1543,7 +1569,7 @@ jobs:
 
   multi-engine-skew-validate:
     runs-on: ubuntu-latest
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1553,10 +1579,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1627,7 +1654,7 @@ jobs:
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: [ build , pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -1645,10 +1672,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1728,7 +1756,7 @@ jobs:
 
   loader-validate:
     runs-on: ubuntu-latest
-    needs: [ build, pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - uses: actions/checkout@v2
 
@@ -1738,10 +1766,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1794,7 +1823,7 @@ jobs:
 
   disconnected-validate:
     runs-on: ubuntu-latest
-    needs: [ build, pull-and-archive ]
+    needs: [ build, build-podman-v5, pull-and-archive ]
     steps:
       - name: checkout with token
         uses: actions/checkout@v3
@@ -1807,10 +1836,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
