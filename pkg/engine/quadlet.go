@@ -412,16 +412,16 @@ func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
 			logger.Errorf("Error moving to current state: %v", err)
 			return
 		}
-
-		q.initialRun = false
-	} else {
-		// Subsequent runs: fetch updates and apply changes
-		err := currentToLatest(ctx, conn, q, target, &tags)
-		if err != nil {
-			logger.Errorf("Error moving current to latest: %v", err)
-			return
-		}
 	}
+
+	// Fetch updates and apply changes (runs on every iteration, including first)
+	err := currentToLatest(ctx, conn, q, target, &tags)
+	if err != nil {
+		logger.Errorf("Error moving current to latest: %v", err)
+		return
+	}
+
+	q.initialRun = false
 }
 
 // MethodEngine processes a single file change
