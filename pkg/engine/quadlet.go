@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containers/fetchit/pkg/engine/utils"
+	"github.com/containers/podman/v5/libpod/define"
 	"github.com/containers/podman/v5/pkg/specgen"
-	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -169,160 +171,115 @@ func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 	return waitAndRemoveContainer(conn, createResponse.ID)
 }
 
-// systemdDaemonReload triggers systemd to reload configuration via D-Bus
-func systemdDaemonReload(ctx context.Context, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
+// runSystemctlCommand runs a systemctl command via a temporary container
+func runSystemctlCommand(conn context.Context, root bool, action, service string) error {
+	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
+		return err
 	}
 
+	s := specgen.NewSpecGenerator(systemdImage, false)
+	runMounttmp := "/run"
+	runMountsd := "/run/systemd"
+	runMountc := "/sys/fs/cgroup"
+	xdg := ""
+
+	if !root {
+		// Rootless mode - use user's XDG_RUNTIME_DIR
+		xdg = os.Getenv("XDG_RUNTIME_DIR")
+		if xdg == "" {
+			uid := os.Getuid()
+			xdg = fmt.Sprintf("/run/user/%d", uid)
+		}
+		runMountsd = filepath.Join(xdg, "systemd")
+		runMounttmp = xdg
+	}
+
+	privileged := true
+	s.Privileged = &privileged
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+
+	// Mount systemd directories
+	s.Mounts = []specs.Mount{
+		{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
+		{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
+		{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
+	}
+
+	s.Name = "quadlet-systemctl-" + action + "-" + service
+	envMap := make(map[string]string)
+	envMap["ROOT"] = strconv.FormatBool(root)
+	envMap["SERVICE"] = service
+	envMap["ACTION"] = action
+	envMap["HOME"] = os.Getenv("HOME")
+	if !root {
+		envMap["XDG_RUNTIME_DIR"] = xdg
+	}
+	s.Env = envMap
+
+	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	if err := conn.ReloadContext(ctx); err != nil {
-		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
+	return waitAndRemoveContainer(conn, createResponse.ID)
+}
+
+// systemdDaemonReload triggers systemd to reload configuration via container
+func systemdDaemonReload(ctx context.Context, conn context.Context, userMode bool) error {
 	mode := "rootful"
 	if userMode {
 		mode = "rootless"
 	}
-	logger.Infof("Triggered systemd daemon-reload (%s)", mode)
+	logger.Infof("Triggering systemd daemon-reload (%s)", mode)
 
-	return nil
-}
-
-// verifyServiceExists checks if systemd generated the service from Quadlet file
-func verifyServiceExists(ctx context.Context, serviceName string, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
+	root := !userMode
+	if err := runSystemctlCommand(conn, root, "daemon-reload", ""); err != nil {
+		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	// Get unit properties to verify it exists
-	_, err = conn.GetUnitPropertiesContext(ctx, serviceName)
-	if err != nil {
-		return fmt.Errorf("service %s not found (Quadlet file may have syntax errors): %w", serviceName, err)
-	}
-
+	logger.Infof("Completed systemd daemon-reload (%s)", mode)
 	return nil
 }
 
 // systemdEnableService enables a service to start on boot
-func systemdEnableService(ctx context.Context, serviceName string, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	// Enable the service
-	_, _, err = conn.EnableUnitFilesContext(ctx, []string{serviceName}, false, true)
-	if err != nil {
+func systemdEnableService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runSystemctlCommand(conn, root, "enable", serviceName); err != nil {
 		return fmt.Errorf("failed to enable service %s: %w", serviceName, err)
 	}
-
 	logger.Infof("Enabled service: %s", serviceName)
 	return nil
 }
 
 // systemdStartService starts a systemd service
-func systemdStartService(ctx context.Context, serviceName string, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	// Start the service
-	_, err = conn.StartUnitContext(ctx, serviceName, "replace", nil)
-	if err != nil {
+func systemdStartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runSystemctlCommand(conn, root, "start", serviceName); err != nil {
 		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
 	}
-
 	logger.Infof("Started service: %s", serviceName)
 	return nil
 }
 
 // systemdRestartService restarts a systemd service
-func systemdRestartService(ctx context.Context, serviceName string, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	// Restart the service
-	_, err = conn.RestartUnitContext(ctx, serviceName, "replace", nil)
-	if err != nil {
+func systemdRestartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runSystemctlCommand(conn, root, "restart", serviceName); err != nil {
 		return fmt.Errorf("failed to restart service %s: %w", serviceName, err)
 	}
-
 	logger.Infof("Restarted service: %s", serviceName)
 	return nil
 }
 
 // systemdStopService stops a systemd service
-func systemdStopService(ctx context.Context, serviceName string, userMode bool) error {
-	var conn *dbus.Conn
-	var err error
-
-	if userMode {
-		conn, err = dbus.NewUserConnectionContext(ctx)
-	} else {
-		conn, err = dbus.NewSystemConnectionContext(ctx)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to systemd D-Bus: %w", err)
-	}
-	defer conn.Close()
-
-	// Stop the service
-	_, err = conn.StopUnitContext(ctx, serviceName, "replace", nil)
-	if err != nil {
+func systemdStopService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runSystemctlCommand(conn, root, "stop", serviceName); err != nil {
 		return fmt.Errorf("failed to stop service %s: %w", serviceName, err)
 	}
-
 	logger.Infof("Stopped service: %s", serviceName)
 	return nil
 }
@@ -524,7 +481,7 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 
 	// Trigger daemon-reload (ONCE after all file changes)
 	userMode := !q.Root
-	if err := systemdDaemonReload(ctx, userMode); err != nil {
+	if err := systemdDaemonReload(ctx, conn, userMode); err != nil {
 		return fmt.Errorf("systemd daemon-reload failed: %w", err)
 	}
 
@@ -543,27 +500,21 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 		serviceName := deriveServiceName(change.To.Name)
 		changeType := determineChangeType(change)
 
-		// Verify service was generated
-		if err := verifyServiceExists(ctx, serviceName, userMode); err != nil {
-			logger.Warnf("Service %s not generated (Quadlet file may have errors): %v", serviceName, err)
-			continue
-		}
-
 		switch changeType {
 		case "create":
 			// Enable and start new services
-			if err := systemdEnableService(ctx, serviceName, userMode); err != nil {
+			if err := systemdEnableService(ctx, conn, serviceName, userMode); err != nil {
 				logger.Errorf("Failed to enable service %s: %v", serviceName, err)
 				continue
 			}
-			if err := systemdStartService(ctx, serviceName, userMode); err != nil {
+			if err := systemdStartService(ctx, conn, serviceName, userMode); err != nil {
 				logger.Errorf("Failed to start service %s: %v", serviceName, err)
 			}
 
 		case "update":
 			// Restart on update if Restart=true
 			if q.Restart {
-				if err := systemdRestartService(ctx, serviceName, userMode); err != nil {
+				if err := systemdRestartService(ctx, conn, serviceName, userMode); err != nil {
 					logger.Errorf("Failed to restart service %s: %v", serviceName, err)
 				}
 			}
@@ -572,7 +523,7 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 			// Stop and disable deleted services
 			if change.From.Name != "" {
 				deletedServiceName := deriveServiceName(change.From.Name)
-				if err := systemdStopService(ctx, deletedServiceName, userMode); err != nil {
+				if err := systemdStopService(ctx, conn, deletedServiceName, userMode); err != nil {
 					logger.Warnf("Failed to stop service %s: %v", deletedServiceName, err)
 				}
 			}
