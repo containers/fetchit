@@ -9,8 +9,8 @@
 
 targetConfigs:
   - name: quadlet-examples
-    url: file:///Users/rcook/git/fetchit
-    branch: 002-quadlet-support
+    url: https://github.com/containers/fetchit  # Change to your repository
+    branch: main  # Change to your branch
 
     quadlet:
       - name: simple-nginx

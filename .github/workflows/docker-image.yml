@@ -1400,8 +1400,25 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
+      - name: Create quadlet config
+        run: |
+          cat > /tmp/quadlet-config.yaml <<EOF
+          targetConfigs:
+            - name: quadlet-basic
+              url: file://$(pwd)
+              branch: 002-quadlet-support
+              quadlet:
+                - name: simple-nginx
+                  targetPath: examples/quadlet/
+                  schedule: "*/5 * * * *"
+                  glob: "simple.container"
+                  root: true
+                  enable: true
+                  restart: false
+          EOF
+
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/quadlet-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for Quadlet directory to be created
         run: timeout 150 bash -c "until [ -d /etc/containers/systemd ]; do sleep 2; done"
@@ -1474,8 +1491,25 @@ jobs:
       - name: tag the image
         run: podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
+      - name: Create quadlet rootless config
+        run: |
+          cat > /tmp/quadlet-rootless.yaml <<EOF
+          targetConfigs:
+            - name: quadlet-rootless
+              url: file://$(pwd)
+              branch: 002-quadlet-support
+              quadlet:
+                - name: simple-nginx-user
+                  targetPath: examples/quadlet/
+                  schedule: "*/5 * * * *"
+                  glob: "simple.container"
+                  root: false
+                  enable: true
+                  restart: false
+          EOF
+
       - name: Start fetchit
-        run: podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/quadlet-rootless.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-rootless.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for Quadlet directory to be created
         run: timeout 150 bash -c "until [ -d ~/.config/containers/systemd ]; do sleep 2; done"
