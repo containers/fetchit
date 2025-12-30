@@ -14,7 +14,7 @@ targetConfigs:
 
     quadlet:
       - name: simple-nginx
-        targetPath: examples/quadlet/
+        targetPath: examples/quadlet
         schedule: "*/5 * * * *"
         glob: "simple.container"
         root: true
@@ -22,7 +22,7 @@ targetConfigs:
         restart: false
 
       - name: httpd-stack
-        targetPath: examples/quadlet/
+        targetPath: examples/quadlet
         schedule: "*/5 * * * *"
         glob: "httpd.{container,volume,network}"
         root: true
