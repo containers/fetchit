@@ -136,18 +136,28 @@ func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 	}
 
 	// Create a temporary container to create the directory on the host
-	// This uses the same approach as fileTransferPodman - bind mount the parent directory
 	s := specgen.NewSpecGenerator(fetchitImage, false)
 	s.Name = "quadlet-mkdir-" + q.Name
 	privileged := true
 	s.Privileged = &privileged
 
-	// Command to create the directory with proper permissions
+	// Determine bind mount point and directory creation command
+	var mountSource, mountDest string
+	if q.Root {
+		// Rootful: bind mount /etc to create /etc/containers/systemd
+		mountSource = "/etc"
+		mountDest = "/etc"
+	} else {
+		// Rootless: bind mount $HOME to create ~/.config/containers/systemd
+		mountSource = paths.HomeDirectory
+		mountDest = paths.HomeDirectory
+	}
+
+	// Command to create the directory with proper permissions using mkdir -p
 	s.Command = []string{"sh", "-c", "mkdir -p " + paths.InputDirectory}
 
-	// Bind mount the parent directory so we can create subdirectories
-	parentDir := filepath.Dir(paths.InputDirectory)
-	s.Mounts = []specs.Mount{{Source: parentDir, Destination: parentDir, Type: "bind", Options: []string{"rw"}}}
+	// Bind mount the base directory so we can create the full path
+	s.Mounts = []specs.Mount{{Source: mountSource, Destination: mountDest, Type: "bind", Options: []string{"rw"}}}
 
 	// Create and start the container
 	createResponse, err := createAndStartContainer(conn, s)
