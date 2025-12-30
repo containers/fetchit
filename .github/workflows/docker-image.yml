@@ -23,9 +23,9 @@ jobs:
         with:
           path: |
             ./bin
-          key: ${{ runner.os }}-podman-${{ env.PODMAN_VER }}
+          key: ${{ runner.os }}-podman-${{ env.PODMAN_VER }}-v2
           restore-keys: |
-            ${{ runner.os }}-podman
+            ${{ runner.os }}-podman-${{ env.PODMAN_VER }}-v2
       - uses: actions/checkout@v4
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         with:
