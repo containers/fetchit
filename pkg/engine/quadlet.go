@@ -4,7 +4,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -355,31 +354,6 @@ func determineChangeType(change *object.Change) string {
 	return "unknown"
 }
 
-// copyFile copies a file with appropriate permissions
-func copyFile(src, dst string) error {
-	// Open source file
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open source file %s: %w", src, err)
-	}
-	defer sourceFile.Close()
-
-	// Create destination file with 0644 permissions (-rw-r--r--)
-	destFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
-	}
-	defer destFile.Close()
-
-	// Copy content
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy file content: %w", err)
-	}
-
-	return nil
-}
-
 // Process handles periodic Git synchronization and change detection
 func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
 	target := q.GetTarget()
@@ -447,9 +421,17 @@ func (q *Quadlet) MethodEngine(ctx context.Context, conn context.Context, change
 		return fmt.Errorf("failed to get Quadlet directory: %w", err)
 	}
 
-	// Ensure directory exists
+	// Ensure directory exists (must be done before fileTransferPodman)
 	if err := q.ensureQuadletDirectory(); err != nil {
 		return err
+	}
+
+	// Use FileTransfer method for copying files (same pattern as Systemd)
+	// This creates a temporary container with bind mounts to access host filesystem
+	ft := &FileTransfer{
+		CommonMethod: CommonMethod{
+			Name: q.Name,
+		},
 	}
 
 	// Perform file operation based on change type
@@ -458,40 +440,28 @@ func (q *Quadlet) MethodEngine(ctx context.Context, conn context.Context, change
 		if curr == nil {
 			return fmt.Errorf("change type %s but no current file name", changeType)
 		}
-		// Copy file from Git clone to Quadlet directory
-		src := filepath.Join(path, *curr)
-		dst := filepath.Join(paths.InputDirectory, filepath.Base(*curr))
-		if err := copyFile(src, dst); err != nil {
+		// Copy file from Git clone to Quadlet directory using fileTransferPodman
+		if err := ft.fileTransferPodman(ctx, conn, path, paths.InputDirectory, nil); err != nil {
 			return fmt.Errorf("failed to copy Quadlet file: %w", err)
 		}
-		logger.Infof("Placed Quadlet file: %s", dst)
+		logger.Infof("Placed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*curr)))
 
 	case "rename":
-		// Remove old file
-		if prev != nil {
-			oldDst := filepath.Join(paths.InputDirectory, filepath.Base(*prev))
-			if err := os.Remove(oldDst); err != nil && !os.IsNotExist(err) {
-				logger.Warnf("Failed to remove old Quadlet file %s: %v", oldDst, err)
-			}
+		// Remove old file, then copy new file
+		if err := ft.fileTransferPodman(ctx, conn, path, paths.InputDirectory, prev); err != nil {
+			return fmt.Errorf("failed to copy renamed Quadlet file: %w", err)
 		}
-		// Copy new file
 		if curr != nil {
-			src := filepath.Join(path, *curr)
-			dst := filepath.Join(paths.InputDirectory, filepath.Base(*curr))
-			if err := copyFile(src, dst); err != nil {
-				return fmt.Errorf("failed to copy renamed Quadlet file: %w", err)
-			}
-			logger.Infof("Renamed Quadlet file: %s", dst)
+			logger.Infof("Renamed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*curr)))
 		}
 
 	case "delete":
 		// Remove file from Quadlet directory
 		if prev != nil {
-			dst := filepath.Join(paths.InputDirectory, filepath.Base(*prev))
-			if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+			if err := ft.fileTransferPodman(ctx, conn, deleteFile, paths.InputDirectory, prev); err != nil {
 				return fmt.Errorf("failed to remove Quadlet file: %w", err)
 			}
-			logger.Infof("Removed Quadlet file: %s", dst)
+			logger.Infof("Removed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*prev)))
 		}
 	}
 
