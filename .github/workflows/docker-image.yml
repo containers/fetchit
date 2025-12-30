@@ -1412,7 +1412,7 @@ jobs:
               quadlet:
                 - name: simple-nginx
                   targetPath: examples/quadlet/
-                  schedule: "*/5 * * * *"
+                  schedule: "*/1 * * * *"
                   glob: "simple.container"
                   root: true
                   enable: true
@@ -1420,7 +1420,7 @@ jobs:
           EOF
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock -v $(pwd):$(pwd):ro --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for Quadlet directory to be created
         run: timeout 150 bash -c "until [ -d /etc/containers/systemd ]; do sleep 2; done"
@@ -1505,7 +1505,7 @@ jobs:
               quadlet:
                 - name: simple-nginx-user
                   targetPath: examples/quadlet/
-                  schedule: "*/5 * * * *"
+                  schedule: "*/1 * * * *"
                   glob: "simple.container"
                   root: false
                   enable: true
@@ -1513,7 +1513,7 @@ jobs:
           EOF
 
       - name: Start fetchit
-        run: podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-rootless.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-rootless.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -v $(pwd):$(pwd):ro -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for Quadlet directory to be created
         run: timeout 150 bash -c "until [ -d ~/.config/containers/systemd ]; do sleep 2; done"
@@ -1597,7 +1597,7 @@ jobs:
               quadlet:
                 - name: multi-resource-stack
                   targetPath: examples/quadlet/
-                  schedule: "*/5 * * * *"
+                  schedule: "*/1 * * * *"
                   glob: "httpd.*"
                   root: true
                   enable: true
@@ -1605,7 +1605,7 @@ jobs:
           EOF
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-multi.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-multi.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock -v $(pwd):$(pwd):ro --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for network Quadlet file
         run: timeout 150 bash -c "until [ -f /etc/containers/systemd/httpd.network ]; do sleep 2; done"
@@ -1709,7 +1709,7 @@ jobs:
               quadlet:
                 - name: colors-kube
                   targetPath: examples/quadlet/
-                  schedule: "*/5 * * * *"
+                  schedule: "*/1 * * * *"
                   glob: "colors.kube"
                   root: true
                   enable: true
@@ -1717,7 +1717,7 @@ jobs:
           EOF
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-kube.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-kube.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock -v $(pwd):$(pwd):ro --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: Wait for Quadlet kube file
         run: timeout 150 bash -c "until [ -f /etc/containers/systemd/colors.kube ]; do sleep 2; done"
