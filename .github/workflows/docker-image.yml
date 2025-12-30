@@ -1079,10 +1079,11 @@ jobs:
           name: podman-bins
           path: bin
 
-      - name: replace
+      - name: Install Podman and crun
         run: |
-          chmod +x bin/podman
+          chmod +x bin/podman bin/crun
           sudo mv bin/podman /usr/bin/podman
+          sudo mv bin/crun /usr/bin/crun
 
       - name: enable podman.socket
         run: |
