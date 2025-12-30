@@ -8,11 +8,11 @@ on:
 
 env:
   CGO_ENABLED: 0
-  PODMAN_VER: v4.9.4
+  PODMAN_VER: v5.7.0
 
 jobs:
 
-  build-podman-v4:
+  build-podman-v5:
     env:
       CGO_ENABLED: 1 # CGO is required for podman
     runs-on: ubuntu-latest
@@ -30,7 +30,7 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         with:
           repository: containers/podman
-          ref: v4.9.4
+          ref: v5.7.0
 
       - uses: actions/setup-go@v4
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
@@ -54,7 +54,7 @@ jobs:
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: sudo apt install -y libsystemd-dev libseccomp-dev pkg-config golang-github-proglottis-gpgme-dev
 
-      - name: Build podman v4
+      - name: Build podman v5
         if: steps.cache-podman-bin.outputs.cache-hit != 'true'
         run: make binaries
 
@@ -75,7 +75,7 @@ jobs:
         run: sudo apt install curl
 
       - name: Build the image
-        run: go mod tidy -compat=1.17 && go mod vendor && docker build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
+        run: go mod tidy -compat=1.21 && go mod vendor && docker build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
 
       - name: Export image
         run: docker save -o /tmp/fetchit.tar quay.io/fetchit/fetchit-amd:latest
@@ -92,7 +92,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the image
-        run: go mod tidy -compat=1.17 && go mod vendor && make build-ansible-cross-build-linux-amd64
+        run: go mod tidy -compat=1.21 && go mod vendor && make build-ansible-cross-build-linux-amd64
 
       - name: docker list images
         run: docker images
@@ -122,7 +122,7 @@ jobs:
         run: sudo apt install podman build-essential qemu-user qemu-user-static
 
       - name: Build the image
-        run: go mod tidy -compat=1.17 && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
+        run: go mod tidy -compat=1.21 && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
 
       - name: Export image
         run: podman save -o /tmp/ansible-arm.tar quay.io/fetchit/fetchit-ansible-arm:latest
@@ -154,7 +154,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the image
-        run: go mod tidy -compat=1.17 && go mod vendor && make build-systemd-cross-build-linux-amd64
+        run: go mod tidy -compat=1.21 && go mod vendor && make build-systemd-cross-build-linux-amd64
 
       - name: docker list images
         run: docker images
@@ -184,7 +184,7 @@ jobs:
         run: sudo apt install podman build-essential qemu-user qemu-user-static
 
       - name: Build the image
-        run: go mod tidy -compat=1.17 && go mod vendor && CTR_CMD=podman make build-systemd-cross-build-linux-arm64
+        run: go mod tidy -compat=1.21 && go mod vendor && CTR_CMD=podman make build-systemd-cross-build-linux-arm64
 
       - name: Export image
         run: podman save -o /tmp/systemd-arm.tar quay.io/fetchit/fetchit-systemd-arm:latest
@@ -1922,7 +1922,7 @@ jobs:
         run: sudo apt install podman build-essential qemu-user qemu-user-static
 
       - name: Build the arm image
-        run: go mod tidy -compat=1.17 && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
+        run: go mod tidy -compat=1.21 && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
 
       - name: Export image
         run: podman save -o /tmp/fetchit-arm.tar quay.io/fetchit/fetchit-arm:latest

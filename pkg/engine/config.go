@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -187,7 +187,7 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 	defer resp.Body.Close()
 	newBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, fmt.Errorf("error downloading config from %s: %v", err)
+		return false, fmt.Errorf("error downloading config from %s: %v", urlStr, err)
 	}
 	if newBytes == nil {
 		// if initial, this is the last resort, newBytes should be populated

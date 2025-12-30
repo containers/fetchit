@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 
-	"github.com/containers/podman/v4/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/bindings/images"
 )
 
 func FetchImage(conn context.Context, image string) error {
