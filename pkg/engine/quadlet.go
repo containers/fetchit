@@ -12,6 +12,7 @@ import (
 
 	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -249,11 +250,46 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	}
 
 	logger.Infof("[QUADLET DEBUG] Container created: %s", createResponse.ID)
-	err = waitAndRemoveContainer(conn, createResponse.ID)
-	if err != nil {
-		logger.Errorf("[QUADLET DEBUG] Container exited with error: %v", err)
-		return err
+
+	// Wait for container to finish
+	_, waitErr := containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{define.ContainerStateStopped, define.ContainerStateExited}))
+	if waitErr != nil {
+		logger.Errorf("[QUADLET DEBUG] Error waiting for container: %v", waitErr)
 	}
+
+	// Get container logs before removing
+	logOptions := new(containers.LogOptions).WithStdout(true).WithStderr(true)
+	logChan, logErr := containers.Logs(conn, createResponse.ID, logOptions)
+	if logErr == nil {
+		logger.Infof("[QUADLET DEBUG] Container %s output:", createResponse.ID)
+		for line := range logChan {
+			logger.Infof("[CONTAINER OUTPUT] %s", line)
+		}
+	} else {
+		logger.Errorf("[QUADLET DEBUG] Failed to get container logs: %v", logErr)
+	}
+
+	// Check exit code
+	inspectData, inspectErr := containers.Inspect(conn, createResponse.ID, new(containers.InspectOptions))
+	if inspectErr == nil {
+		exitCode := inspectData.State.ExitCode
+		logger.Infof("[QUADLET DEBUG] Container exit code: %d", exitCode)
+		if exitCode != 0 {
+			logger.Errorf("[QUADLET DEBUG] Container exited with non-zero code: %d", exitCode)
+		}
+	}
+
+	// Remove container
+	_, removeErr := containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
+	if removeErr != nil {
+		logger.Warnf("[QUADLET DEBUG] Failed to remove container: %v", removeErr)
+	}
+
+	// Return error if container failed
+	if inspectErr == nil && inspectData.State.ExitCode != 0 {
+		return fmt.Errorf("systemctl container exited with code %d", inspectData.State.ExitCode)
+	}
+
 	logger.Infof("[QUADLET DEBUG] Container %s completed successfully", createResponse.ID)
 	return nil
 }
