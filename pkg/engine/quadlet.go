@@ -173,11 +173,6 @@ func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 
 // runSystemctlCommand runs a systemctl command via a temporary container
 func runSystemctlCommand(conn context.Context, root bool, action, service string) error {
-	mode := "rootful"
-	if !root {
-		mode = "rootless"
-	}
-	logger.Infof("[QUADLET DEBUG] Running systemctl command: action=%s, service=%s, mode=%s", action, service, mode)
 
 	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
 		return err
@@ -195,7 +190,6 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		return fmt.Errorf("failed to get Quadlet directory: %w", err)
 	}
 	quadletDir := quadletPaths.InputDirectory
-	logger.Infof("[QUADLET DEBUG] Quadlet directory: %s", quadletDir)
 
 	if !root {
 		// Rootless mode - use user's XDG_RUNTIME_DIR
@@ -203,23 +197,10 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		if xdg == "" {
 			uid := os.Getuid()
 			xdg = fmt.Sprintf("/run/user/%d", uid)
-			logger.Infof("[QUADLET DEBUG] XDG_RUNTIME_DIR not set, using default: %s", xdg)
-		} else {
-			logger.Infof("[QUADLET DEBUG] XDG_RUNTIME_DIR: %s", xdg)
-		}
-
-		// Verify XDG_RUNTIME_DIR exists
-		if _, err := os.Stat(xdg); os.IsNotExist(err) {
-			logger.Warnf("[QUADLET DEBUG] XDG_RUNTIME_DIR %s does not exist, this may cause issues", xdg)
 		}
 
 		runMountsd = filepath.Join(xdg, "systemd")
 		runMounttmp = xdg
-
-		// Check if systemd subdirectory exists
-		if _, err := os.Stat(runMountsd); os.IsNotExist(err) {
-			logger.Warnf("[QUADLET DEBUG] systemd directory %s does not exist, systemctl may fail", runMountsd)
-		}
 	}
 
 	privileged := true
@@ -260,32 +241,16 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	}
 	s.Env = envMap
 
-	logger.Infof("[QUADLET DEBUG] Container env: ROOT=%s, SERVICE=%s, ACTION=%s, HOME=%s, XDG_RUNTIME_DIR=%s",
-		envMap["ROOT"], envMap["SERVICE"], envMap["ACTION"], envMap["HOME"], envMap["XDG_RUNTIME_DIR"])
-	if !root {
-		dbusSocket := filepath.Join(xdg, "bus")
-		logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s, dbus=%s",
-			quadletDir, runMounttmp, runMountc, runMountsd, dbusSocket)
-	} else {
-		logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s",
-			quadletDir, runMounttmp, runMountc, runMountsd)
-	}
-
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
-		logger.Errorf("[QUADLET DEBUG] Failed to create container: %v", err)
 		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
-
-	logger.Infof("[QUADLET DEBUG] Container created: %s", createResponse.ID)
 
 	// Wait for container to complete and remove it (same pattern as systemd method)
 	if err := waitAndRemoveContainer(conn, createResponse.ID); err != nil {
-		logger.Errorf("[QUADLET DEBUG] Container failed: %v", err)
 		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
-	logger.Infof("[QUADLET DEBUG] Container %s completed successfully", createResponse.ID)
 	return nil
 }
 
@@ -303,16 +268,6 @@ func systemdDaemonReload(ctx context.Context, conn context.Context, userMode boo
 	}
 
 	logger.Infof("Completed systemd daemon-reload (%s)", mode)
-	return nil
-}
-
-// systemdEnableService enables a service to start on boot
-func systemdEnableService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
-	root := !userMode
-	if err := runSystemctlCommand(conn, root, "enable", serviceName); err != nil {
-		return fmt.Errorf("failed to enable service %s: %w", serviceName, err)
-	}
-	logger.Infof("Enabled service: %s", serviceName)
 	return nil
 }
 
@@ -553,7 +508,9 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 		return nil
 	}
 
-	// Enable and start/restart services based on change type
+	// Start/restart services based on change type
+	// Note: Quadlet-generated services with [Install] WantedBy= are automatically
+	// "enabled" by the systemd generator when daemon-reload runs. We just need to start them.
 	for change := range changeMap {
 		if change.To.Name == "" {
 			continue // Skip deletes for service start
@@ -564,9 +521,9 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 
 		switch changeType {
 		case "create":
-			// Enable and start new services (enable with --now starts them)
-			if err := systemdEnableService(ctx, conn, serviceName, userMode); err != nil {
-				logger.Errorf("Failed to enable service %s: %v", serviceName, err)
+			// Start new services (generator already created Want symlinks during daemon-reload)
+			if err := systemdStartService(ctx, conn, serviceName, userMode); err != nil {
+				logger.Errorf("Failed to start service %s: %v", serviceName, err)
 				continue
 			}
 
@@ -579,7 +536,7 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 			}
 
 		case "delete":
-			// Stop and disable deleted services
+			// Stop deleted services
 			if change.From.Name != "" {
 				deletedServiceName := deriveServiceName(change.From.Name)
 				if err := systemdStopService(ctx, conn, deletedServiceName, userMode); err != nil {
