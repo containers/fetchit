@@ -502,13 +502,10 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 
 		switch changeType {
 		case "create":
-			// Enable and start new services
+			// Enable and start new services (enable with --now starts them)
 			if err := systemdEnableService(ctx, conn, serviceName, userMode); err != nil {
 				logger.Errorf("Failed to enable service %s: %v", serviceName, err)
 				continue
-			}
-			if err := systemdStartService(ctx, conn, serviceName, userMode); err != nil {
-				logger.Errorf("Failed to start service %s: %v", serviceName, err)
 			}
 
 		case "update":
