@@ -171,9 +171,10 @@ func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 	return waitAndRemoveContainer(conn, createResponse.ID)
 }
 
-// runSystemctlCommand runs a systemctl command via a temporary container
-func runSystemctlCommand(conn context.Context, root bool, action, service string) error {
-
+// runQuadletSystemctlCommand runs a systemctl command via container (same approach as systemd.go)
+// For daemon-reload, mounts the Quadlet directory so generator can read .container files
+// For start/stop/restart, uses standard systemd approach without Quadlet directory
+func runQuadletSystemctlCommand(conn context.Context, root bool, action, service string) error {
 	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
 		return err
 	}
@@ -184,21 +185,12 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	runMountc := "/sys/fs/cgroup"
 	xdg := ""
 
-	// Get Quadlet directory to mount
-	quadletPaths, err := GetQuadletDirectory(root)
-	if err != nil {
-		return fmt.Errorf("failed to get Quadlet directory: %w", err)
-	}
-	quadletDir := quadletPaths.InputDirectory
-
 	if !root {
-		// Rootless mode - use user's XDG_RUNTIME_DIR
 		xdg = os.Getenv("XDG_RUNTIME_DIR")
 		if xdg == "" {
 			uid := os.Getuid()
 			xdg = fmt.Sprintf("/run/user/%d", uid)
 		}
-
 		runMountsd = filepath.Join(xdg, "systemd")
 		runMounttmp = xdg
 	}
@@ -210,23 +202,28 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		Value:  "",
 	}
 
-	// Mount systemd directories AND Quadlet directory
-	mounts := []specs.Mount{
-		{Source: quadletDir, Destination: quadletDir, Type: define.TypeBind, Options: []string{"rw"}},
-		{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
-		{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
-		{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
-	}
-
-	// For rootless mode, also mount D-Bus socket so systemctl can communicate with host systemd
-	if !root {
-		dbusSocket := filepath.Join(xdg, "bus")
-		mounts = append(mounts, specs.Mount{
-			Source:      dbusSocket,
-			Destination: dbusSocket,
-			Type:        define.TypeBind,
-			Options:     []string{"rw"},
-		})
+	// For daemon-reload, mount Quadlet directory so generator can read .container files
+	// For other actions, just mount systemd directories (same as systemd.go)
+	var mounts []specs.Mount
+	if action == "daemon-reload" {
+		quadletPaths, err := GetQuadletDirectory(root)
+		if err != nil {
+			return fmt.Errorf("failed to get Quadlet directory: %w", err)
+		}
+		quadletDir := quadletPaths.InputDirectory
+		mounts = []specs.Mount{
+			{Source: quadletDir, Destination: quadletDir, Type: define.TypeBind, Options: []string{"rw"}},
+			{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
+			{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
+			{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
+		}
+	} else {
+		// For start/stop/restart, use same mounts as systemd.go (no Quadlet directory needed)
+		mounts = []specs.Mount{
+			{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
+			{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
+			{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
+		}
 	}
 	s.Mounts = mounts
 
@@ -246,8 +243,8 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
-	// Wait for container to complete and remove it (same pattern as systemd method)
-	if err := waitAndRemoveContainer(conn, createResponse.ID); err != nil {
+	err = waitAndRemoveContainer(conn, createResponse.ID)
+	if err != nil {
 		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
@@ -255,15 +252,14 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 }
 
 // systemdDaemonReload triggers systemd to reload configuration via container
-func systemdDaemonReload(ctx context.Context, conn context.Context, userMode bool) error {
+func systemdDaemonReload(ctx context.Context, conn context.Context, root bool) error {
 	mode := "rootful"
-	if userMode {
+	if !root {
 		mode = "rootless"
 	}
 	logger.Infof("Triggering systemd daemon-reload (%s)", mode)
 
-	root := !userMode
-	if err := runSystemctlCommand(conn, root, "daemon-reload", ""); err != nil {
+	if err := runQuadletSystemctlCommand(conn, root, "daemon-reload", ""); err != nil {
 		return fmt.Errorf("failed to reload systemd daemon: %w", err)
 	}
 
@@ -274,7 +270,7 @@ func systemdDaemonReload(ctx context.Context, conn context.Context, userMode boo
 // systemdStartService starts a systemd service
 func systemdStartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
 	root := !userMode
-	if err := runSystemctlCommand(conn, root, "start", serviceName); err != nil {
+	if err := runQuadletSystemctlCommand(conn, root, "start", serviceName); err != nil {
 		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
 	}
 	logger.Infof("Started service: %s", serviceName)
@@ -284,7 +280,7 @@ func systemdStartService(ctx context.Context, conn context.Context, serviceName 
 // systemdRestartService restarts a systemd service
 func systemdRestartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
 	root := !userMode
-	if err := runSystemctlCommand(conn, root, "restart", serviceName); err != nil {
+	if err := runQuadletSystemctlCommand(conn, root, "restart", serviceName); err != nil {
 		return fmt.Errorf("failed to restart service %s: %w", serviceName, err)
 	}
 	logger.Infof("Restarted service: %s", serviceName)
@@ -294,7 +290,7 @@ func systemdRestartService(ctx context.Context, conn context.Context, serviceNam
 // systemdStopService stops a systemd service
 func systemdStopService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
 	root := !userMode
-	if err := runSystemctlCommand(conn, root, "stop", serviceName); err != nil {
+	if err := runQuadletSystemctlCommand(conn, root, "stop", serviceName); err != nil {
 		return fmt.Errorf("failed to stop service %s: %w", serviceName, err)
 	}
 	logger.Infof("Stopped service: %s", serviceName)
@@ -497,10 +493,10 @@ func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState pl
 	}
 
 	// Trigger daemon-reload (ONCE after all file changes)
-	userMode := !q.Root
-	if err := systemdDaemonReload(ctx, conn, userMode); err != nil {
+	if err := systemdDaemonReload(ctx, conn, q.Root); err != nil {
 		return fmt.Errorf("systemd daemon-reload failed: %w", err)
 	}
+	userMode := !q.Root
 
 	// If Enable is false, we're done
 	if !q.Enable {
