@@ -259,14 +259,37 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 
 	// Get container logs before removing
 	logOptions := new(containers.LogOptions).WithStdout(true).WithStderr(true)
-	logChan, logErr := containers.Logs(conn, createResponse.ID, logOptions)
-	if logErr == nil {
-		logger.Infof("[QUADLET DEBUG] Container %s output:", createResponse.ID)
-		for line := range logChan {
-			logger.Infof("[CONTAINER OUTPUT] %s", line)
+	stdoutChan := make(chan string, 100)
+	stderrChan := make(chan string, 100)
+
+	// Start goroutine to collect logs
+	go func() {
+		logErr := containers.Logs(conn, createResponse.ID, logOptions, stdoutChan, stderrChan)
+		if logErr != nil {
+			logger.Errorf("[QUADLET DEBUG] Failed to get container logs: %v", logErr)
 		}
-	} else {
-		logger.Errorf("[QUADLET DEBUG] Failed to get container logs: %v", logErr)
+	}()
+
+	// Read logs from both channels
+	logger.Infof("[QUADLET DEBUG] Container %s output:", createResponse.ID)
+	for {
+		select {
+		case line, ok := <-stdoutChan:
+			if !ok {
+				stdoutChan = nil
+			} else {
+				logger.Infof("[CONTAINER STDOUT] %s", line)
+			}
+		case line, ok := <-stderrChan:
+			if !ok {
+				stderrChan = nil
+			} else {
+				logger.Infof("[CONTAINER STDERR] %s", line)
+			}
+		}
+		if stdoutChan == nil && stderrChan == nil {
+			break
+		}
 	}
 
 	// Check exit code
