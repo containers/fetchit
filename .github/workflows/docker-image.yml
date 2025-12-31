@@ -1500,12 +1500,15 @@ jobs:
         run: systemctl --user list-units --all || true
 
       - name: DEBUG - Check for quadlet-systemctl containers
+        if: always()
         run: podman ps -a | grep quadlet-systemctl || echo "No quadlet-systemctl containers found"
 
       - name: DEBUG - Show Quadlet files content
+        if: always()
         run: cat ~/.config/containers/systemd/*.container || true
 
       - name: DEBUG - Check generator BEFORE manual daemon-reload
+        if: always()
         run: |
           echo "=== Checking for generated service files BEFORE manual daemon-reload ==="
           find /run/user/$UID -name "*simple*" 2>/dev/null || echo "No simple service files found in /run/user/$UID"
@@ -1516,9 +1519,11 @@ jobs:
         run: systemctl --user daemon-reload
 
       - name: DEBUG - Check if Quadlet generated service files
+        if: always()
         run: ls -la ~/.config/systemd/user.control/ || ls -la /run/user/$UID/systemd/generator/ || echo "No generator directory found"
 
       - name: DEBUG - List all systemd generator locations
+        if: always()
         run: find /run/user/$UID -name "*simple*" 2>/dev/null || echo "No simple service files found"
 
       - name: Wait for service to be generated
@@ -1528,9 +1533,11 @@ jobs:
         run: systemctl --user status simple.service || true
 
       - name: DEBUG - List all generated services
+        if: always()
         run: systemctl --user list-unit-files | grep -E '(simple|httpd)' || true
 
       - name: DEBUG - Show podman containers state
+        if: always()
         run: podman ps -a
 
       - name: Wait for service to be active
