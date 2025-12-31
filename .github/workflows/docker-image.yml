@@ -1502,7 +1502,7 @@ jobs:
           echo "=== Waiting for httpd.container... ==="
 
       - name: Wait for httpd Quadlet file to be placed
-        run: timeout 300 bash -c "until [ -f ~/.config/containers/systemd/httpd.container ]; do sleep 2; done"
+        run: timeout 150 bash -c "until [ -f ~/.config/containers/systemd/httpd.container ]; do sleep 2; done"
 
 
       - name: DEBUG - List all user services before daemon-reload
@@ -1536,7 +1536,7 @@ jobs:
         run: find /run/user/$UID -name "*httpd*" 2>/dev/null || echo "No httpd service files found"
 
       - name: Wait for httpd service to be generated
-        run: timeout 300 bash -c "until systemctl --user list-units --all | grep -q httpd.service; do sleep 2; done"
+        run: timeout 150 bash -c "until systemctl --user list-units --all | grep -q httpd.service; do sleep 2; done"
 
       - name: Check httpd service status
         run: systemctl --user status httpd.service || true
@@ -1550,7 +1550,7 @@ jobs:
         run: podman ps -a
 
       - name: Wait for httpd service to be active
-        run: timeout 300 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active httpd.service); sleep 2; done'
+        run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active httpd.service); sleep 2; done'
 
       - name: Verify httpd container is running
         run: podman ps | grep systemd-httpd

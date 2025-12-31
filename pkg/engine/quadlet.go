@@ -262,66 +262,10 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 
 	logger.Infof("[QUADLET DEBUG] Container created: %s", createResponse.ID)
 
-	// Wait for container to finish
-	_, waitErr := containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{define.ContainerStateStopped, define.ContainerStateExited}))
-	if waitErr != nil {
-		logger.Errorf("[QUADLET DEBUG] Error waiting for container: %v", waitErr)
-	}
-
-	// Get container logs before removing
-	logOptions := new(containers.LogOptions).WithStdout(true).WithStderr(true)
-	stdoutChan := make(chan string, 100)
-	stderrChan := make(chan string, 100)
-
-	// Start goroutine to collect logs
-	go func() {
-		logErr := containers.Logs(conn, createResponse.ID, logOptions, stdoutChan, stderrChan)
-		if logErr != nil {
-			logger.Errorf("[QUADLET DEBUG] Failed to get container logs: %v", logErr)
-		}
-	}()
-
-	// Read logs from both channels
-	logger.Infof("[QUADLET DEBUG] Container %s output:", createResponse.ID)
-	for {
-		select {
-		case line, ok := <-stdoutChan:
-			if !ok {
-				stdoutChan = nil
-			} else {
-				logger.Infof("[CONTAINER STDOUT] %s", line)
-			}
-		case line, ok := <-stderrChan:
-			if !ok {
-				stderrChan = nil
-			} else {
-				logger.Infof("[CONTAINER STDERR] %s", line)
-			}
-		}
-		if stdoutChan == nil && stderrChan == nil {
-			break
-		}
-	}
-
-	// Check exit code
-	inspectData, inspectErr := containers.Inspect(conn, createResponse.ID, new(containers.InspectOptions))
-	if inspectErr == nil {
-		exitCode := inspectData.State.ExitCode
-		logger.Infof("[QUADLET DEBUG] Container exit code: %d", exitCode)
-		if exitCode != 0 {
-			logger.Errorf("[QUADLET DEBUG] Container exited with non-zero code: %d", exitCode)
-		}
-	}
-
-	// Remove container
-	_, removeErr := containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
-	if removeErr != nil {
-		logger.Warnf("[QUADLET DEBUG] Failed to remove container: %v", removeErr)
-	}
-
-	// Return error if container failed
-	if inspectErr == nil && inspectData.State.ExitCode != 0 {
-		return fmt.Errorf("systemctl container exited with code %d", inspectData.State.ExitCode)
+	// Wait for container to complete and remove it (same pattern as systemd method)
+	if err := waitAndRemoveContainer(conn, createResponse.ID); err != nil {
+		logger.Errorf("[QUADLET DEBUG] Container failed: %v", err)
+		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
 	logger.Infof("[QUADLET DEBUG] Container %s completed successfully", createResponse.ID)
