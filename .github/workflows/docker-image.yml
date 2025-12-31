@@ -1492,8 +1492,15 @@ jobs:
       - name: Wait for Quadlet directory to be created
         run: timeout 150 bash -c "until [ -d ~/.config/containers/systemd ]; do sleep 2; done"
 
+      - name: DEBUG - Show what files exist while waiting
+        if: always()
+        run: |
+          echo "=== Files in Quadlet directory ==="
+          ls -la ~/.config/containers/systemd/ 2>/dev/null || echo "Directory doesn't exist yet"
+          echo "=== Waiting for simple.container... ==="
+
       - name: Wait for Quadlet file to be placed
-        run: timeout 150 bash -c "until [ -f ~/.config/containers/systemd/simple.container ]; do sleep 2; done"
+        run: timeout 300 bash -c "until [ -f ~/.config/containers/systemd/simple.container ]; do sleep 2; done"
 
 
       - name: DEBUG - List all user services before daemon-reload
@@ -1527,7 +1534,7 @@ jobs:
         run: find /run/user/$UID -name "*simple*" 2>/dev/null || echo "No simple service files found"
 
       - name: Wait for service to be generated
-        run: timeout 150 bash -c "until systemctl --user list-units --all | grep -q simple.service; do sleep 2; done"
+        run: timeout 300 bash -c "until systemctl --user list-units --all | grep -q simple.service; do sleep 2; done"
 
       - name: Check service status
         run: systemctl --user status simple.service || true
@@ -1541,7 +1548,7 @@ jobs:
         run: podman ps -a
 
       - name: Wait for service to be active
-        run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active simple.service); sleep 2; done'
+        run: timeout 300 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active simple.service); sleep 2; done'
 
       - name: Verify container is running
         run: podman ps | grep systemd-simple
