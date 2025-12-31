@@ -1485,6 +1485,8 @@ jobs:
           cp ./examples/quadlet-rootless.yaml /tmp/quadlet-rootless.yaml
           sed -i 's|branch: main|branch: ${{ github.head_ref || github.ref_name }}|g' /tmp/quadlet-rootless.yaml
           sed -i 's|schedule: ".*/2 \* \* \* \*"|schedule: "*/1 * * * *"|g' /tmp/quadlet-rootless.yaml
+          echo "=== Modified config ==="
+          cat /tmp/quadlet-rootless.yaml
 
       - name: Start fetchit
         run: podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/quadlet-rootless.yaml:/opt/mount/config.yaml -v /run/user/"${UID}"/podman/podman.sock:/run/podman/podman.sock -e XDG_RUNTIME_DIR="/run/user/${UID}" -e HOME="${HOME}" --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
@@ -1497,10 +1499,10 @@ jobs:
         run: |
           echo "=== Files in Quadlet directory ==="
           ls -la ~/.config/containers/systemd/ 2>/dev/null || echo "Directory doesn't exist yet"
-          echo "=== Waiting for simple.container... ==="
+          echo "=== Waiting for httpd.container... ==="
 
-      - name: Wait for Quadlet file to be placed
-        run: timeout 300 bash -c "until [ -f ~/.config/containers/systemd/simple.container ]; do sleep 2; done"
+      - name: Wait for httpd Quadlet file to be placed
+        run: timeout 300 bash -c "until [ -f ~/.config/containers/systemd/httpd.container ]; do sleep 2; done"
 
 
       - name: DEBUG - List all user services before daemon-reload
@@ -1518,9 +1520,9 @@ jobs:
         if: always()
         run: |
           echo "=== Checking for generated service files BEFORE manual daemon-reload ==="
-          find /run/user/$UID -name "*simple*" 2>/dev/null || echo "No simple service files found in /run/user/$UID"
-          systemctl --user list-unit-files | grep simple || echo "No simple.service in unit files"
-          systemctl --user list-units --all | grep simple || echo "No simple.service in units"
+          find /run/user/$UID -name "*httpd*" 2>/dev/null || echo "No httpd service files found in /run/user/$UID"
+          systemctl --user list-unit-files | grep httpd || echo "No httpd services in unit files"
+          systemctl --user list-units --all | grep httpd || echo "No httpd services in units"
 
       - name: Trigger daemon-reload manually
         run: systemctl --user daemon-reload
@@ -1531,27 +1533,27 @@ jobs:
 
       - name: DEBUG - List all systemd generator locations
         if: always()
-        run: find /run/user/$UID -name "*simple*" 2>/dev/null || echo "No simple service files found"
+        run: find /run/user/$UID -name "*httpd*" 2>/dev/null || echo "No httpd service files found"
 
-      - name: Wait for service to be generated
-        run: timeout 300 bash -c "until systemctl --user list-units --all | grep -q simple.service; do sleep 2; done"
+      - name: Wait for httpd service to be generated
+        run: timeout 300 bash -c "until systemctl --user list-units --all | grep -q httpd.service; do sleep 2; done"
 
-      - name: Check service status
-        run: systemctl --user status simple.service || true
+      - name: Check httpd service status
+        run: systemctl --user status httpd.service || true
 
       - name: DEBUG - List all generated services
         if: always()
-        run: systemctl --user list-unit-files | grep -E '(simple|httpd)' || true
+        run: systemctl --user list-unit-files | grep -E 'httpd' || true
 
       - name: DEBUG - Show podman containers state
         if: always()
         run: podman ps -a
 
-      - name: Wait for service to be active
-        run: timeout 300 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active simple.service); sleep 2; done'
+      - name: Wait for httpd service to be active
+        run: timeout 300 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active httpd.service); sleep 2; done'
 
-      - name: Verify container is running
-        run: podman ps | grep systemd-simple
+      - name: Verify httpd container is running
+        run: podman ps | grep systemd-httpd
 
       - name: Logs
         if: always()
