@@ -208,8 +208,19 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		} else {
 			logger.Infof("[QUADLET DEBUG] XDG_RUNTIME_DIR: %s", xdg)
 		}
+
+		// Verify XDG_RUNTIME_DIR exists
+		if _, err := os.Stat(xdg); os.IsNotExist(err) {
+			logger.Warnf("[QUADLET DEBUG] XDG_RUNTIME_DIR %s does not exist, this may cause issues", xdg)
+		}
+
 		runMountsd = filepath.Join(xdg, "systemd")
 		runMounttmp = xdg
+
+		// Check if systemd subdirectory exists
+		if _, err := os.Stat(runMountsd); os.IsNotExist(err) {
+			logger.Warnf("[QUADLET DEBUG] systemd directory %s does not exist, systemctl may fail", runMountsd)
+		}
 	}
 
 	privileged := true
