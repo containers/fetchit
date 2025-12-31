@@ -183,6 +183,13 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	runMountc := "/sys/fs/cgroup"
 	xdg := ""
 
+	// Get Quadlet directory to mount
+	quadletPaths, err := GetQuadletDirectory(root)
+	if err != nil {
+		return fmt.Errorf("failed to get Quadlet directory: %w", err)
+	}
+	quadletDir := quadletPaths.InputDirectory
+
 	if !root {
 		// Rootless mode - use user's XDG_RUNTIME_DIR
 		xdg = os.Getenv("XDG_RUNTIME_DIR")
@@ -201,8 +208,9 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		Value:  "",
 	}
 
-	// Mount systemd directories
+	// Mount systemd directories AND Quadlet directory
 	s.Mounts = []specs.Mount{
+		{Source: quadletDir, Destination: quadletDir, Type: define.TypeBind, Options: []string{"rw"}},
 		{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
 		{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
 		{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},

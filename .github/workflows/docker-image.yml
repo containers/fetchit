@@ -1667,7 +1667,7 @@ jobs:
               branch: ${{ github.head_ref || github.ref_name }}
               quadlet:
                 - name: colors-kube
-                  targetPath: examples/quadlet/
+                  targetPath: examples/quadlet
                   schedule: "*/1 * * * *"
                   glob: "colors.kube"
                   root: true
