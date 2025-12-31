@@ -1495,6 +1495,16 @@ jobs:
       - name: Wait for Quadlet file to be placed
         run: timeout 150 bash -c "until [ -f ~/.config/containers/systemd/simple.container ]; do sleep 2; done"
 
+
+      - name: DEBUG - List all user services before daemon-reload
+        run: systemctl --user list-units --all || true
+
+      - name: DEBUG - Check for quadlet-systemctl containers
+        run: podman ps -a | grep quadlet-systemctl || echo "No quadlet-systemctl containers found"
+
+      - name: DEBUG - Show Quadlet files content
+        run: cat ~/.config/containers/systemd/*.container || true
+
       - name: Trigger daemon-reload manually
         run: systemctl --user daemon-reload
 
@@ -1503,6 +1513,12 @@ jobs:
 
       - name: Check service status
         run: systemctl --user status simple.service || true
+
+      - name: DEBUG - List all generated services
+        run: systemctl --user list-unit-files | grep -E '(simple|httpd)' || true
+
+      - name: DEBUG - Show podman containers state
+        run: podman ps -a
 
       - name: Wait for service to be active
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(systemctl --user is-active simple.service); sleep 2; done'

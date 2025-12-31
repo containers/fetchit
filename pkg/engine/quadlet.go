@@ -173,6 +173,12 @@ func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
 
 // runSystemctlCommand runs a systemctl command via a temporary container
 func runSystemctlCommand(conn context.Context, root bool, action, service string) error {
+	mode := "rootful"
+	if !root {
+		mode = "rootless"
+	}
+	logger.Infof("[QUADLET DEBUG] Running systemctl command: action=%s, service=%s, mode=%s", action, service, mode)
+
 	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
 		return err
 	}
@@ -189,6 +195,7 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		return fmt.Errorf("failed to get Quadlet directory: %w", err)
 	}
 	quadletDir := quadletPaths.InputDirectory
+	logger.Infof("[QUADLET DEBUG] Quadlet directory: %s", quadletDir)
 
 	if !root {
 		// Rootless mode - use user's XDG_RUNTIME_DIR
@@ -196,6 +203,9 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 		if xdg == "" {
 			uid := os.Getuid()
 			xdg = fmt.Sprintf("/run/user/%d", uid)
+			logger.Infof("[QUADLET DEBUG] XDG_RUNTIME_DIR not set, using default: %s", xdg)
+		} else {
+			logger.Infof("[QUADLET DEBUG] XDG_RUNTIME_DIR: %s", xdg)
 		}
 		runMountsd = filepath.Join(xdg, "systemd")
 		runMounttmp = xdg
@@ -227,12 +237,25 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	}
 	s.Env = envMap
 
+	logger.Infof("[QUADLET DEBUG] Container env: ROOT=%s, SERVICE=%s, ACTION=%s, HOME=%s, XDG_RUNTIME_DIR=%s",
+		envMap["ROOT"], envMap["SERVICE"], envMap["ACTION"], envMap["HOME"], envMap["XDG_RUNTIME_DIR"])
+	logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s",
+		quadletDir, runMounttmp, runMountc, runMountsd)
+
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
+		logger.Errorf("[QUADLET DEBUG] Failed to create container: %v", err)
 		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
 	}
 
-	return waitAndRemoveContainer(conn, createResponse.ID)
+	logger.Infof("[QUADLET DEBUG] Container created: %s", createResponse.ID)
+	err = waitAndRemoveContainer(conn, createResponse.ID)
+	if err != nil {
+		logger.Errorf("[QUADLET DEBUG] Container exited with error: %v", err)
+		return err
+	}
+	logger.Infof("[QUADLET DEBUG] Container %s completed successfully", createResponse.ID)
+	return nil
 }
 
 // systemdDaemonReload triggers systemd to reload configuration via container
