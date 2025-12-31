@@ -230,12 +230,24 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 	}
 
 	// Mount systemd directories AND Quadlet directory
-	s.Mounts = []specs.Mount{
+	mounts := []specs.Mount{
 		{Source: quadletDir, Destination: quadletDir, Type: define.TypeBind, Options: []string{"rw"}},
 		{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
 		{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
 		{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
 	}
+
+	// For rootless mode, also mount D-Bus socket so systemctl can communicate with host systemd
+	if !root {
+		dbusSocket := filepath.Join(xdg, "bus")
+		mounts = append(mounts, specs.Mount{
+			Source:      dbusSocket,
+			Destination: dbusSocket,
+			Type:        define.TypeBind,
+			Options:     []string{"rw"},
+		})
+	}
+	s.Mounts = mounts
 
 	s.Name = "quadlet-systemctl-" + action + "-" + service
 	envMap := make(map[string]string)
@@ -250,8 +262,14 @@ func runSystemctlCommand(conn context.Context, root bool, action, service string
 
 	logger.Infof("[QUADLET DEBUG] Container env: ROOT=%s, SERVICE=%s, ACTION=%s, HOME=%s, XDG_RUNTIME_DIR=%s",
 		envMap["ROOT"], envMap["SERVICE"], envMap["ACTION"], envMap["HOME"], envMap["XDG_RUNTIME_DIR"])
-	logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s",
-		quadletDir, runMounttmp, runMountc, runMountsd)
+	if !root {
+		dbusSocket := filepath.Join(xdg, "bus")
+		logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s, dbus=%s",
+			quadletDir, runMounttmp, runMountc, runMountsd, dbusSocket)
+	} else {
+		logger.Infof("[QUADLET DEBUG] Container mounts: quadlet=%s, tmpfs=%s, cgroup=%s, systemd=%s",
+			quadletDir, runMounttmp, runMountc, runMountsd)
+	}
 
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
