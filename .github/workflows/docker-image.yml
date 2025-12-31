@@ -1561,7 +1561,7 @@ jobs:
 
       - name: Service journal logs
         if: always()
-        run: journalctl --user -u simple.service || true
+        run: journalctl --user -u httpd.service || true
 
       - name: List Quadlet files
         if: always()
