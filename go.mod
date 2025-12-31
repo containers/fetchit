@@ -10,7 +10,7 @@ require (
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/openshift/build-machinery-go v0.0.0-20220121085309-f94edc2d6874
-	github.com/sigstore/gitsign v0.10.0
+	github.com/sigstore/gitsign v0.11.0
 	github.com/sigstore/rekor v1.3.10
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
@@ -203,7 +203,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.1 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/cosign/v2 v2.2.4 // indirect
+	github.com/sigstore/cosign/v2 v2.4.1 // indirect
 	github.com/sigstore/fulcio v1.7.1 // indirect
 	github.com/sigstore/protobuf-specs v0.4.1 // indirect
 	github.com/sigstore/sigstore v1.9.5 // indirect
