@@ -1,0 +1,10 @@
+[Unit]
+Description=Multi-container pod example with StopTimeout
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+
+[Pod]
+# Pod configuration with StopTimeout (v5.7.0 feature)
+StopTimeout=60
+
+[Install]
+WantedBy=default.target

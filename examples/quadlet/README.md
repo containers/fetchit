@@ -4,7 +4,7 @@ This directory contains example Quadlet files for deploying containers with fetc
 
 ## What is Quadlet?
 
-Quadlet is a systemd generator integrated into Podman (v4.4+) that converts declarative container configuration files (`.container`, `.volume`, `.network`, `.kube`) into systemd service units. This eliminates the need for writing complex systemd service files and provides a Podman-native way to manage containers via systemd.
+Quadlet is a systemd generator integrated into Podman (v4.4+) that converts declarative container configuration files into systemd service units. Podman v5.7.0 supports **eight file types**: `.container`, `.volume`, `.network`, `.pod`, `.build`, `.image`, `.artifact`, and `.kube`. This eliminates the need for writing complex systemd service files and provides a Podman-native way to manage containers via systemd.
 
 ## Example Files
 
@@ -36,6 +36,39 @@ Quadlet is a systemd generator integrated into Podman (v4.4+) that converts decl
   - Deploys a pod with multiple containers
   - Demonstrates Kubernetes manifest support in Quadlet
   - Useful for migrating from Kubernetes to Podman
+
+### Pod with Timeout Configuration (v5.7.0)
+
+- **httpd.pod** - Multi-container pod with StopTimeout
+  - Demonstrates pod-level configuration
+  - Uses v5.7.0 StopTimeout feature (60 seconds before SIGKILL)
+  - Foundation for multi-container applications
+
+### Image Build Example (v5.7.0)
+
+- **webapp.build** - Build container image with custom arguments
+  - Demonstrates image building with BuildArg feature
+  - Uses IgnoreFile (.dockerignore) to exclude files from build context
+  - Builds image tagged as `localhost/webapp:latest`
+- **Dockerfile** - Multi-stage build example
+  - Uses build arguments (VERSION, ENV) from webapp.build
+  - Labels image with metadata
+- **.dockerignore** - Build context ignore patterns
+  - Excludes .git/, README.md, logs from build
+
+### Image Pull Example (v5.7.0)
+
+- **nginx.image** - Pull container image from registry
+  - Automatically pulls nginx:latest from Docker Hub
+  - Uses Pull=always to ensure latest version
+  - Useful for keeping images up-to-date
+
+### OCI Artifact Example (v5.7.0)
+
+- **artifact.artifact** - OCI artifact management
+  - Demonstrates v5.7.0 artifact support
+  - Uses Pull=missing to avoid authentication issues in examples
+  - NOTE: Requires `podman login <registry>` for private registries
 
 ## Usage with Fetchit
 
@@ -94,11 +127,15 @@ podman ps
 
 ## Service Naming Conventions
 
-Quadlet automatically generates systemd service names:
+Quadlet automatically generates systemd service names based on file type:
 - `myapp.container` → `myapp.service` (container named `systemd-myapp`)
 - `data.volume` → `data-volume.service`
 - `app-net.network` → `app-net-network.service`
-- `webapp.kube` → `webapp.service`
+- `mypod.pod` → `mypod-pod.service`
+- `webapp.build` → `webapp.service`
+- `nginx.image` → `nginx.service`
+- `config.artifact` → `config.service`
+- `colors.kube` → `colors.service`
 
 ## Further Reading
 

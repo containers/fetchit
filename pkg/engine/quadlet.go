@@ -27,6 +27,10 @@ const (
 	QuadletContainer QuadletFileType = "container"
 	QuadletVolume    QuadletFileType = "volume"
 	QuadletNetwork   QuadletFileType = "network"
+	QuadletPod       QuadletFileType = "pod"
+	QuadletBuild     QuadletFileType = "build"
+	QuadletImage     QuadletFileType = "image"
+	QuadletArtifact  QuadletFileType = "artifact"
 	QuadletKube      QuadletFileType = "kube"
 )
 
@@ -318,6 +322,15 @@ func deriveServiceName(quadletFilename string) string {
 	case ".pod":
 		// mypod.pod -> mypod-pod.service
 		return base + "-pod.service"
+	case ".build":
+		// webapp.build -> webapp.service
+		return base + ".service"
+	case ".image":
+		// nginx.image -> nginx.service
+		return base + ".service"
+	case ".artifact":
+		// config.artifact -> config.service
+		return base + ".service"
 	default:
 		// Unknown type, assume base + .service
 		return base + ".service"
@@ -368,8 +381,8 @@ func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
 	target.mu.Lock()
 	defer target.mu.Unlock()
 
-	// Define Quadlet file extensions to monitor
-	tags := []string{".container", ".volume", ".network", ".kube"}
+	// Define Quadlet file extensions to monitor (all Podman v5.7.0 file types)
+	tags := []string{".container", ".volume", ".network", ".pod", ".build", ".image", ".artifact", ".kube"}
 
 	if q.initialRun {
 		// First run: clone repository
