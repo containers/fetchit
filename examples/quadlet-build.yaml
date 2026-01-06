@@ -1,0 +1,19 @@
+targets:
+  - name: quadlet-build-example
+    # Git repository containing Quadlet files
+    url: https://github.com/containers/fetchit.git
+    branch: main
+    targetPath: examples/quadlet/
+    # Check for updates every 5 minutes
+    schedule: "*/5 * * * *"
+
+    method:
+      type: quadlet
+      # Rootful deployment (system-wide)
+      root: true
+      # Enable and start services automatically
+      enable: true
+      # Restart services on updates to rebuild images
+      restart: true
+      # Only process .build files
+      glob: "**/*.build"

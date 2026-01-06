@@ -1,0 +1,20 @@
+[Unit]
+Description=Build container image with custom build arguments
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+
+[Build]
+# Dockerfile location (relative to .build file)
+File=./Dockerfile
+
+# Build arguments (v5.7.0 feature)
+BuildArg=VERSION=1.0
+BuildArg=ENV=production
+
+# Ignore file for build context (v5.7.0 feature)
+IgnoreFile=.dockerignore
+
+# Resulting image tag
+ImageTag=localhost/webapp:latest
+
+[Install]
+WantedBy=default.target

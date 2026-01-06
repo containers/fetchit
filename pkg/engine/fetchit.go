@@ -327,6 +327,14 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 				fetchit.methodTargetScheds[k] = k.SchedInfo()
 			}
 		}
+		if len(tc.Quadlet) > 0 {
+			fetchit.allMethodTypes[quadletMethod] = struct{}{}
+			for _, q := range tc.Quadlet {
+				q.initialRun = true
+				q.target = internalTarget
+				fetchit.methodTargetScheds[q] = q.SchedInfo()
+			}
+		}
 		if len(tc.Raw) > 0 {
 			fetchit.allMethodTypes[rawMethod] = struct{}{}
 			for _, r := range tc.Raw {
@@ -376,11 +384,11 @@ func (f *Fetchit) RunTargets() {
 
 func getRepo(target *Target) error {
 	if target.url != "" && !target.disconnected {
-		getClone(target)
+		return getClone(target)
 	} else if target.disconnected && len(target.url) > 0 {
-		getDisconnected(target)
+		return getDisconnected(target)
 	} else if target.disconnected && len(target.device) > 0 {
-		getDeviceDisconnected(target)
+		return getDeviceDisconnected(target)
 	}
 	return nil
 }

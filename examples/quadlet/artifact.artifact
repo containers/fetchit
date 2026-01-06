@@ -1,0 +1,15 @@
+[Unit]
+Description=OCI artifact management example (Podman v5.7.0)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+
+[Artifact]
+# OCI artifact reference
+# NOTE: Replace with your actual artifact registry
+# For public testing, you may need authentication: podman login <registry>
+Artifact=ghcr.io/example/config:v1.0
+
+# Pull only if missing (avoid authentication issues in examples)
+Pull=missing
+
+[Install]
+WantedBy=default.target

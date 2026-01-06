@@ -1,18 +1,71 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env bash
 
-if [ "$ACTION" == "enable" ]; then
+set -x  # Enable debug output
+
+echo "[SYSTEMD-SCRIPT DEBUG] Starting with ACTION=$ACTION, SERVICE=$SERVICE, ROOT=$ROOT"
+echo "[SYSTEMD-SCRIPT DEBUG] HOME=$HOME, XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+
+if [ "$ACTION" == "daemon-reload" ]; then
+  echo "[SYSTEMD-SCRIPT DEBUG] Running daemon-reload..."
   if [ "$ROOT" == "true" ]; then
     systemctl daemon-reload
+    echo "[SYSTEMD-SCRIPT DEBUG] Rootful daemon-reload exit code: $?"
+  else
+    systemctl --user daemon-reload
+    echo "[SYSTEMD-SCRIPT DEBUG] Rootless daemon-reload exit code: $?"
+  fi
+fi
+
+if [ "$ACTION" == "enable" ]; then
+  echo "[SYSTEMD-SCRIPT DEBUG] Running enable for service: $SERVICE"
+  if [ "$ROOT" == "true" ]; then
+    echo "[SYSTEMD-SCRIPT DEBUG] Running rootful daemon-reload..."
+    systemctl daemon-reload
+    echo "[SYSTEMD-SCRIPT DEBUG] daemon-reload exit code: $?"
     sleep 2
+    echo "[SYSTEMD-SCRIPT DEBUG] Running: systemctl enable ${SERVICE} --now"
     systemctl enable "${SERVICE}" --now
+    echo "[SYSTEMD-SCRIPT DEBUG] enable --now exit code: $?"
+    sleep 2
+    echo "[SYSTEMD-SCRIPT DEBUG] Checking if service is active..."
+    systemctl status "${SERVICE}" || true
+    if ! systemctl is-active --quiet "${SERVICE}"; then
+      echo "[SYSTEMD-SCRIPT DEBUG] ERROR: Service ${SERVICE} is not active!"
+      systemctl status "${SERVICE}"
+      journalctl -u "${SERVICE}" -n 50 || true
+      exit 1
+    fi
+    echo "[SYSTEMD-SCRIPT DEBUG] Service ${SERVICE} is active"
+  else
+    echo "[SYSTEMD-SCRIPT DEBUG] Running rootless daemon-reload..."
+    systemctl --user daemon-reload
+    echo "[SYSTEMD-SCRIPT DEBUG] daemon-reload exit code: $?"
+    sleep 2
+    echo "[SYSTEMD-SCRIPT DEBUG] Running: systemctl --user enable ${SERVICE} --now"
+    systemctl --user enable "${SERVICE}" --now
+    echo "[SYSTEMD-SCRIPT DEBUG] enable --now exit code: $?"
+    sleep 2
+    echo "[SYSTEMD-SCRIPT DEBUG] Checking if service is active..."
+    systemctl --user status "${SERVICE}" || true
+    if ! systemctl --user is-active --quiet "${SERVICE}"; then
+      echo "[SYSTEMD-SCRIPT DEBUG] ERROR: Service ${SERVICE} is not active!"
+      systemctl --user status "${SERVICE}"
+      journalctl --user -u "${SERVICE}" -n 50 || true
+      exit 1
+    fi
+    echo "[SYSTEMD-SCRIPT DEBUG] Service ${SERVICE} is active"
+  fi
+fi
+
+if [ "$ACTION" == "start" ]; then
+  if [ "$ROOT" == "true" ]; then
+    systemctl start "${SERVICE}"
     sleep 2
     if ! systemctl is-active --quiet "${SERVICE}"; then
       exit 1
     fi
   else
-    systemctl --user daemon-reload
-    sleep 2
-    systemctl --user enable "${SERVICE}" --now
+    systemctl --user start "${SERVICE}"
     sleep 2
     if ! systemctl --user is-active --quiet "${SERVICE}"; then
       exit 1
