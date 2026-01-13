@@ -994,8 +994,20 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/sallyom/httpd-ex:latest registry.access.redhat.com/ubi8/httpd-24:latest
 
+      - name: Debug - Check what curl returns
+        run: curl -v http://localhost:8080/ || true
+
+      - name: Debug - Check what curl returns for index.html
+        run: curl -v http://localhost:8080/index.html || true
+
+      - name: Debug - Exec into container to check httpd
+        run: sudo podman exec httpd ps aux || true
+
+      - name: Debug - Check if index.html exists in container
+        run: sudo podman exec httpd ls -la /var/www/html/ || true
+
       - name: Wait for podman auto-update
-        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); done'
+        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); sleep 2; done'
 
       - name: check the service
         if: always()
