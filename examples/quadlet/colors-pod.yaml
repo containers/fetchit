@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: colors
+  labels:
+    app: colors
+spec:
+  containers:
+  - name: red
+    image: docker.io/library/alpine:latest
+    command: ["sh", "-c", "echo 'Red container running' && sleep infinity"]
+  - name: blue
+    image: docker.io/library/alpine:latest
+    command: ["sh", "-c", "echo 'Blue container running' && sleep infinity"]
+  - name: green
+    image: docker.io/library/alpine:latest
+    command: ["sh", "-c", "echo 'Green container running' && sleep infinity"]

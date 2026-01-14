@@ -1,0 +1,560 @@
+// Package engine provides deployment methods for fetchit
+package engine
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/containers/fetchit/pkg/engine/utils"
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/specgen"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+)
+
+const quadletMethod = "quadlet"
+
+// QuadletFileType represents the type of Quadlet file
+type QuadletFileType string
+
+const (
+	QuadletContainer QuadletFileType = "container"
+	QuadletVolume    QuadletFileType = "volume"
+	QuadletNetwork   QuadletFileType = "network"
+	QuadletPod       QuadletFileType = "pod"
+	QuadletBuild     QuadletFileType = "build"
+	QuadletImage     QuadletFileType = "image"
+	QuadletArtifact  QuadletFileType = "artifact"
+	QuadletKube      QuadletFileType = "kube"
+)
+
+// QuadletDirectoryPaths holds the directory configuration for Quadlet deployments
+type QuadletDirectoryPaths struct {
+	// InputDirectory is where Quadlet files are placed for systemd generator
+	// Rootful: /etc/containers/systemd/
+	// Rootless: ~/.config/containers/systemd/
+	InputDirectory string
+
+	// XDGRuntimeDir is the runtime directory for rootless mode
+	// Only set for rootless deployments
+	// Typically /run/user/<UID>
+	XDGRuntimeDir string
+
+	// HomeDirectory is the user's home directory
+	// Required for rootless deployments to construct paths
+	HomeDirectory string
+}
+
+// QuadletFileMetadata represents metadata about a Quadlet file being deployed
+type QuadletFileMetadata struct {
+	// SourcePath is the path in the Git repository
+	SourcePath string
+
+	// TargetPath is the destination path in the Quadlet directory
+	// Rootful: /etc/containers/systemd/<filename>
+	// Rootless: ~/.config/containers/systemd/<filename>
+	TargetPath string
+
+	// FileType indicates the type of Quadlet file
+	FileType QuadletFileType
+
+	// ServiceName is the generated systemd service name
+	// e.g., "myapp.container" -> "myapp.service"
+	ServiceName string
+
+	// ChangeType indicates what operation is being performed
+	ChangeType string
+}
+
+// Quadlet implements the Method interface for Podman Quadlet deployments
+type Quadlet struct {
+	CommonMethod `mapstructure:",squash"`
+
+	// Root indicates whether to deploy in rootful (true) or rootless (false) mode
+	// Rootful: Files placed in /etc/containers/systemd/ (requires root)
+	// Rootless: Files placed in ~/.config/containers/systemd/ (user-level)
+	Root bool `mapstructure:"root"`
+
+	// Enable indicates whether to enable and start systemd services after deployment
+	// If false, Quadlet files are placed but services are not enabled
+	Enable bool `mapstructure:"enable"`
+
+	// Restart indicates whether to restart services on each update
+	// If true, implies Enable=true
+	// If false and Enable=true, services are enabled but not restarted on updates
+	Restart bool `mapstructure:"restart"`
+
+	// initialRun tracks if this is the first execution for this target
+	// Used to determine whether to perform initial clone or just fetch updates
+	initialRun bool
+}
+
+// GetKind returns the method type identifier
+func (q *Quadlet) GetKind() string {
+	return "quadlet"
+}
+
+// GetQuadletDirectory returns the appropriate directory based on mode
+func GetQuadletDirectory(root bool) (QuadletDirectoryPaths, error) {
+	if root {
+		// Rootful deployment
+		return QuadletDirectoryPaths{
+			InputDirectory: "/etc/containers/systemd",
+		}, nil
+	}
+
+	// Rootless deployment
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		return QuadletDirectoryPaths{}, fmt.Errorf("HOME environment variable not set (required for rootless)")
+	}
+
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		xdgConfigHome = filepath.Join(homeDir, ".config")
+	}
+
+	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if xdgRuntimeDir == "" {
+		uid := os.Getuid()
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", uid)
+	}
+
+	return QuadletDirectoryPaths{
+		InputDirectory: filepath.Join(xdgConfigHome, "containers", "systemd"),
+		XDGRuntimeDir:  xdgRuntimeDir,
+		HomeDirectory:  homeDir,
+	}, nil
+}
+
+// ensureQuadletDirectory creates the Quadlet directory on the HOST filesystem using a temporary container
+// This is necessary because the fetchit container cannot create directories on the host directly
+func (q *Quadlet) ensureQuadletDirectory(conn context.Context) error {
+	paths, err := GetQuadletDirectory(q.Root)
+	if err != nil {
+		return fmt.Errorf("failed to get Quadlet directory: %w", err)
+	}
+
+	// Create a temporary container to create the directory on the host
+	s := specgen.NewSpecGenerator(fetchitImage, false)
+	s.Name = "quadlet-mkdir-" + q.Name
+	privileged := true
+	s.Privileged = &privileged
+
+	// Determine bind mount point and directory creation command
+	var mountSource, mountDest string
+	if q.Root {
+		// Rootful: bind mount /etc to create /etc/containers/systemd
+		mountSource = "/etc"
+		mountDest = "/etc"
+	} else {
+		// Rootless: bind mount $HOME to create ~/.config/containers/systemd
+		mountSource = paths.HomeDirectory
+		mountDest = paths.HomeDirectory
+	}
+
+	// Command to create the directory with proper permissions using mkdir -p
+	s.Command = []string{"sh", "-c", "mkdir -p " + paths.InputDirectory}
+
+	// Bind mount the base directory so we can create the full path
+	s.Mounts = []specs.Mount{{Source: mountSource, Destination: mountDest, Type: "bind", Options: []string{"rw"}}}
+
+	// Create and start the container
+	createResponse, err := createAndStartContainer(conn, s)
+	if err != nil {
+		return fmt.Errorf("failed to create directory container: %w", err)
+	}
+
+	// Wait for the container to exit and remove it
+	return waitAndRemoveContainer(conn, createResponse.ID)
+}
+
+// runQuadletSystemctlCommand runs a systemctl command via container (same approach as systemd.go)
+// For daemon-reload, mounts the Quadlet directory so generator can read .container files
+// For start/stop/restart, uses standard systemd approach without Quadlet directory
+func runQuadletSystemctlCommand(conn context.Context, root bool, action, service string) error {
+	if err := detectOrFetchImage(conn, systemdImage, false); err != nil {
+		return err
+	}
+
+	s := specgen.NewSpecGenerator(systemdImage, false)
+	runMounttmp := "/run"
+	runMountsd := "/run/systemd"
+	runMountc := "/sys/fs/cgroup"
+	xdg := ""
+
+	if !root {
+		xdg = os.Getenv("XDG_RUNTIME_DIR")
+		if xdg == "" {
+			uid := os.Getuid()
+			xdg = fmt.Sprintf("/run/user/%d", uid)
+		}
+		runMountsd = filepath.Join(xdg, "systemd")
+		runMounttmp = xdg
+	}
+
+	privileged := true
+	s.Privileged = &privileged
+	s.PidNS = specgen.Namespace{
+		NSMode: "host",
+		Value:  "",
+	}
+
+	// For daemon-reload, mount Quadlet directory so generator can read .container files
+	// For other actions, just mount systemd directories (same as systemd.go)
+	var mounts []specs.Mount
+	if action == "daemon-reload" {
+		quadletPaths, err := GetQuadletDirectory(root)
+		if err != nil {
+			return fmt.Errorf("failed to get Quadlet directory: %w", err)
+		}
+		quadletDir := quadletPaths.InputDirectory
+		mounts = []specs.Mount{
+			{Source: quadletDir, Destination: quadletDir, Type: define.TypeBind, Options: []string{"rw"}},
+			{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
+			{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
+			{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
+		}
+	} else {
+		// For start/stop/restart, use same mounts as systemd.go (no Quadlet directory needed)
+		mounts = []specs.Mount{
+			{Source: runMounttmp, Destination: runMounttmp, Type: define.TypeTmpfs, Options: []string{"rw"}},
+			{Source: runMountc, Destination: runMountc, Type: define.TypeBind, Options: []string{"ro"}},
+			{Source: runMountsd, Destination: runMountsd, Type: define.TypeBind, Options: []string{"rw"}},
+		}
+	}
+	s.Mounts = mounts
+
+	s.Name = "quadlet-systemctl-" + action + "-" + service
+	envMap := make(map[string]string)
+	envMap["ROOT"] = strconv.FormatBool(root)
+	envMap["SERVICE"] = service
+	envMap["ACTION"] = action
+	envMap["HOME"] = os.Getenv("HOME")
+	if !root {
+		envMap["XDG_RUNTIME_DIR"] = xdg
+	}
+	s.Env = envMap
+
+	createResponse, err := createAndStartContainer(conn, s)
+	if err != nil {
+		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
+	}
+
+	err = waitAndRemoveContainer(conn, createResponse.ID)
+	if err != nil {
+		return utils.WrapErr(err, "Failed to run systemctl %s %s", action, service)
+	}
+
+	return nil
+}
+
+// systemdDaemonReload triggers systemd to reload configuration via container
+func systemdDaemonReload(ctx context.Context, conn context.Context, root bool) error {
+	mode := "rootful"
+	if !root {
+		mode = "rootless"
+	}
+	logger.Infof("Triggering systemd daemon-reload (%s)", mode)
+
+	if err := runQuadletSystemctlCommand(conn, root, "daemon-reload", ""); err != nil {
+		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
+
+	logger.Infof("Completed systemd daemon-reload (%s)", mode)
+	return nil
+}
+
+// systemdStartService starts a systemd service
+func systemdStartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runQuadletSystemctlCommand(conn, root, "start", serviceName); err != nil {
+		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
+	}
+	logger.Infof("Started service: %s", serviceName)
+	return nil
+}
+
+// systemdRestartService restarts a systemd service
+func systemdRestartService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runQuadletSystemctlCommand(conn, root, "restart", serviceName); err != nil {
+		return fmt.Errorf("failed to restart service %s: %w", serviceName, err)
+	}
+	logger.Infof("Restarted service: %s", serviceName)
+	return nil
+}
+
+// systemdStopService stops a systemd service
+func systemdStopService(ctx context.Context, conn context.Context, serviceName string, userMode bool) error {
+	root := !userMode
+	if err := runQuadletSystemctlCommand(conn, root, "stop", serviceName); err != nil {
+		return fmt.Errorf("failed to stop service %s: %w", serviceName, err)
+	}
+	logger.Infof("Stopped service: %s", serviceName)
+	return nil
+}
+
+// deriveServiceName converts a Quadlet filename to systemd service name
+func deriveServiceName(quadletFilename string) string {
+	ext := filepath.Ext(quadletFilename)
+	base := strings.TrimSuffix(filepath.Base(quadletFilename), ext)
+
+	switch ext {
+	case ".container":
+		// myapp.container -> myapp.service
+		return base + ".service"
+	case ".volume":
+		// data.volume -> data-volume.service
+		return base + "-volume.service"
+	case ".network":
+		// app-net.network -> app-net-network.service
+		return base + "-network.service"
+	case ".kube":
+		// webapp.kube -> webapp.service
+		return base + ".service"
+	case ".pod":
+		// mypod.pod -> mypod-pod.service
+		return base + "-pod.service"
+	case ".build":
+		// webapp.build -> webapp.service
+		return base + ".service"
+	case ".image":
+		// nginx.image -> nginx.service
+		return base + ".service"
+	case ".artifact":
+		// config.artifact -> config.service
+		return base + ".service"
+	default:
+		// Unknown type, assume base + .service
+		return base + ".service"
+	}
+}
+
+// determineChangeType analyzes object.Change to determine operation type
+func determineChangeType(change *object.Change) string {
+	if change == nil {
+		return "unknown"
+	}
+
+	// From is empty and To is populated = create
+	if change.From.Name == "" && change.To.Name != "" {
+		return "create"
+	}
+
+	// From is populated and To is empty = delete
+	if change.From.Name != "" && change.To.Name == "" {
+		return "delete"
+	}
+
+	// From and To are both populated but different = rename
+	if change.From.Name != "" && change.To.Name != "" && change.From.Name != change.To.Name {
+		return "rename"
+	}
+
+	// From and To are the same = update
+	if change.From.Name != "" && change.To.Name != "" && change.From.Name == change.To.Name {
+		return "update"
+	}
+
+	return "unknown"
+}
+
+// Process handles periodic Git synchronization and change detection
+func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
+	target := q.GetTarget()
+	if target == nil {
+		logger.Errorf("Quadlet target not initialized")
+		return
+	}
+
+	// Sleep for skew milliseconds to distribute load
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+
+	// Acquire target mutex lock
+	target.mu.Lock()
+	defer target.mu.Unlock()
+
+	// Define Quadlet file extensions to monitor (all Podman v5.7.0 file types)
+	tags := []string{".container", ".volume", ".network", ".pod", ".build", ".image", ".artifact", ".kube"}
+
+	if q.initialRun {
+		// First run: clone repository
+		err := getRepo(target)
+		if err != nil {
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
+			return
+		}
+
+		// Initial deployment
+		err = zeroToCurrent(ctx, conn, q, target, &tags)
+		if err != nil {
+			logger.Errorf("Error moving to current state: %v", err)
+			return
+		}
+	}
+
+	// Fetch updates and apply changes (runs on every iteration, including first)
+	err := currentToLatest(ctx, conn, q, target, &tags)
+	if err != nil {
+		logger.Errorf("Error moving current to latest: %v", err)
+		return
+	}
+
+	q.initialRun = false
+}
+
+// MethodEngine processes a single file change
+func (q *Quadlet) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	var changeType string
+	var curr *string
+	var prev *string
+
+	// Determine change type and file names
+	if change != nil {
+		if change.From.Name != "" {
+			prev = &change.From.Name
+		}
+		if change.To.Name != "" {
+			curr = &change.To.Name
+		}
+		changeType = determineChangeType(change)
+	}
+
+	// Get Quadlet directory
+	paths, err := GetQuadletDirectory(q.Root)
+	if err != nil {
+		return fmt.Errorf("failed to get Quadlet directory: %w", err)
+	}
+
+	// Ensure directory exists on HOST (must be done before fileTransferPodman)
+	if err := q.ensureQuadletDirectory(conn); err != nil {
+		return err
+	}
+
+	// Use FileTransfer method for copying files (same pattern as Systemd)
+	// This creates a temporary container with bind mounts to access host filesystem
+	ft := &FileTransfer{
+		CommonMethod: CommonMethod{
+			Name: q.Name,
+		},
+	}
+
+	// Perform file operation based on change type
+	switch changeType {
+	case "create", "update":
+		if curr == nil {
+			return fmt.Errorf("change type %s but no current file name", changeType)
+		}
+		// Copy file from Git clone to Quadlet directory using fileTransferPodman
+		if err := ft.fileTransferPodman(ctx, conn, path, paths.InputDirectory, nil); err != nil {
+			return fmt.Errorf("failed to copy Quadlet file: %w", err)
+		}
+		logger.Infof("Placed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*curr)))
+
+	case "rename":
+		// Remove old file, then copy new file
+		if err := ft.fileTransferPodman(ctx, conn, path, paths.InputDirectory, prev); err != nil {
+			return fmt.Errorf("failed to copy renamed Quadlet file: %w", err)
+		}
+		if curr != nil {
+			logger.Infof("Renamed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*curr)))
+		}
+
+	case "delete":
+		// Remove file from Quadlet directory
+		if prev != nil {
+			if err := ft.fileTransferPodman(ctx, conn, deleteFile, paths.InputDirectory, prev); err != nil {
+				return fmt.Errorf("failed to remove Quadlet file: %w", err)
+			}
+			logger.Infof("Removed Quadlet file: %s", filepath.Join(paths.InputDirectory, filepath.Base(*prev)))
+		}
+	}
+
+	// Note: daemon-reload is batched in Apply(), not triggered here
+	return nil
+}
+
+// Apply processes all file changes in a batch and triggers daemon-reload
+func (q *Quadlet) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
+	target := q.GetTarget()
+	if target == nil {
+		return fmt.Errorf("Quadlet target not initialized")
+	}
+
+	// Get filtered changes (use Glob pointer directly, applyChanges handles nil)
+	changeMap, err := applyChanges(ctx, target, q.GetTargetPath(), q.Glob, currentState, desiredState, tags)
+	if err != nil {
+		return fmt.Errorf("failed to apply changes: %w", err)
+	}
+
+	// If no changes, nothing to do
+	if len(changeMap) == 0 {
+		logger.Infof("No Quadlet file changes detected for target %s", q.GetName())
+		return nil
+	}
+
+	// Process each file change
+	if err := runChanges(ctx, conn, q, changeMap); err != nil {
+		return fmt.Errorf("failed to run changes: %w", err)
+	}
+
+	// Trigger daemon-reload (ONCE after all file changes)
+	if err := systemdDaemonReload(ctx, conn, q.Root); err != nil {
+		return fmt.Errorf("systemd daemon-reload failed: %w", err)
+	}
+	userMode := !q.Root
+
+	// If Enable is false, we're done
+	if !q.Enable {
+		logger.Infof("Quadlet target %s successfully processed (files placed, not enabled)", q.GetName())
+		return nil
+	}
+
+	// Start/restart services based on change type
+	// Note: Quadlet-generated services with [Install] WantedBy= are automatically
+	// "enabled" by the systemd generator when daemon-reload runs. We just need to start them.
+	for change := range changeMap {
+		if change.To.Name == "" {
+			continue // Skip deletes for service start
+		}
+
+		serviceName := deriveServiceName(change.To.Name)
+		changeType := determineChangeType(change)
+
+		switch changeType {
+		case "create":
+			// Start new services (generator already created Want symlinks during daemon-reload)
+			if err := systemdStartService(ctx, conn, serviceName, userMode); err != nil {
+				logger.Errorf("Failed to start service %s: %v", serviceName, err)
+				continue
+			}
+
+		case "update":
+			// Restart on update if Restart=true
+			if q.Restart {
+				if err := systemdRestartService(ctx, conn, serviceName, userMode); err != nil {
+					logger.Errorf("Failed to restart service %s: %v", serviceName, err)
+				}
+			}
+
+		case "delete":
+			// Stop deleted services
+			if change.From.Name != "" {
+				deletedServiceName := deriveServiceName(change.From.Name)
+				if err := systemdStopService(ctx, conn, deletedServiceName, userMode); err != nil {
+					logger.Warnf("Failed to stop service %s: %v", deletedServiceName, err)
+				}
+			}
+		}
+	}
+
+	logger.Infof("Quadlet target %s successfully processed", q.GetName())
+	return nil
+}

@@ -1,0 +1,8 @@
+[Unit]
+Description=Volume for Apache HTTP Server content
+
+[Volume]
+Label=app=httpd
+
+[Install]
+WantedBy=multi-user.target default.target

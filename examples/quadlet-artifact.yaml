@@ -1,0 +1,22 @@
+targets:
+  - name: quadlet-artifact-example
+    # Git repository containing Quadlet files
+    url: https://github.com/containers/fetchit.git
+    branch: main
+    targetPath: examples/quadlet/
+    # Check for updates every 5 minutes
+    schedule: "*/5 * * * *"
+
+    method:
+      type: quadlet
+      # Rootful deployment (system-wide)
+      root: true
+      # Do not enable automatically (artifacts may require authentication)
+      enable: false
+      # Do not restart automatically
+      restart: false
+      # Only process .artifact files
+      glob: "**/*.artifact"
+
+# NOTE: OCI artifacts may require authentication
+# Before deploying, run: podman login <your-registry>

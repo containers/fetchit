@@ -1,0 +1,16 @@
+[Unit]
+Description=Simple Nginx web server
+Documentation=https://nginx.org/en/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=docker.io/library/nginx:latest
+PublishPort=8080:80
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target default.target

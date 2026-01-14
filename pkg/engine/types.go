@@ -40,6 +40,7 @@ type TargetConfig struct {
 	Ansible           []*Ansible         `mapstructure:"ansible"`
 	FileTransfer      []*FileTransfer    `mapstructure:"filetransfer"`
 	Kube              []*Kube            `mapstructure:"kube"`
+	Quadlet           []*Quadlet         `mapstructure:"quadlet"`
 	Raw               []*Raw             `mapstructure:"raw"`
 	Systemd           []*Systemd         `mapstructure:"systemd"`
 
