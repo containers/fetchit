@@ -185,6 +185,11 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 		return false, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("received non-200 HTTP status from %s: %d %s", urlStr, resp.StatusCode, resp.Status)
+	}
+
 	newBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, fmt.Errorf("error downloading config from %s: %v", urlStr, err)
