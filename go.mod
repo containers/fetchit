@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/containers/podman/v5 v5.7.0
 	github.com/go-co-op/gocron v1.13.0
-	github.com/go-git/go-git/v5 v5.14.0
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/gobwas/glob v0.2.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/opencontainers/runtime-spec v1.2.1
