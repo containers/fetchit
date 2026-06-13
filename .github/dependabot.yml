@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Go module dependencies. Minor/patch bumps are grouped into a single weekly
+  # PR to cut down on noise; major bumps stay as individual PRs since they tend
+  # to need code changes and a real review.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - go
+    groups:
+      go-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Keep GitHub Actions used in workflows up to date.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        update-types:
+          - minor
+          - patch

@@ -348,6 +348,7 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 }
 
 func (f *Fetchit) RunTargets() {
+	startStatusServer()
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
@@ -367,7 +368,12 @@ func (f *Fetchit) RunTargets() {
 		defer cancel()
 		mt := method.GetKind()
 		logger.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
-		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, skew)
+		status.register(method, schedInfo.schedule)
+		m := method
+		s.Cron(schedInfo.schedule).Tag(mt).Do(func(ctx, conn context.Context, skew int) {
+			status.recordRun(m)
+			m.Process(ctx, conn, skew)
+		}, ctx, f.conn, skew)
 		s.StartImmediately()
 	}
 	s.StartAsync()

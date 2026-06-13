@@ -166,3 +166,48 @@ watch ls -al /tmp/hello.txt
 ```
 podman stop colors1 colors2 fetchit && podman rm colors1 colors2 && podman volume rm fetchit-volume
 ```
+
+## Health and status endpoint
+
+FetchIt can expose a small HTTP server for liveness checks and reconciliation
+status. It is off by default; set `FETCHIT_STATUS_ADDR` to the address to listen
+on to enable it:
+
+```
+podman run -d --rm --name fetchit \
+    -e FETCHIT_STATUS_ADDR=:8080 \
+    -p 8080:8080 \
+    -v fetchit-volume:/opt \
+    -v $HOME/.fetchit:/opt/mount \
+    -v /run/user/$(id -u)/podman//podman.sock:/run/podman/podman.sock \
+    --security-opt label=disable \
+    quay.io/fetchit/fetchit:latest
+```
+
+A host-less value like `:8080` binds all interfaces, which is what container
+port publishing (`-p 8080:8080`) needs. For a bare-metal install where you only
+want local access, set `FETCHIT_STATUS_ADDR=127.0.0.1:8080`.
+
+- `GET /healthz` returns `200 OK` while the process is alive (use as a container
+  healthcheck or readiness probe).
+- `GET /status` returns JSON describing uptime and each configured method, its
+  schedule, run count, and last run time:
+
+```
+curl -s localhost:8080/status
+{
+  "status": "running",
+  "startedAt": "2026-06-13T15:04:05Z",
+  "uptimeSeconds": 312,
+  "methods": [
+    {
+      "kind": "raw",
+      "name": "raw-ex",
+      "url": "https://github.com/containers/fetchit",
+      "schedule": "*/1 * * * *",
+      "runs": 5,
+      "lastRun": "2026-06-13T15:09:05Z"
+    }
+  ]
+}
+```

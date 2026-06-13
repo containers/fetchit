@@ -1,0 +1,35 @@
+name: Unit tests
+
+# Fast feedback gate: compiles the code (go vet) and runs the unit tests in
+# tests/unit. Far quicker than the integration "validate" jobs, so build breaks
+# and obvious regressions surface in a couple of minutes.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CGO_ENABLED: "1" # podman bindings require CGO
+  BUILDTAGS: "containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgpgme-dev libdevmapper-dev libseccomp-dev pkg-config
+
+      - name: go vet
+        run: go vet -tags "$BUILDTAGS" ./cmd/... ./pkg/...
+
+      - name: Unit tests
+        run: go test -tags "$BUILDTAGS" ./tests/unit/... ./pkg/...
