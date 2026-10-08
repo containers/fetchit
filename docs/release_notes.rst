@@ -50,3 +50,19 @@ Set ``FETCHIT_STATUS_ADDR`` to enable ``/healthz`` and ``/status``. The status
 response includes current method schedules and invocation statistics, including
 Quadlet methods. Snapshots are safe during concurrent reconciliations and config
 reloads. See :doc:`status` for deployment and monitoring details.
+
+
+SSH integration, remote config safety, and optional networks
+------------------------------------------------------------
+
+SSH CI now uses a temporary local Git server to verify host-key rejection,
+clone, fetch, and file deployment without GitHub secrets. Clone failures now
+propagate to the caller, allowing scheduled retries to report the actual error.
+
+Remote configuration downloads reject HTTP failures and invalid YAML before
+changing files, fixing issue #345. Updates use atomic replacement and require a
+writable directory mount; see :doc:`running` for limits and recovery.
+
+Raw and Kube accept optional existing Podman networks (issue #285). Omitted or
+empty network lists preserve the existing behavior; Raw manifests may override
+the method list. See :doc:`methods` for setup and redeployment behavior.

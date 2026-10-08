@@ -29,6 +29,8 @@ const kubeMethod = "kube"
 // Kube to launch pods using podman kube-play
 type Kube struct {
 	CommonMethod `mapstructure:",squash"`
+	// Optional existing Podman networks for all pods played by this method.
+	Networks []string `mapstructure:"networks"`
 }
 
 func (k *Kube) GetKind() string {
@@ -87,6 +89,9 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 
 func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
 	if path != deleteFile {
+		if err := validateNetworks(conn, k.Networks); err != nil {
+			return err
+		}
 		logger.Infof("Creating podman container from %s using kube method", path)
 	}
 
@@ -111,7 +116,7 @@ func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) 
 			}
 		}
 
-		err = createPods(conn, path, kubeYaml)
+		err = createPods(conn, path, kubeYaml, k.Networks)
 		if err != nil {
 			return utils.WrapErr(err, "Error creating pod")
 		}
@@ -139,7 +144,7 @@ func stopPods(ctx context.Context, podSpec []byte) error {
 	return nil
 }
 
-func createPods(ctx context.Context, path string, specs []byte) error {
+func createPods(ctx context.Context, path string, specs []byte, networks []string) error {
 	pod_list, err := podFromBytes(specs)
 	if err != nil {
 		return utils.WrapErr(err, "Error getting list of pods in spec")
@@ -152,7 +157,7 @@ func createPods(ctx context.Context, path string, specs []byte) error {
 		}
 	}
 
-	_, err = play.Kube(ctx, path, nil)
+	_, err = play.Kube(ctx, path, kubeNetworkOptions(networks))
 	if err != nil {
 		return utils.WrapErr(err, "Error playing kube spec")
 	}
@@ -214,4 +219,11 @@ func validatePod(p v1.Pod) error {
 		}
 	}
 	return nil
+}
+
+func kubeNetworkOptions(networks []string) *play.KubeOptions {
+	if len(networks) == 0 {
+		return nil
+	}
+	return new(play.KubeOptions).WithNetwork(networks)
 }

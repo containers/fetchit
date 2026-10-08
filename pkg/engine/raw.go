@@ -28,6 +28,8 @@ type Raw struct {
 	CommonMethod `mapstructure:",squash"`
 	// Pull images configured in target files each time regardless of if it already exists
 	PullImage bool `mapstructure:"pullImage"`
+	// Optional existing Podman networks for containers managed by this method.
+	Networks []string `mapstructure:"networks"`
 }
 
 func (r *Raw) GetKind() string {
@@ -71,14 +73,15 @@ type namedVolume struct {
 }
 
 type RawPod struct {
-	Image   string            `json:"Image" yaml:"Image"`
-	Name    string            `json:"Name" yaml:"Name"`
-	Env     map[string]string `json:"Env" yaml:"Env"`
-	Ports   []port            `json:"Ports" yaml:"Ports"`
-	Mounts  []mount           `json:"Mounts" yaml:"Mounts"`
-	Volumes []namedVolume     `json:"Volumes" yaml:"Volumes"`
-	CapAdd  []string          `json:"CapAdd" yaml:"CapAdd"`
-	CapDrop []string          `json:"CapDrop" yaml:"CapDrop"`
+	Image    string            `json:"Image" yaml:"Image"`
+	Name     string            `json:"Name" yaml:"Name"`
+	Env      map[string]string `json:"Env" yaml:"Env"`
+	Ports    []port            `json:"Ports" yaml:"Ports"`
+	Mounts   []mount           `json:"Mounts" yaml:"Mounts"`
+	Volumes  []namedVolume     `json:"Volumes" yaml:"Volumes"`
+	CapAdd   []string          `json:"CapAdd" yaml:"CapAdd"`
+	CapDrop  []string          `json:"CapDrop" yaml:"CapDrop"`
+	Networks []string          `json:"Networks" yaml:"Networks"`
 }
 
 func (r *Raw) Process(ctx context.Context, conn context.Context, skew int) {
@@ -123,6 +126,13 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 
 	raw, err := rawPodFromBytes(rawFile)
 	if err != nil {
+		return err
+	}
+
+	if raw.Networks == nil {
+		raw.Networks = r.Networks
+	}
+	if err := validateNetworks(conn, raw.Networks); err != nil {
 		return err
 	}
 
@@ -245,6 +255,13 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 	s.CapAdd = []string(raw.CapAdd)
 	s.CapDrop = []string(raw.CapDrop)
 	s.RestartPolicy = "always"
+	if len(raw.Networks) > 0 {
+		s.NetNS = specgen.Namespace{NSMode: specgen.Bridge}
+		s.Networks = make(map[string]types.PerNetworkOptions, len(raw.Networks))
+		for _, network := range raw.Networks {
+			s.Networks[network] = types.PerNetworkOptions{}
+		}
+	}
 	// add a label to signify ownership of fetchit <--> this container
 	s.Labels = map[string]string{
 		"owned-by": FetchItLabel,

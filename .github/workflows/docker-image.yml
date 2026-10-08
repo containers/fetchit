@@ -65,7 +65,7 @@ jobs:
 
   build-ansible-arm:
     runs-on: ubuntu-26.04
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -142,7 +142,7 @@ jobs:
 
   build-systemd-arm:
     runs-on: ubuntu-26.04
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
+    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -260,7 +260,7 @@ jobs:
         run: sudo mkdir "${HOME}"/.fetchit && sudo cp ./examples/config-url.yaml "${HOME}"/.fetchit/config.yaml
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v "${HOME}"/.fetchit/config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v "${HOME}"/.fetchit:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -307,11 +307,14 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: swap in the GITHUB PAT token
-        run: sudo sed -i "s/CHANGEME/${{ secrets.GITHUB_TOKEN }}/g" ./examples/pat-testing-config.yaml
+      - name: Prepare writable config directory
+        uses: ./.github/actions/prepare-config
+        with:
+          source: ./examples/pat-testing-config.yaml
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/pat-testing-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/fetchit-config:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -563,8 +566,13 @@ jobs:
          export GH_PAT=${{ secrets.GITHUB_TOKEN }}
          podman secret create --env GH_PAT GH_PAT
 
+      - name: Prepare writable config directory
+        uses: ./.github/actions/prepare-config
+        with:
+          source: ./examples/podman-secret-raw-config.yaml
+
       - name: Start fetchit
-        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v ./examples/podman-secret-raw-config.yaml:/opt/mount/config.yaml -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
+        run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/fetchit-config:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
 
       - name: identify colors container
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 2 ]; do c=$(sudo podman ps | grep colors | wc -l); done'
@@ -669,6 +677,28 @@ jobs:
 
       - name: Check that no capabilities exist for cap2
         run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+  ssh-validate:
+    runs-on: ubuntu-26.04
+    needs: [build]
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+      - name: Install local SSH server
+        run: sudo apt-get install -y openssh-server git
+      - name: Enable the Podman socket
+        run: sudo systemctl enable --now podman.socket
+      - uses: actions/download-artifact@v4
+        with:
+          name: fetchit-image
+          path: /tmp
+      - name: Load and tag FetchIt
+        run: |
+          sudo podman load -i /tmp/fetchit.tar
+          sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
+      - name: Verify SSH clone, fetch, deployment, and host trust
+        run: bash tests/integration/ssh/validate.sh
+
   filetransfer-validate:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
@@ -1660,7 +1690,7 @@ jobs:
 
   push-amd-image-to-registry:
     runs-on: ubuntu-26.04
-    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
+    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1690,7 +1720,7 @@ jobs:
 
   build-arm-and-manifest-list:
     runs-on: ubuntu-26.04
-    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ansible-validate, loader-validate, disconnected-validate ]
+    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))

@@ -3,13 +3,17 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -159,16 +163,7 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod
 func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, username, password string) (bool, error) {
-	_, err := url.Parse(urlStr)
-	if err != nil {
-		return false, fmt.Errorf("unable to parse config file url %s: %v", urlStr, err)
-	}
-	client := http.Client{
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
+	client := http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return false, fmt.Errorf("unable to create request: %v", err)
@@ -185,38 +180,123 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 		return false, err
 	}
 	defer resp.Body.Close()
-	newBytes, err := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("config download returned HTTP %d", resp.StatusCode)
+	}
+	const maxConfigBytes = 1 << 20
+	newBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBytes+1))
 	if err != nil {
-		return false, fmt.Errorf("error downloading config from %s: %v", urlStr, err)
+		return false, fmt.Errorf("error downloading config: %w", err)
 	}
-	if newBytes == nil {
-		// if initial, this is the last resort, newBytes should be populated
-		// the only way to get here from initial
-		// is if there is no config file on disk, only a FETCHIT_CONFIG_URL
-		return false, fmt.Errorf("found empty config at %s, unable to update or populate config", urlStr)
+	if len(newBytes) > maxConfigBytes {
+		return false, fmt.Errorf("downloaded config exceeds 1 MiB")
 	}
+	if err := validateDownloadedConfig(newBytes); err != nil {
+		return false, fmt.Errorf("invalid downloaded config: %w", err)
+	}
+	var currentConfigBytes []byte
 	if !initial {
-		currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
+		currentConfigBytes, err = os.ReadFile(defaultConfigPath)
 		if err != nil {
-			logger.Infof("unable to read current config, will try with new downloaded config file: %v", err)
 			existsAlready = false
-		} else {
-			if bytes.Equal(newBytes, currentConfigBytes) {
-				return false, nil
-			}
-		}
-
-		if existsAlready {
-			if err := os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600); err != nil {
-				return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
-			}
-			logger.Infof("Current config backup placed at %s", defaultConfigBackup)
+		} else if bytes.Equal(newBytes, currentConfigBytes) {
+			return false, nil
 		}
 	}
-	if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
-		return false, fmt.Errorf("unable to write new config contents, reverting to old config: %v", err)
+	updated, err := replaceConfigFiles(defaultConfigPath, defaultConfigBackup, newBytes, currentConfigBytes, existsAlready && !initial, os.Rename)
+	if err != nil {
+		return updated, err
 	}
 
 	logger.Infof("Config updates found from url: %s, will load new targets", urlStr)
 	return true, nil
+}
+
+// Validate one nonempty YAML mapping using the same decoder as local configs,
+// rejecting unknown fields so an error page cannot masquerade as configuration.
+func validateDownloadedConfig(data []byte) error {
+	if err := validateSingleConfigMapping(data); err != nil {
+		return err
+	}
+	return decodeConfigExactly(data)
+}
+
+func validateSingleConfigMapping(data []byte) error {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	var document yaml.Node
+	if err := decoder.Decode(&document); err != nil {
+		return fmt.Errorf("invalid YAML: %w", err)
+	}
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode || len(document.Content[0].Content) == 0 {
+		return fmt.Errorf("expected a nonempty configuration mapping")
+	}
+	var extra yaml.Node
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return fmt.Errorf("expected exactly one YAML document")
+	}
+	return nil
+}
+
+func decodeConfigExactly(data []byte) error {
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+		return err
+	}
+	var config FetchitConfig
+	return v.UnmarshalExact(&config)
+}
+
+// Stage both files before touching either destination. Publish the backup only
+// after config replacement succeeds, rolling the config back on backup failure.
+func replaceConfigFiles(configPath, backupPath string, next, previous []byte, backup bool, rename func(string, string) error) (bool, error) {
+	stage, err := stageConfig(configPath, next)
+	if err != nil {
+		return false, fmt.Errorf("stage config: %w", err)
+	}
+	defer os.Remove(stage)
+	var backupStage string
+	if backup {
+		backupStage, err = stageConfig(backupPath, previous)
+		if err != nil {
+			return false, fmt.Errorf("stage backup: %w", err)
+		}
+		defer os.Remove(backupStage)
+	}
+	if err := rename(stage, configPath); err != nil {
+		return false, fmt.Errorf("replace config; previous files preserved: %w", err)
+	}
+	if backup {
+		if err := rename(backupStage, backupPath); err != nil {
+			if rollbackErr := rename(backupStage, configPath); rollbackErr != nil {
+				return true, errors.Join(fmt.Errorf("publish backup: %w", err), fmt.Errorf("rollback failed; new config remains active: %w", rollbackErr))
+			}
+			return false, fmt.Errorf("publish backup; config rolled back: %w", err)
+		}
+	}
+	return true, nil
+}
+
+func stageConfig(destination string, data []byte) (name string, resultErr error) {
+	file, err := os.CreateTemp(filepath.Dir(destination), ".fetchit-config-*")
+	if err != nil {
+		return "", err
+	}
+	name = file.Name()
+	defer func() {
+		file.Close()
+		if resultErr != nil {
+			os.Remove(name)
+		}
+	}()
+	if _, err := file.Write(data); err != nil {
+		return name, err
+	}
+	if err := file.Sync(); err != nil {
+		return name, err
+	}
+	if err := file.Close(); err != nil {
+		return name, err
+	}
+	return name, nil
 }

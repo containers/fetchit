@@ -106,10 +106,26 @@ NOTE: The key must be defined within your git provider to be able to be used for
 
    mkdir -p ~/.fetchit/.ssh
    cp -rp ~/.ssh/id_rsa ~/.fetchit/.ssh/id_rsa
-   chmod 0600 -R ~/.fetchit/.ssh
-   ssh-keyscan -t ecdsa github.com >> ~/.fetchit/.ssh/known_hosts
-   ssh-keyscan -t rsa github.com > ~/.fetchit/.ssh/known_hosts
+   chmod 0700 ~/.fetchit/.ssh
+   chmod 0600 ~/.fetchit/.ssh/id_rsa
+   ssh-keyscan -t ed25519 github.com > /tmp/github.keys
+   ssh-keygen -lf /tmp/github.keys -E sha256
 
+
+Compare the printed SHA256 fingerprint with GitHub's `published SSH fingerprints
+<https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints>`_
+through a trusted channel. Only after they match, install the verified key:
+
+.. code-block:: bash
+
+   install -m 0600 /tmp/github.keys ~/.fetchit/.ssh/known_hosts
+
+Mount the directory at ``/opt/mount/.ssh`` (normally
+as part of the ``~/.fetchit:/opt/mount`` directory mount). An unknown or changed
+host key fails authentication; do not disable host key checking. For a nonstandard
+port, use ``ssh://git@host:2222/path/repo.git`` and a matching ``[host]:2222``
+known-hosts entry. Set ``sshKeyFile`` to the private key filename, including an
+Ed25519 key if desired. The SSH key is used for both clone and later fetches.
 
 The configuration file to use the key is shown below.
 
@@ -298,3 +314,48 @@ Quadlet Method
 --------------
 
 See :doc:`quadlet` for host-managed Podman Quadlet bundles, configuration, and lifecycle behavior.
+
+
+Optional Podman networks
+------------------------
+
+Raw and Kube methods accept ``networks``, a list of existing Podman network names
+or IDs. Omit it or use ``[]`` to retain Podman's existing defaults. FetchIt does
+not create or delete these networks; create them on the same rootful or rootless
+Podman instance that FetchIt uses before deploying:
+
+.. code-block:: shell
+
+   podman network create frontend
+   podman network create backend
+
+.. code-block:: yaml
+
+   targetConfigs:
+   - url: https://github.com/example/workloads
+     branch: main
+     raw:
+     - name: web
+       targetPath: raw
+       networks: [frontend, backend]
+       schedule: '*/1 * * * *'
+     kube:
+     - name: pods
+       targetPath: kube
+       networks: [backend]
+       schedule: '*/1 * * * *'
+
+The Raw list applies to all containers from that method. A Raw JSON/YAML file can
+override it with ``Networks: [frontend]``; an explicit ``Networks: []`` opts that
+container back into defaults. Kube passes the method's list to Podman kube play
+for all pods in its manifest. These are Podman networks, not Kubernetes Services
+or NetworkPolicies. Network creation, IPs, aliases, and routing remain managed by
+Podman. A named network list replaces implicit default-network attachment;
+include the default network explicitly if needed. Configured networks are inspected before workload teardown. Missing networks
+fail before removing existing containers or pods. A network disappearing after
+this check, or another Podman runtime failure, can still interrupt redeployment. Network options are not applied
+to file-transfer or other helper containers.
+
+Changing a network setting in FetchIt's config alone does not redeploy an
+unchanged Git manifest. Commit a change to the workload file to apply the new
+attachments; existing workloads keep their current attachments until recreated.

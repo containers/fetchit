@@ -1,0 +1,28 @@
+name: Prepare writable FetchIt config
+description: Stage a mode-0600 config in a private writable directory for atomic reloads.
+inputs:
+  source:
+    description: Source configuration file
+    required: true
+  token:
+    description: Optional test token replacing CHANGEME
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        FETCHIT_TEST_CONFIG_SOURCE: ${{ inputs.source }}
+        FETCHIT_TEST_CONFIG_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        install -d -m 700 /tmp/fetchit-config
+        install -m 600 "$FETCHIT_TEST_CONFIG_SOURCE" /tmp/fetchit-config/config.yaml
+        python3 - <<'PY'
+        import os
+        from pathlib import Path
+        token = os.environ['FETCHIT_TEST_CONFIG_TOKEN']
+        if token:
+            path = Path('/tmp/fetchit-config/config.yaml')
+            path.write_text(path.read_text().replace('CHANGEME', token))
+        PY
