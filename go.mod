@@ -289,5 +289,7 @@ require (
 
 // Podman v5.8 uses the OCI 1.2 LinuxRlimit layout. Storage's newer minimum
 // selects OCI 1.3, whose pointer fields do not compile with Podman v5.
-// Remove this compatibility pin when upgrading Podman to v6.
+// This is temporary while we retain Podman v5. After adopting Podman v6,
+// remove the replace directive below and run go mod tidy to regenerate
+// go.mod/go.sum, then rerun Linux builds and tests.
 replace github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.2.1

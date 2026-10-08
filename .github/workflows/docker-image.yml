@@ -42,6 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/setup-podman
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -70,6 +72,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/setup-podman
+
       - name: update system
         run: sudo apt-get update
 
@@ -95,6 +99,9 @@ jobs:
   pull-and-archive:
     runs-on: ubuntu-26.04
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: pull the colors image
         run: podman pull docker.io/mmumshad/simple-webapp-color:latest
 
@@ -111,6 +118,8 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-podman
 
       - uses: actions/setup-go@v5
         with:
@@ -140,6 +149,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/setup-podman
+
       - name: update system
         run: sudo apt-get update
 
@@ -168,13 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -225,13 +230,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -282,13 +281,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -339,13 +332,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -396,13 +383,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -474,13 +455,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -557,13 +532,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -640,13 +609,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -700,13 +663,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -748,13 +705,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -793,13 +744,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -835,13 +780,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -928,13 +867,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -985,13 +918,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: enable podman.socket
         run: |
@@ -1049,13 +976,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1109,13 +1030,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1172,13 +1087,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1217,13 +1126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1262,13 +1165,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1322,13 +1219,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1379,13 +1270,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1454,13 +1339,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1543,13 +1422,7 @@ jobs:
           path: ci
           ref: ci
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1633,13 +1506,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1699,13 +1566,7 @@ jobs:
         with:
           path: ci
 
-      - name: Verify packaged Podman and crun
-        run: |
-          podman --version
-          crun --version
-          version=$(podman --version | awk '{print $3}')
-          dpkg --compare-versions "$version" ge 5.7.0
-          dpkg --compare-versions "$version" lt 6.0.0
+      - uses: ./.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1792,6 +1653,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -1819,6 +1683,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: Checkout code
         uses: actions/checkout@v2
 
@@ -1827,6 +1694,10 @@ jobs:
 
       - name: Install required packages
         run: sudo apt install podman build-essential qemu-user qemu-user-static
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Build the arm image
         run: go mod download && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
@@ -1847,6 +1718,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: pull artifact
         uses: actions/download-artifact@v4
         with:
@@ -1891,6 +1765,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: pull arm image
         uses: actions/download-artifact@v4
         with:
@@ -1934,6 +1811,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: pull artifact
         uses: actions/download-artifact@v4
         with:
@@ -1978,6 +1858,9 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-podman
+
       - name: pull artifact
         uses: actions/download-artifact@v4
         with:
