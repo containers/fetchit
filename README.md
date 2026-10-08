@@ -164,3 +164,19 @@ Set `FETCHIT_STATUS_ADDR=127.0.0.1:8080` to enable optional `/healthz` and
 The status endpoint reports scheduled invocation attempts, including Quadlet;
 liveness does not imply successful reconciliation. See the
 [full status guide](docs/status.rst) for response fields, reload behavior, and access configuration.
+
+### Building documentation
+
+Use the pinned documentation dependencies shared by Read the Docs and GitHub Actions:
+
+```bash
+python3 -m venv .venv-docs
+. .venv-docs/bin/activate
+python -m pip install -r docs/requirements.txt
+python -m sphinx -W -E -b html docs /tmp/fetchit-docs
+```
+
+Read the Docs must build a commit containing the current `.readthedocs.yml`.
+Historical versions keep their own build configuration. If a build still checks
+out an old commit, inspect the hosted project's version settings and trigger a
+build of `main` after merging; changing this repository does not rewrite old tags.

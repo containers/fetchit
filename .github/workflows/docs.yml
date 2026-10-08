@@ -1,0 +1,25 @@
+name: Documentation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sphinx:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+      - name: Install documentation requirements
+        run: python -m pip install -r docs/requirements.txt
+      - name: Build documentation with warnings treated as errors
+        run: python -m sphinx -W -E -b html docs _output/docs
