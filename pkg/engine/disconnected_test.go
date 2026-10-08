@@ -71,6 +71,9 @@ func TestDisconnectedCopyCompletionAndInspection(t *testing.T) {
 			// Non-image mode must return a failed copy before attempting a HEAD cache write.
 			image := tc.copyCode == 0
 			_, err := localDevicePullWithConnection(conn, "test-copy", "/dev/test", "", image)
+			if tc.copyCode != 0 && (err == nil || !strings.Contains(err.Error(), "status 7")) {
+				t.Fatalf("copy exit failure was replaced or discarded: %v", err)
+			}
 			if (err != nil) != tc.wantError || creates != tc.wantCreates || removes != creates {
 				t.Fatalf("err=%v creates=%d removes=%d", err, creates, removes)
 			}
