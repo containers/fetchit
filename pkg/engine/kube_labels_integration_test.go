@@ -90,8 +90,13 @@ func TestKubeLabelsPodmanLifecycle(t *testing.T) {
 			if err := k.MethodEngine(context.Background(), conn, nil, path); err != nil {
 				t.Fatal(err)
 			}
-			if err := stopPods(conn, input); err != nil {
+			previous := string(input)
+			if err := k.kubePodman(context.Background(), conn, deleteFile, &previous); err != nil {
 				t.Fatal(err)
+			}
+			out, err := exec.Command("podman", "pod", "ps", "-a", "-q", "--filter", "label="+kubeOwnerLabel+"="+k.kubeLabels()[kubeOwnerLabel]).Output()
+			if err != nil || strings.TrimSpace(string(out)) != "" {
+				t.Fatal("deleted labeled pod remains")
 			}
 		})
 	}
