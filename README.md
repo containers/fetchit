@@ -179,3 +179,12 @@ watch ls -al /tmp/hello.txt
 ```
 podman stop colors1 colors2 fetchit && podman rm colors1 colors2 && podman volume rm fetchit-volume
 ```
+
+## Health and status endpoint
+
+Set `FETCHIT_STATUS_ADDR=127.0.0.1:8080` to enable optional `/healthz` and
+`/status` HTTP endpoints. For containers, add
+`-e FETCHIT_STATUS_ADDR=:8080 -p 127.0.0.1:8080:8080` to the launch command.
+The status endpoint reports scheduled invocation attempts, including Quadlet;
+liveness does not imply successful reconciliation. See the
+[full status guide](docs/status.rst) for response fields, reload behavior, and access configuration.

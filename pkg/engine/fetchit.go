@@ -335,6 +335,15 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 				fetchit.methodTargetScheds[r] = r.SchedInfo()
 			}
 		}
+		if len(tc.Quadlet) > 0 {
+			fetchit.allMethodTypes[quadletMethod] = struct{}{}
+			for _, q := range tc.Quadlet {
+				q.initialRun = true
+				q.target = internalTarget
+				fetchit.methodTargetScheds[q] = q.SchedInfo()
+			}
+		}
+
 		if len(tc.Systemd) > 0 {
 			fetchit.allMethodTypes[systemdMethod] = struct{}{}
 			for _, sd := range tc.Systemd {
@@ -348,6 +357,8 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 }
 
 func (f *Fetchit) RunTargets() {
+	status.replace(f.methodTargetScheds)
+	startStatusServer()
 	for method := range f.methodTargetScheds {
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
@@ -367,7 +378,11 @@ func (f *Fetchit) RunTargets() {
 		defer cancel()
 		mt := method.GetKind()
 		logger.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
-		s.Cron(schedInfo.schedule).Tag(mt).Do(method.Process, ctx, f.conn, skew)
+		m := method
+		s.Cron(schedInfo.schedule).Tag(mt).Do(func(ctx, conn context.Context, skew int) {
+			status.recordRun(m)
+			m.Process(ctx, conn, skew)
+		}, ctx, f.conn, skew)
 		s.StartImmediately()
 	}
 	s.StartAsync()

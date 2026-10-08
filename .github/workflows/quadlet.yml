@@ -1,0 +1,73 @@
+name: Quadlet integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [rootful, rootless]
+    env:
+      CGO_ENABLED: '0'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs quadlet_integration
+      QUADLET_HELPER_IMAGE: localhost/fetchit-quadlet-test:ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-podman
+      - name: Compile integration tests
+        run: |
+          mkdir -p _output
+          go test -mod=readonly -tags "$BUILDTAGS" -c -o _output/quadlet.test ./pkg/engine
+      - name: Prepare host systemd and helper
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$MODE" = rootful ]; then
+            sudo systemctl enable --now podman.socket
+            sudo podman build -t "$QUADLET_HELPER_IMAGE" -f tests/integration/quadlet/Dockerfile .
+            sudo podman pull docker.io/library/alpine:3.22
+          else
+            sudo loginctl enable-linger "$(id -un)"
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            mkdir -p "$HOME/.config"
+            systemctl --user enable --now podman.socket
+            podman build -t "$QUADLET_HELPER_IMAGE" -f tests/integration/quadlet/Dockerfile .
+            podman pull docker.io/library/alpine:3.22
+          fi
+      - name: Test complete bundle lifecycle
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$MODE" = rootful ]; then
+            sudo env QUADLET_HELPER_IMAGE="$QUADLET_HELPER_IMAGE" \
+              ./_output/quadlet.test -test.v -test.run 'TestQuadlet'
+          else
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            ./_output/quadlet.test -test.v -test.run 'TestQuadlet'
+          fi
+      - name: Collect host diagnostics
+        if: failure()
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$MODE" = rootful ]; then
+            sudo journalctl --no-pager -n 300
+            sudo podman ps -a
+          else
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            journalctl --user --no-pager -n 300
+            podman ps -a
+          fi

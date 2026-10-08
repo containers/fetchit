@@ -574,7 +574,19 @@ jobs:
         run: sudo podman logs fetchit
 
       - name: verify container is running
-        run: if [[ $(sudo podman ps | grep -v CON= | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
+        run: |
+          # Config reload can recreate a workload just as the first deployment
+          # finishes. Poll actual running names rather than a transient snapshot.
+          for attempt in {1..30}; do
+            names=$(sudo podman ps --format '{{.Names}}')
+            if grep -qx colors1 <<< "$names" && grep -qx colors2 <<< "$names"; then
+              echo "Containers successfully launched"
+              exit 0
+            fi
+            sleep 1
+          done
+          sudo podman logs fetchit
+          exit 1
 
       - name: Print the current running container
         run: sudo podman ps

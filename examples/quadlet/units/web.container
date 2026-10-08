@@ -1,0 +1,15 @@
+[Unit]
+Description=Fetchit Quadlet example
+
+[Container]
+Image=docker.io/library/alpine:3.22
+Network=web.network
+Volume=web.volume:/data
+EnvironmentFile=./files/environment
+Exec=/bin/sh -c 'echo "$MESSAGE" > /data/message; exec sleep infinity'
+
+[Service]
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

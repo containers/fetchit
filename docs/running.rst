@@ -30,8 +30,8 @@ Launching
 ---------
 The podman engine can be launched by running the following command or by using the systemd files from the repository. Most methods except for systemd can be ran without sudo. 
 
-Systemd
--------
+Running with systemd
+--------------------
 The two systemd files are differentiated by .root and .user.
 
 Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
