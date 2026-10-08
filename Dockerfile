@@ -19,6 +19,8 @@ WORKDIR $GOPATH/src/github.com/containers/fetchit
 
 COPY . .
 
+RUN bash scripts/install-sops.sh "$ARCH" /usr/local/bin/sops
+
 RUN GOPATH=/opt/app-root GOCACHE=/mnt/cache make $MAKE_TARGET
 
 RUN mv $GOPATH/src/github.com/containers/fetchit/_output/bin/linux_$ARCH/fetchit /usr/local/bin/
@@ -30,6 +32,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 RUN microdnf -y install rsync tar coreutils-single util-linux findutils grep sed device-mapper-libs libseccomp && command -v chroot && command -v flock && microdnf clean all
 
+COPY --from=builder /usr/local/bin/sops /usr/local/bin/
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 COPY --from=builder /usr/local/bin/entry.sh /usr/local/bin/
 

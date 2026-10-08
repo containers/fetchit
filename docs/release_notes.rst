@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+SOPS-encrypted Kube manifests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Kube methods may configure ``sops.ageKeyFile`` to decrypt authenticated YAML with
+local age identities. FetchIt prepares changed old/new manifests before teardown,
+keeps plaintext out of manifest files and logs, and uses Podman 5 body-based play.
+The images include pinned SOPS 3.13.3 binaries for amd64 and arm64. See :doc:`sops`
+for authoring, read-only key mounts, lifecycle behavior, limits, and recovery.
+
 HTTP image and archive download errors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

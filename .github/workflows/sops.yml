@@ -1,0 +1,62 @@
+name: SOPS Kube integration
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lifecycle:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [ubuntu-rootful, ubuntu-rootless, fedora-rootful]
+    env:
+      CGO_ENABLED: '0'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs sops_integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-podman
+      - name: Install tools and compile tests
+        run: |
+          sudo apt-get install -y age
+          mkdir -p _output
+          bash scripts/install-sops.sh amd64 _output/sops
+          sudo install -m 0755 _output/sops /usr/local/bin/sops
+          go test -mod=readonly -tags "$BUILDTAGS" -c -o _output/sops.test ./pkg/engine
+      - name: Ubuntu lifecycle
+        if: matrix.environment != 'fedora-rootful'
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          if [ "$ENVIRONMENT" = ubuntu-rootful ]; then
+            sudo systemctl enable --now podman.socket
+            sudo podman pull docker.io/library/alpine:3.22
+            sudo env SOPS_TEST_SOCKET=unix:///run/podman/podman.sock ./_output/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+          else
+            sudo loginctl enable-linger "$(id -un)"
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            systemctl --user enable --now podman.socket
+            podman pull docker.io/library/alpine:3.22
+            SOPS_TEST_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+          fi
+      - name: Fedora lifecycle
+        if: matrix.environment == 'fedora-rootful'
+        run: |
+          sudo podman build -t localhost/fetchit-sops-fedora -f tests/integration/sops/Dockerfile .
+          sudo podman run --rm --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD/_output:/work:ro" \
+            localhost/fetchit-sops-fedora bash -euo pipefail -c '
+              install -m 0755 /work/sops /usr/local/bin/sops
+              mkdir -p /run/podman
+              podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-service.log 2>&1 &
+              timeout 30 bash -c "until test -S /run/podman/podman.sock; do sleep 1; done"
+              podman pull docker.io/library/alpine:3.22
+              SOPS_TEST_SOCKET=unix:///run/podman/podman.sock /work/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+            '
