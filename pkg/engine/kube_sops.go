@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"path/filepath"
@@ -143,7 +144,9 @@ func validateDecryptedKube(input []byte) error {
 			Metadata   struct {
 				Name string `yaml:"name"`
 			} `yaml:"metadata"`
-			SOPS interface{} `yaml:"sops"`
+			SOPS       interface{}            `yaml:"sops"`
+			Data       map[string]interface{} `yaml:"data"`
+			StringData map[string]interface{} `yaml:"stringData"`
 		}
 		err := decoder.Decode(&doc)
 		if err == io.EOF {
@@ -156,6 +159,22 @@ func validateDecryptedKube(input []byte) error {
 		case "Pod", "Deployment", "DaemonSet", "Job", "Secret", "ConfigMap", "PersistentVolumeClaim":
 		default:
 			return errors.New("unsupported decrypted Kubernetes kind")
+		}
+		if doc.Kind == "Secret" {
+			for _, value := range doc.StringData {
+				if _, ok := value.(string); !ok {
+					return errors.New("invalid decrypted Secret stringData")
+				}
+			}
+			for _, value := range doc.Data {
+				text, ok := value.(string)
+				if !ok {
+					return errors.New("invalid decrypted Secret data")
+				}
+				if _, err := base64.StdEncoding.DecodeString(text); err != nil {
+					return errors.New("invalid decrypted Secret data")
+				}
+			}
 		}
 		identity := doc.Kind + "/" + doc.Metadata.Name
 		if seen[identity] {
@@ -171,6 +190,14 @@ func validateDecryptedKube(input []byte) error {
 		return errors.New("invalid decrypted pod specification")
 	}
 	for _, pod := range pods {
+		if len(pod.Spec.Containers) == 0 {
+			return errors.New("decrypted pod requires containers")
+		}
+		for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
+			if container.Name == "" || container.Image == "" {
+				return errors.New("decrypted pod requires container names and images")
+			}
+		}
 		if err := validatePod(pod); err != nil {
 			return errors.New("invalid decrypted pod specification")
 		}
@@ -215,12 +242,15 @@ func (k *Kube) runPreparedSOPS(ctx, conn context.Context, changes []preparedKube
 func readSOPSGitFile(file *object.File) ([]byte, error) {
 	reader, err := file.Reader()
 	if err != nil {
-		return nil, errors.New("cannot read encrypted Git blob")
+		return nil, ErrSOPSInput
 	}
 	defer reader.Close()
 	data, err := io.ReadAll(io.LimitReader(reader, sopsFileLimit+1))
-	if err != nil || len(data) > sopsFileLimit {
-		return nil, errors.New("encrypted Git blob exceeds read limits")
+	if err != nil {
+		return nil, ErrSOPSInput
+	}
+	if len(data) > sopsFileLimit {
+		return nil, ErrSOPSSize
 	}
 	return data, nil
 }

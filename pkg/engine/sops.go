@@ -193,12 +193,15 @@ func validateSOPSMetadata(input []byte) error {
 func readSOPSInput(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, errors.New("cannot read encrypted manifest")
+		return nil, fmt.Errorf("%w: cannot read encrypted manifest", ErrSOPSInput)
 	}
 	defer file.Close()
 	data, err := io.ReadAll(io.LimitReader(file, sopsFileLimit+1))
-	if err != nil || len(data) > sopsFileLimit {
-		return nil, errors.New("encrypted manifest read failed or exceeds 8 MiB")
+	if err != nil {
+		return nil, ErrSOPSInput
+	}
+	if len(data) > sopsFileLimit {
+		return nil, ErrSOPSSize
 	}
 	return data, nil
 }

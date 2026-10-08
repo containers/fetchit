@@ -329,3 +329,16 @@ func TestSOPSInvalidInputStopsBeforePodman(t *testing.T) {
 		t.Fatalf("did not stop at preparation: %v", err)
 	}
 }
+
+func TestSOPSValidationRejectsInvalidSecretAndPod(t *testing.T) {
+	for _, input := range []string{
+		"apiVersion: v1\nkind: Secret\nmetadata: {name: invalid}\ndata: {password: not-base64!}\n",
+		"apiVersion: v1\nkind: Secret\nmetadata: {name: invalid}\nstringData: {password: true}\n",
+		"apiVersion: v1\nkind: Pod\nmetadata: {name: invalid}\nspec: {containers: []}\n",
+		"apiVersion: v1\nkind: Pod\nmetadata: {name: invalid}\nspec:\n  containers: [{name: app}]\n",
+	} {
+		if err := validateDecryptedKube([]byte(input)); err == nil {
+			t.Fatal("invalid decrypted resource accepted")
+		}
+	}
+}
