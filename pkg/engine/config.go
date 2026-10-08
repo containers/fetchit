@@ -7,7 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
+	"path/filepath"
+
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 	"os"
 	"time"
 
@@ -159,16 +162,7 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod
 func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, username, password string) (bool, error) {
-	_, err := url.Parse(urlStr)
-	if err != nil {
-		return false, fmt.Errorf("unable to parse config file url %s: %v", urlStr, err)
-	}
-	client := http.Client{
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
+	client := http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return false, fmt.Errorf("unable to create request: %v", err)
@@ -185,15 +179,19 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 		return false, err
 	}
 	defer resp.Body.Close()
-	newBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, fmt.Errorf("error downloading config from %s: %v", urlStr, err)
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("config download returned HTTP %d", resp.StatusCode)
 	}
-	if newBytes == nil {
-		// if initial, this is the last resort, newBytes should be populated
-		// the only way to get here from initial
-		// is if there is no config file on disk, only a FETCHIT_CONFIG_URL
-		return false, fmt.Errorf("found empty config at %s, unable to update or populate config", urlStr)
+	const maxConfigBytes = 1 << 20
+	newBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBytes+1))
+	if err != nil {
+		return false, fmt.Errorf("error downloading config: %w", err)
+	}
+	if len(newBytes) > maxConfigBytes {
+		return false, fmt.Errorf("downloaded config exceeds 1 MiB")
+	}
+	if err := validateDownloadedConfig(newBytes); err != nil {
+		return false, fmt.Errorf("invalid downloaded config: %w", err)
 	}
 	if !initial {
 		currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
@@ -207,16 +205,61 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 		}
 
 		if existsAlready {
-			if err := os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600); err != nil {
+			if err := writeConfigAtomically(defaultConfigBackup, currentConfigBytes); err != nil {
 				return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
 			}
 			logger.Infof("Current config backup placed at %s", defaultConfigBackup)
 		}
 	}
-	if err := os.WriteFile(defaultConfigPath, newBytes, 0600); err != nil {
-		return false, fmt.Errorf("unable to write new config contents, reverting to old config: %v", err)
+	if err := writeConfigAtomically(defaultConfigPath, newBytes); err != nil {
+		return false, fmt.Errorf("unable to replace config; previous config preserved: %v", err)
 	}
 
 	logger.Infof("Config updates found from url: %s, will load new targets", urlStr)
 	return true, nil
+}
+
+// Validate one nonempty YAML mapping using the same decoder as local configs,
+// rejecting unknown fields so an error page cannot masquerade as configuration.
+func validateDownloadedConfig(data []byte) error {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	var document yaml.Node
+	if err := decoder.Decode(&document); err != nil {
+		return fmt.Errorf("invalid YAML: %w", err)
+	}
+	if len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode || len(document.Content[0].Content) == 0 {
+		return fmt.Errorf("expected a nonempty configuration mapping")
+	}
+	var extra yaml.Node
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return fmt.Errorf("expected exactly one YAML document")
+	}
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
+		return err
+	}
+	var config FetchitConfig
+	return v.UnmarshalExact(&config)
+}
+
+// Stage on the same filesystem and rename only after the complete file is synced.
+// A file bind mount cannot be renamed; fail without truncating the existing file.
+func writeConfigAtomically(destination string, data []byte) error {
+	file, err := os.CreateTemp(filepath.Dir(destination), ".fetchit-config-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), destination)
 }
