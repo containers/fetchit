@@ -126,6 +126,8 @@ func fetchWithMirrors(repo *git.Repository, target *Target, original *git.FetchO
 		options := *original
 		options.RefSpecs = []config.RefSpec{config.RefSpec("+" + branch.String() + ":" + incoming.String())}
 		options.RemoteName = "fetchit-source"
+		// Applied-state tags are local bookkeeping; mirrors must not import tags.
+		options.Tags = git.NoTags
 		remote := git.NewRemote(repo.Storer, &config.RemoteConfig{Name: "fetchit-source", URLs: []string{url}})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		err := remote.FetchContext(ctx, &options)
