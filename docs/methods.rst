@@ -359,3 +359,22 @@ to file-transfer or other helper containers.
 Changing a network setting in FetchIt's config alone does not redeploy an
 unchanged Git manifest. Commit a change to the workload file to apply the new
 attachments; existing workloads keep their current attachments until recreated.
+
+HTTP image and disconnected ZIP archive downloads
+-------------------------------------------------
+
+Image URLs and disconnected ZIP archive URLs fetched over HTTP must return HTTP
+200 after redirects. Other status codes fail the attempt before the response is
+written to a local image or archive file. Image error responses are never imported
+into Podman. The error includes the HTTP status code; check the source URL, access
+permissions, and server availability before the next scheduled attempt. Image
+failures are logged at error level. Failed archive refreshes stop reconciliation
+for that attempt rather than applying cached repository content.
+
+Incomplete transfers and invalid ZIP archives return errors. Temporary download
+files are removed on failure, allowing retries. Existing local files are retained
+on HTTP status failures. ZIP paths escaping the extraction directory and ZIP
+symlinks are rejected. Legacy entries such as ``../fetchit/file`` remain supported
+when their normalized paths resolve inside the destination ``fetchit`` directory.
+Archive extraction is not transactional: a filesystem or
+entry-read error during extraction can leave some extracted files behind.

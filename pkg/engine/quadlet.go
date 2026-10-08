@@ -88,7 +88,9 @@ func (q *Quadlet) reconcile(ctx, conn context.Context) error {
 	target := q.GetTarget()
 	if target.disconnected {
 		if target.url != "" {
-			extractZip(target.url)
+			if err := extractZip(target.url); err != nil {
+				return fmt.Errorf("refreshing disconnected archive: %w", err)
+			}
 		} else if target.device != "" {
 			localDevicePull(getDirectory(target), target.device, "", false)
 		}
