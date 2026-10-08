@@ -359,3 +359,13 @@ to file-transfer or other helper containers.
 Changing a network setting in FetchIt's config alone does not redeploy an
 unchanged Git manifest. Commit a change to the workload file to apply the new
 attachments; existing workloads keep their current attachments until recreated.
+
+HTTP image and disconnected archive downloads
+---------------------------------------------
+
+HTTP image and disconnected ZIP archive sources must return HTTP 200 after
+redirects. Other status codes fail the attempt without writing the error response
+or importing it into Podman. The error includes the HTTP status code; check the
+source URL, access permissions, and server availability before the next scheduled
+attempt. Invalid ZIP archives and incomplete archive transfers also fail the
+attempt. Existing local files are retained on HTTP status failures.

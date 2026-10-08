@@ -3,6 +3,7 @@ package engine
 import (
 	"archive/zip"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -34,9 +35,13 @@ func extractZip(url string) error {
 		}
 		logger.Info("URL not present...requeuing")
 		return nil
-	} else if data.StatusCode == http.StatusOK {
+	}
+	defer data.Body.Close()
+	if data.StatusCode != http.StatusOK {
+		return fmt.Errorf("archive download returned HTTP %d", data.StatusCode)
+	}
+	if data.StatusCode == http.StatusOK {
 		if _, err := os.Stat(dest); os.IsNotExist(err) {
-			defer data.Body.Close()
 			// Check the http response code and if not present exit
 			logger.Infof("loading disconnected archive from %s", url)
 			// Place the data into the placeholder file
@@ -52,13 +57,21 @@ func extractZip(url string) error {
 			}
 
 			// Write the body to file
-			io.Copy(outFile, data.Body)
+			_, copyErr := io.Copy(outFile, data.Body)
+			closeErr := outFile.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
 
 			// Unzip the file
 			r, err := zip.OpenReader(outFile.Name())
 			if err != nil {
-				logger.Infof("error opening zip file: %s", err)
+				return fmt.Errorf("opening downloaded archive: %w", err)
 			}
+			defer r.Close()
 			for _, f := range r.File {
 				rc, err := f.Open()
 				if err != nil {
@@ -67,13 +80,13 @@ func extractZip(url string) error {
 				defer rc.Close()
 
 				fpath := filepath.Join(directory, f.Name)
-			// Prevent path traversal attacks
-			cleanPath := filepath.Clean(fpath)
-			cleanDir := filepath.Clean(directory)
-			if !strings.HasPrefix(cleanPath, cleanDir) {
-				logger.Errorf("Illegal file path in ZIP archive (path traversal attempt): %s", f.Name)
-				return err
-			}
+				// Prevent path traversal attacks
+				cleanPath := filepath.Clean(fpath)
+				cleanDir := filepath.Clean(directory)
+				if !strings.HasPrefix(cleanPath, cleanDir) {
+					logger.Errorf("Illegal file path in ZIP archive (path traversal attempt): %s", f.Name)
+					return err
+				}
 
 				if f.FileInfo().IsDir() {
 					os.MkdirAll(fpath, f.Mode())

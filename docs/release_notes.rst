@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+HTTP image and archive download errors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Image downloads and disconnected ZIP archive downloads now report an error when
+the server returns anything other than HTTP 200, including 204, 401, 404, and
+500. Error responses are not written or imported. Response bodies are closed
+even when a download is skipped because its local file already exists. Archive
+body read failures and invalid ZIP files also return errors.
+
 Optional Git repository mirrors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

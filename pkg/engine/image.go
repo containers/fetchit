@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -75,23 +76,22 @@ func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
 		flushImages(pathToLoad)
 		return nil
 	}
+	defer data.Body.Close()
+	if data.StatusCode != http.StatusOK {
+		return fmt.Errorf("image download returned HTTP %d", data.StatusCode)
+	}
 	if data.StatusCode == http.StatusOK {
 		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
 			logger.Infof("Loading image from %s", url)
 			// Place the data into the placeholder file
-			defer data.Body.Close()
 
-			// Fail early if http error code is not 200
-			if data.StatusCode != http.StatusOK {
-				logger.Error("Failed getting data from ", i.Url)
-				return err
-			}
 			// Create the file to write the data to
 			file, err := os.Create("/opt/" + imageName)
 			if err != nil {
 				logger.Error("Failed creating file ", file)
 				return err
 			}
+			defer file.Close()
 			// Write the data to the file
 			_, err = io.Copy(file, data.Body)
 			if err != nil {
