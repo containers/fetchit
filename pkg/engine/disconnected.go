@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/containers/podman/v5/pkg/errorhandling"
 	"net/http"
 	"os"
 	"path"
@@ -120,8 +121,24 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		logger.Error("Failed to create connection to podman")
 		return "", err
 	}
+	return localDevicePullWithConnection(conn, name, device, trimDir, image)
+}
+
+func requireMissingContainer(conn context.Context, name string) error {
+	_, err := containers.Inspect(conn, name, nil)
+	if err == nil {
+		return fmt.Errorf("helper container %s already exists", name)
+	}
+	var apiError *errorhandling.ErrorModel
+	if errors.As(err, &apiError) && apiError.Code() == http.StatusNotFound {
+		return nil
+	}
+	return fmt.Errorf("inspect helper container %s: %w", name, err)
+}
+
+func localDevicePullWithConnection(conn context.Context, name, device, trimDir string, image bool) (string, error) {
 	// Ensure that the device is present
-	_, exitCode, err := localDeviceCheck(name, device, trimDir)
+	_, exitCode, err := localDeviceCheckWithConnection(conn, name, device, trimDir)
 	if err != nil {
 		logger.Error("Failed to check device")
 		return "", err
@@ -130,16 +147,16 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 		// remove the diff file
 		cache := "/opt/.cache/" + name + "/"
 		dest := cache + "/" + "HEAD"
-		err = os.Remove(dest)
+		if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
 		logger.Info("Device not present...requeuing")
 		return "", nil
 	}
 	if exitCode == 0 {
 		// List currently running containers to ensure we don't create a duplicate
-		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + "-" + trimDir)
-		inspectData, err := containers.Inspect(conn, containerName, nil)
-		if err == nil || inspectData == nil {
-			logger.Error("The container already exists..requeuing")
+		containerName := filetransferMethod + "-" + name + "-disconnected" + trimDir
+		if err := requireMissingContainer(conn, containerName); err != nil {
 			return "", err
 		}
 
@@ -150,9 +167,13 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 			return "", err
 		}
 		// Wait for the container to finish
-		waitAndRemoveContainer(conn, createResponse.ID)
+		if err := waitAndRemoveContainer(conn, createResponse.ID); err != nil {
+			return "", err
+		}
 		if !image {
-			createDiffFile(name)
+			if err := createDiffFile(name); err != nil {
+				return "", err
+			}
 		}
 		return createResponse.ID, nil
 	}
@@ -169,11 +190,13 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 		logger.Error("Failed to create connection to podman")
 		return "", 0, err
 	}
+	return localDeviceCheckWithConnection(conn, name, device, trimDir)
+}
+
+func localDeviceCheckWithConnection(conn context.Context, name, device, trimDir string) (string, int32, error) {
 	// List currently running containers to ensure we don't create a duplicate
 	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
-	inspectData, err := containers.Inspect(conn, containerName, nil)
-	if err == nil && inspectData != nil {
-		logger.Errorf("Container %s already exists, cannot proceed", containerName)
+	if err := requireMissingContainer(conn, containerName+"-device-check"); err != nil {
 		return "", 0, err
 	}
 
@@ -185,11 +208,7 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 
 	// Wait for the container to finish
 	exitCode, err := containers.Wait(conn, createResponse.ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
-	if err != nil {
-		return "", exitCode, err
-	}
-
-	if err := removeHelperContainer(conn, createResponse.ID); err != nil {
+	if err := errors.Join(err, removeHelperContainer(conn, createResponse.ID)); err != nil {
 		return "", exitCode, err
 	}
 
@@ -198,7 +217,9 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 
 func createDiffFile(name string) error {
 	cache := "/opt/.cache/" + name + "/"
-	os.MkdirAll(cache, os.ModePerm)
+	if err := os.MkdirAll(cache, os.ModePerm); err != nil {
+		return err
+	}
 	// Copy the file to the cache directory
 	src := "/opt/" + name + "/" + ".git/logs/HEAD"
 	dest := cache + "/" + "HEAD"

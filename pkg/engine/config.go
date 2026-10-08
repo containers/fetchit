@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -131,7 +130,10 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 	} else if exitCode == 0 {
 		if _, err := os.Stat(dest); os.IsNotExist(err) {
 			// make the cache directory
-			err = os.MkdirAll(cache, 0755)
+			if err := os.MkdirAll(cache, 0755); err != nil {
+				logger.Error(err)
+				return false
+			}
 			copyFile := ("/mnt/" + configPath + " " + dest)
 			s := generateDeviceSpec(filetransferMethod, "disconnected-", copyFile, device, name)
 			createResponse, err := createAndStartContainer(conn, s)
@@ -139,26 +141,50 @@ func checkForDisconUpdates(device, configPath string, existsAlready bool, initia
 				return false
 			}
 			// Wait for the container to finish
-			waitAndRemoveContainer(conn, createResponse.ID)
-			logger.Info("container created", createResponse.ID)
-			currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
-			newBytes, err := ioutil.ReadFile(dest)
-			if err != nil {
-				logger.Error("Failed to read config file")
-			} else {
-				if bytes.Equal(newBytes, currentConfigBytes) {
-					return false
-				} else {
-					// Replace the old config file at defaultConfigPath with the new one from dest and restart
-					os.WriteFile(defaultConfigBackup, currentConfigBytes, 0600)
-					os.WriteFile(defaultConfigPath, newBytes, 0600)
-					logger.Infof("Current config backup placed at %s", defaultConfigBackup)
-					return true
-				}
+			if err := waitAndRemoveContainer(conn, createResponse.ID); err != nil {
+				logger.Error(err)
+				return false
 			}
+			logger.Info("container created", createResponse.ID)
+			updated, err := updateDisconnectedConfig(dest, existsAlready, initial)
+			if err != nil {
+				logger.Error(err)
+			}
+			return updated
+
 		}
 	}
 	return false
+}
+
+// Device configurations use the same validation and atomic publication as HTTP.
+func updateDisconnectedConfig(source string, existsAlready, initial bool) (bool, error) {
+	file, err := os.Open(source)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
+	if err != nil {
+		return false, err
+	}
+	if len(data) > 1<<20 {
+		return false, errors.New("device configuration exceeds 1 MiB")
+	}
+	if err := validateDownloadedConfig(data); err != nil {
+		return false, err
+	}
+	previous, err := os.ReadFile(defaultConfigPath)
+	if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
+	if os.IsNotExist(err) {
+		existsAlready = false
+	}
+	if bytes.Equal(data, previous) {
+		return false, nil
+	}
+	return replaceConfigFiles(defaultConfigPath, defaultConfigBackup, data, previous, existsAlready && !initial, os.Rename)
 }
 
 // downloadUpdateConfig returns true if config was updated in fetchit pod

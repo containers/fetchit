@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
 )
@@ -15,8 +16,12 @@ func TestCommonGitProcessRetriesAndAdvancesOnlyOnSuccess(t *testing.T) {
 	method := &lifecycleFake{CommonMethod: common, kind: rawMethod}
 	calls := 0
 	fail := true
+	expectedFrom, expectedTo := plumbing.ZeroHash, initial
 	method.apply = func(from, to plumbing.Hash) error {
 		calls++
+		if from != expectedFrom || to != expectedTo {
+			t.Fatalf("wrong transition: %s -> %s, want %s -> %s", from, to, expectedFrom, expectedTo)
+		}
 		if fail {
 			return errors.New("apply failed")
 		}
@@ -45,9 +50,26 @@ func TestCommonGitProcessRetriesAndAdvancesOnlyOnSuccess(t *testing.T) {
 		t.Fatal("saved revision was not replayed")
 	}
 	next := mirrorCommit(t, source, "next")
+	expectedFrom, expectedTo = initial, next
 	method.processGit(ctx, ctx, method, 0, nil)
 	current, err = getCurrent(target, rawMethod, method.Name)
 	if err != nil || current != next || calls != 4 {
 		t.Fatalf("new revision not applied: %s %v calls=%d", current, err, calls)
+	}
+}
+
+func TestCommonGitCancelledSkew(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	method := &lifecycleFake{CommonMethod: CommonMethod{initialRun: true}, kind: rawMethod}
+	done := make(chan struct{})
+	go func() { method.processGit(ctx, ctx, method, 60000, nil); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled skew did not return")
+	}
+	if !method.initialRun {
+		t.Fatal("cancelled startup advanced state")
 	}
 }

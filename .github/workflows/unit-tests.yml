@@ -36,7 +36,7 @@ jobs:
           AGE_TEST_BINARY: /usr/bin/age-keygen
         run: go test -mod=readonly -tags "$BUILDTAGS" ./...
       - name: Engine concurrency race checks
-        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror|TestCommonGit|TestHelperContainer|TestRetirement|TestConfigReloadCan|TestRollback'
+        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror|TestCommonGit|TestHelperContainer|TestRetirement|TestConfigReloadCan|TestRollback|TestDisconnected|TestFileTransfer'
 
   fedora:
     runs-on: ubuntu-26.04

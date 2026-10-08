@@ -18,32 +18,43 @@ func TestHelperContainerCompletion(t *testing.T) {
 		malformed  bool
 		exists     bool
 		checkFails bool
+		waitFails  bool
 		wantError  bool
 	}{
 		{name: "successful"},
 		{name: "command failure", code: 7, wantError: true},
+		{name: "wait failure", waitFails: true, wantError: true},
 		{name: "verified malformed removal", malformed: true},
 		{name: "unverified malformed removal", malformed: true, exists: true, wantError: true},
 		{name: "verification failure", malformed: true, checkFails: true, wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			removed := false
+			present := true
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "/_ping"):
 					w.Header().Set("Libpod-API-Version", "5.0.0")
-				case strings.HasSuffix(r.URL.Path, "/wait"):
-					fmt.Fprint(w, tc.code)
-				case r.Method == http.MethodDelete:
+				case strings.HasSuffix(r.URL.Path, "/containers/helper/wait"):
+					if tc.waitFails {
+						w.WriteHeader(500)
+						fmt.Fprint(w, `{ "message":"wait failed", "response":500 }`)
+					} else {
+						fmt.Fprint(w, tc.code)
+					}
+				case r.Method == http.MethodDelete && strings.HasSuffix(r.URL.Path, "/containers/helper"):
 					removed = true
+					if !tc.exists {
+						present = false
+					}
 					if !tc.malformed {
 						fmt.Fprint(w, "[]")
 					}
-				case strings.HasSuffix(r.URL.Path, "/json"):
+				case strings.HasSuffix(r.URL.Path, "/containers/helper/json"):
 					if tc.checkFails {
 						w.WriteHeader(http.StatusInternalServerError)
 						fmt.Fprint(w, `{"message":"failed","response":500}`)
-					} else if !tc.exists {
+					} else if !present {
 						w.WriteHeader(http.StatusNotFound)
 						fmt.Fprint(w, `{"message":"missing","response":404}`)
 					} else {

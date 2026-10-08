@@ -83,7 +83,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 				return fmt.Errorf("refreshing disconnected archive: %w", err)
 			}
 		} else if len(target.device) > 0 {
-			localDevicePull(directory, target.device, "", false)
+			if _, err := localDevicePull(directory, target.device, "", false); err != nil {
+				return fmt.Errorf("refreshing disconnected device: %w", err)
+			}
 		}
 	}
 	latest, err := getLatest(target)
@@ -155,13 +157,25 @@ func readChangeInput(change *object.Change, path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// processGit serializes methods sharing a target and retries startup replay until
-// both the saved revision and latest revision have applied successfully.
+// processGit serializes methods sharing a target. Later scheduled invocations
+// retry failed startup replay; initialRun clears only after both phases succeed.
 func (m *CommonMethod) processGit(ctx, conn context.Context, method Method, skew int, tags *[]string) {
-	time.Sleep(time.Duration(skew) * time.Millisecond)
+	timer := time.NewTimer(time.Duration(skew) * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+	if ctx.Err() != nil {
+		return
+	}
 	target := m.GetTarget()
 	target.mu.Lock()
 	defer target.mu.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
 	if m.initialRun {
 		if err := getRepo(target); err != nil {
 			logger.Errorf("Failed to clone repository %s: %v", target.url, err)

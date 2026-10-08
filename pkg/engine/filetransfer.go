@@ -59,8 +59,8 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, skew int) {
 func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
 	var prev *string = nil
 	if change != nil {
-		if change.To.Name != "" {
-			prev = &change.To.Name
+		if change.From.Name != "" {
+			prev = &change.From.Name
 		}
 	}
 	dest := ft.DestinationDirectory
@@ -95,9 +95,8 @@ func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest
 	file := filepath.Base(path)
 
 	source := filepath.Join("/opt", path)
-	copyFile := (source + " " + dest)
 
-	s := generateSpec(filetransferMethod, file, copyFile, dest, ft.Name)
+	s := generateSpec(filetransferMethod, file, source, dest, ft.Name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
 		return err

@@ -558,7 +558,8 @@ func getDeviceDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		localDevicePull(directory, target.device, "", false)
+		_, err := localDevicePull(directory, target.device, "", false)
+		return err
 	}
 	return nil
 }

@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containers/podman/v5/libpod/define"
-	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -119,13 +117,11 @@ func (i *Image) loadDevicePodman(ctx, conn context.Context) error {
 	} else if exitCode == 0 {
 		// If file does not exist pull from the device
 		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
-			id, err := localDevicePull(baseDir, i.Device, "-"+trimDir, true)
+			_, err := localDevicePull(baseDir, i.Device, "-"+trimDir, true)
 			if err != nil {
-				logger.Info("Issue pulling image from device ", err)
+				return err
 			}
 
-			// Wait for the image to be copied into the fetchit container
-			containers.Wait(conn, id, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
 		}
 		err = i.podmanImageLoad(ctx, conn, pathToLoad)
 		if err != nil {

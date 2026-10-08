@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,14 +42,7 @@ func generateSpec(method, file, copyFile, dest string, name string) *specgen.Spe
 		NSMode: "host",
 		Value:  "",
 	}
-	// Validate parameters to prevent command injection
-	if err := validateShellParam(copyFile, "copyFile"); err != nil {
-		logger.Errorf("Invalid copyFile parameter: %s", copyFile)
-		// Return spec with safe command that will fail
-		s.Command = []string{"sh", "-c", "exit 1"}
-		return s
-	}
-	s.Command = []string{"sh", "-c", "rsync -avz" + " " + copyFile}
+	s.Command = []string{"rsync", "-avz", "--", copyFile, dest}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	return s
@@ -109,13 +103,7 @@ func generateSpecRemove(method, file, pathToRemove, dest, name string) *specgen.
 		NSMode: "host",
 		Value:  "",
 	}
-	// Validate parameters to prevent command injection
-	if err := validateShellParam(pathToRemove, "pathToRemove"); err != nil {
-		logger.Errorf("Invalid pathToRemove parameter: %s", pathToRemove)
-		s.Command = []string{"sh", "-c", "exit 1"}
-		return s
-	}
-	s.Command = []string{"sh", "-c", "rm " + pathToRemove}
+	s.Command = []string{"rm", "-f", "--", pathToRemove}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"ro"}}}
 	return s
@@ -136,29 +124,32 @@ func createAndStartContainer(conn context.Context, s *specgen.SpecGenerator) (en
 
 func waitAndRemoveContainer(conn context.Context, ID string) error {
 	code, err := containers.Wait(conn, ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
-	if err != nil {
-		return err
-	}
 	var exitErr error
-	if code != 0 {
+	if err == nil && code != 0 {
 		exitErr = fmt.Errorf("helper container %s exited with status %d", ID, code)
 	}
-	return errors.Join(exitErr, removeHelperContainer(conn, ID))
+	return errors.Join(err, exitErr, removeHelperContainer(conn, ID))
 }
 
 // Some older Podman services return a malformed successful removal response.
 // Suppress that error only when a second API call proves the container is gone.
 func removeHelperContainer(conn context.Context, ID string) error {
 	err := deleteContainer(conn, ID)
-	if err != nil && strings.Contains(err.Error(), "unexpected end of JSON input") {
-		_, checkErr := containers.Inspect(conn, ID, nil)
-		var apiError *errorhandling.ErrorModel
-		if errors.As(checkErr, &apiError) && apiError.Code() == http.StatusNotFound {
-			return nil
-		}
-		return errors.Join(err, checkErr)
+	var syntaxError *json.SyntaxError
+	if !errors.As(err, &syntaxError) {
+		return err
 	}
-	return err
+	return verifyMalformedRemoval(conn, ID, err)
+}
+
+// Accept a malformed removal response only after typed HTTP 404 confirms absence.
+func verifyMalformedRemoval(conn context.Context, ID string, removalErr error) error {
+	_, checkErr := containers.Inspect(conn, ID, nil)
+	var apiError *errorhandling.ErrorModel
+	if errors.As(checkErr, &apiError) && apiError.Code() == http.StatusNotFound {
+		return nil
+	}
+	return errors.Join(removalErr, checkErr)
 }
 
 func detectOrFetchImage(conn context.Context, imageName string, force bool) error {

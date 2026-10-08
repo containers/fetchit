@@ -13,7 +13,11 @@ removed. Error wrappers retain their causes, and helper-container completion
 reports failed commands and unverified removal failures. Bad-commit tracking no
 longer mistakes an unrecorded empty state for a failed revision. Legacy systemd
 helpers pass ``ROOT`` only in their container environment. Configuration fields
-and defaults are unchanged.
+and defaults are unchanged. FileTransfer now skips teardown on first creation,
+removes the old filename on rename/deletion, and passes paths as command arguments.
+Disconnected-device copies propagate failures; device configurations receive the
+same size limits, validation, and atomic replacement as HTTP configuration updates.
+Shared Git startup skew observes cancellation.
 
 The `release cleanup review <https://github.com/containers/fetchit/blob/main/docs/design/release-cleanup-review.md>`_
 records the changes, regression coverage, and remaining legacy-method findings.
