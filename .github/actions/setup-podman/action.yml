@@ -1,0 +1,13 @@
+name: Set up Podman 5
+description: Install Ubuntu's Podman and crun packages and verify the supported versions.
+runs:
+  using: composite
+  steps:
+    - name: Install Podman and crun
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman crun
+    - name: Verify Podman and crun compatibility
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/verify.sh"

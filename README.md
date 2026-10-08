@@ -8,12 +8,25 @@ A quickstart example is available at https://github.com/containers/fetchit/blob/
 
 ## Requirements
 
-- **Podman v5.0+** (tested with v5.7.0)
-- **Go 1.21+** (for building from source)
-- **Linux Kernel 5.2+** (required by Podman v5)
+- **Podman v5.7+ and below v6** (Go libraries use v5.8.8; Fedora 44 packages provide v5.8.7)
+- **Go 1.27.1+** (for building from source)
+- **Linux Kernel 5.2+** (required by Podman)
 
 ## Developing
 To develop and test changes of FetchIt, the FetchIt image can be built locally and then run on the development system.
+
+Run the unit tests on Linux with Go 1.27.1 and the GPGME, device-mapper,
+and libseccomp development packages installed:
+
+```sh
+go test -mod=readonly -tags 'containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs' ./...
+```
+
+CI runs these tests on Ubuntu 26.04 and Fedora 44. Integration tests use
+Ubuntu 26.04's packaged Podman 5 and crun, installed by a shared CI action
+without building Podman from source. The action requires Podman 5.7+ and below
+6, and crun 1.18+ (the runtime baseline previously used by this project).
+Ubuntu 26.04 is a [generally available GitHub runner](https://github.com/actions/runner-images/issues/14747).
 
 ```
 go mod tidy

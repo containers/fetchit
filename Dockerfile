@@ -1,5 +1,8 @@
 # BUILD STAGE
-FROM registry.access.redhat.com/ubi8/go-toolset as builder
+FROM golang:1.27.1 AS go-toolchain
+FROM registry.access.redhat.com/ubi9/ubi AS builder
+
+COPY --from=go-toolchain /usr/local/go /usr/local/go
 
 ARG ARCH=amd64
 ARG MAKE_TARGET=cross-build-linux-$ARCH
@@ -8,9 +11,9 @@ USER root
 
 LABEL name=fetchit-build
 
-ENV GOPATH=/opt/app-root GOCACHE=/mnt/cache GO111MODULE=on
+ENV GOPATH=/opt/app-root GOCACHE=/mnt/cache GO111MODULE=on PATH=/usr/local/go/bin:$PATH
 
-RUN dnf -y install gpgme-devel device-mapper-devel
+RUN dnf -y install gcc make git pkgconf-pkg-config gpgme-devel device-mapper-devel libseccomp-devel && dnf clean all
 
 WORKDIR $GOPATH/src/github.com/containers/fetchit
 
@@ -25,7 +28,7 @@ RUN mv ./scripts/entry.sh /usr/local/bin/
 # RUN STAGE
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf -y install rsync device-mapper-libs && microdnf clean all
+RUN microdnf -y install rsync device-mapper-libs libseccomp && microdnf clean all
 
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 COPY --from=builder /usr/local/bin/entry.sh /usr/local/bin/
