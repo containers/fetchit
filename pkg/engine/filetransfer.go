@@ -63,6 +63,22 @@ func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.C
 			prev = &change.From.Name
 		}
 	}
+	if ft.CleanupOnRemoval {
+		receipt, _, err := hostMethodReceipt(ft)
+		if err != nil {
+			return err
+		}
+		plan := hostArtifactPlan{Receipt: receipt, Action: "apply"}
+		if prev != nil {
+			plan.Previous = filepath.Base(*prev)
+		}
+		if path == deleteFile {
+			plan.Action = "delete"
+		} else {
+			plan.Source = filepath.Join("/opt", path)
+		}
+		return deployHostArtifact(conn, plan)
+	}
 	dest := ft.DestinationDirectory
 	return ft.fileTransferPodman(ctx, conn, path, dest, prev)
 }

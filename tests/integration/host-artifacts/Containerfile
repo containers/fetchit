@@ -1,0 +1,3 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+RUN microdnf install -y coreutils-single rsync && command -v chroot && microdnf clean all
+COPY _output/host-artifact-fetchit /usr/local/bin/fetchit

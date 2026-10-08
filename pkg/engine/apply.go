@@ -240,6 +240,7 @@ func updateCurrent(ctx context.Context, target *Target, newCurrent plumbing.Hash
 }
 
 func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string) (*object.Tree, error) {
+	targetPath = normalizedTargetPath(targetPath)
 	if hash.IsZero() {
 		return &object.Tree{}, nil
 	}

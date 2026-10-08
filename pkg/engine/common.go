@@ -44,8 +44,18 @@ func (m *CommonMethod) SchedInfo() SchedInfo {
 	}
 }
 
+// Normalize only trailing separators; do not turn an absolute root into an empty target.
+func normalizedTargetPath(target string) string {
+	normalized := strings.TrimRight(target, "/")
+	if normalized == "" {
+		return target
+	}
+	return normalized
+}
+func (m *CommonMethod) normalizeTargetPath() { m.TargetPath = normalizedTargetPath(m.TargetPath) }
+
 func (m *CommonMethod) GetTargetPath() string {
-	return m.TargetPath
+	return normalizedTargetPath(m.TargetPath)
 }
 
 func (m *CommonMethod) GetTarget() *Target {
@@ -194,7 +204,7 @@ func (m *CommonMethod) processGit(ctx, conn context.Context, method Method, skew
 }
 
 func (m *CommonMethod) applyGitChanges(ctx, conn context.Context, method Method, current, desired plumbing.Hash, tags *[]string) error {
-	changes, err := applyChanges(ctx, m.GetTarget(), m.TargetPath, m.Glob, current, desired, tags)
+	changes, err := applyChanges(ctx, m.GetTarget(), m.GetTargetPath(), m.Glob, current, desired, tags)
 	if err != nil {
 		return err
 	}

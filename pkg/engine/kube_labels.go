@@ -25,7 +25,7 @@ func (k *CommonMethod) workloadLabels() map[string]string {
 	if k.target != nil {
 		url, branch = k.target.url, k.target.branch
 	}
-	return map[string]string{kubeManagedByLabel: "fetchit", kubeOwnerLabel: kubeOwner(url, branch, k.Name, k.TargetPath)}
+	return map[string]string{kubeManagedByLabel: "fetchit", kubeOwnerLabel: kubeOwner(url, branch, k.Name, k.GetTargetPath())}
 }
 
 func kubeOwner(url, branch, name, targetPath string) string {

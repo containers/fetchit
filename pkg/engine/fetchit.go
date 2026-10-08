@@ -392,6 +392,11 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 	}
+	for method := range fetchit.methodTargetScheds {
+		if normalizer, ok := method.(interface{ normalizeTargetPath() }); ok {
+			normalizer.normalizeTargetPath()
+		}
+	}
 	return fetchit
 }
 
