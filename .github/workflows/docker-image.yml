@@ -1422,7 +1422,7 @@ jobs:
           path: ci
           ref: ci
 
-      - uses: ./.github/actions/setup-podman
+      - uses: ./main/.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
@@ -1559,14 +1559,14 @@ jobs:
 
   disconnected-validate:
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
+    needs: [ build, build-ansible-amd, pull-and-archive ]
     steps:
       - name: checkout with token
         uses: actions/checkout@v3
         with:
           path: ci
 
-      - uses: ./.github/actions/setup-podman
+      - uses: ./ci/.github/actions/setup-podman
 
       - name: Enable the podman socket
         run: sudo systemctl enable --now podman.socket
