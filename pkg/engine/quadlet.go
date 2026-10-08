@@ -131,7 +131,10 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 	if err != nil {
 		return b, err
 	}
-	tree, err := root.Tree(q.TargetPath)
+	tree := root
+	if q.TargetPath != "." {
+		tree, err = root.Tree(q.TargetPath)
+	}
 	if errors.Is(err, object.ErrDirectoryNotFound) {
 		return b, nil
 	}
@@ -238,7 +241,7 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 	if err != nil {
 		return err
 	}
-	if len(next.files) > 0 && len(next.services) == 0 && len(old.services) == 0 {
+	if len(next.services) == 0 && (current.IsZero() || (len(next.files) > 0 && len(old.services) == 0)) {
 		return fmt.Errorf("Quadlet bundle contains no supported source units")
 	}
 	if reflect.DeepEqual(old.files, next.files) && reflect.DeepEqual(old.modes, next.modes) {

@@ -11,8 +11,8 @@ systemd manager. The helper uses the host's generator and binaries, so it valida
 against the installed Podman rather than Fetchit's Go library version. Podman 6
 is not supported by this method.
 
-Configuration
--------------
+Quadlet configuration
+---------------------
 
 .. code-block:: yaml
 
@@ -96,7 +96,7 @@ Quadlet support: it must provide ``sh``, ``chroot``, ``flock``, ``cp``, ``find``
 so no changes to the legacy Systemd helper image are required.
 
 Updates, removal, and recovery
------------------------------
+------------------------------
 
 Fetchit stops removed services before deleting their source files. Renaming a
 file or changing ``ServiceName=`` retires the old service. It refuses to overwrite
