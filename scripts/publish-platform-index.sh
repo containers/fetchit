@@ -44,13 +44,24 @@ arm_digest=$(cat "$scratch/arm.digest")
 for digest in "$amd_digest" "$arm_digest"; do
   [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid pushed image digest' >&2; exit 1; }
 done
+# Fetch by immutable digest from the destination repository before publishing.
+for digest in "$amd_digest" "$arm_digest"; do
+  if ! podman manifest inspect "${options[@]}" "$repository@$digest" > /dev/null; then
+    echo "Missing child manifest in destination repository: $repository@$digest" >&2
+    exit 1
+  fi
+done
 podman manifest create "$manifest"
 podman manifest add "${options[@]}" "$manifest" "docker://$repository@$amd_digest"
 podman manifest add "${options[@]}" "$manifest" "docker://$repository@$arm_digest"
 # Child manifests and blobs already exist in this repository. Copying them again
 # can recompress layers and replace the exact digests pinned above. Publish only
-# the index; keep the registry verification below strict.
-podman manifest push --all=false "${options[@]}" --format=docker "$manifest" "docker://$destination"
+# the index with --all=false; Podman 5 defaults --all to true. Keep both pinned
+# child digests unchanged. Child publication and index publication are separate.
+if ! podman manifest push --all=false "${options[@]}" --format=docker "$manifest" "docker://$destination"; then
+  echo "Failed to publish platform index: $destination" >&2
+  exit 1
+fi
 podman manifest inspect "${options[@]}" "$destination" > "$scratch/index.json"
 python3 - "$scratch/index.json" "$amd_digest" "$arm_digest" <<'PYTHON'
 import json
