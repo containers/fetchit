@@ -124,7 +124,8 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", hashStr, target.branch)
 	}
 
-	if target.gitsignVerify {
+	// Mirror candidates are verified inside the bounded attempt before branch updates.
+	if target.gitsignVerify && (!hasRepositoryMirrors(target) || target.disconnected) {
 		commit, err := repo.CommitObject(branch.Hash())
 		if err != nil {
 			return plumbing.Hash{}, utils.WrapErr(err, "Error getting verified commit at hash %s from repository %s", hashStr, directory)
