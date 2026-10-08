@@ -63,11 +63,13 @@ func extractZip(url string) error {
 
 func extractArchive(files []*zip.File, directory string) error {
 	// Validate every entry before writing any files, including sibling-prefix escapes.
-	for _, f := range files {
+	relativePaths := make([]string, len(files))
+	for index, f := range files {
 		relative, err := filepath.Rel(directory, filepath.Join(directory, f.Name))
 		if err != nil || filepath.IsAbs(f.Name) || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
 			return fmt.Errorf("illegal file path in ZIP archive: %q", f.Name)
 		}
+		relativePaths[index] = relative
 		if f.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("unsupported ZIP symlink: %q", f.Name)
 		}
@@ -80,22 +82,23 @@ func extractArchive(files []*zip.File, directory string) error {
 		return err
 	}
 	defer root.Close()
-	for _, f := range files {
+	for index, f := range files {
+		name := relativePaths[index]
 		// os.Root also prevents writes through existing symlinks that escape the root.
 		if f.FileInfo().IsDir() {
-			if err := root.MkdirAll(f.Name, f.Mode().Perm()); err != nil {
+			if err := root.MkdirAll(name, f.Mode().Perm()); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := root.MkdirAll(filepath.Dir(f.Name), 0755); err != nil {
+		if err := root.MkdirAll(filepath.Dir(name), 0755); err != nil {
 			return err
 		}
 		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
-		out, err := root.OpenFile(f.Name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
+		out, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
 		if err != nil {
 			rc.Close()
 			return err

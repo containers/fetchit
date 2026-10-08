@@ -374,5 +374,7 @@ for that attempt rather than applying cached repository content.
 Incomplete transfers and invalid ZIP archives return errors. Temporary download
 files are removed on failure, allowing retries. Existing local files are retained
 on HTTP status failures. ZIP paths escaping the extraction directory and ZIP
-symlinks are rejected. Archive extraction is not transactional: a filesystem or
+symlinks are rejected. Legacy entries such as ``../fetchit/file`` remain supported
+when their normalized paths resolve inside the destination ``fetchit`` directory.
+Archive extraction is not transactional: a filesystem or
 entry-read error during extraction can leave some extracted files behind.

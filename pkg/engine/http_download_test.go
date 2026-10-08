@@ -179,6 +179,9 @@ func zipEntries(t *testing.T, names ...string) []*zip.File {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if strings.HasSuffix(name, "/") {
+			continue
+		}
 		if _, err := entry.Write([]byte("payload")); err != nil {
 			t.Fatal(err)
 		}
@@ -294,5 +297,20 @@ func TestImageHTTPFailureIsLoggedAtErrorLevel(t *testing.T) {
 	}
 	if !body.closed {
 		t.Fatal("body not closed")
+	}
+}
+
+func TestArchiveExtractsLegacyParentPrefixedEntries(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "archive")
+	// The disconnected CI fixture runs zip from inside the repository, giving
+	// entries a ../archive/ prefix that resolves back inside the destination.
+	if err := extractArchive(zipEntries(t, "../archive/", "../archive/.git/HEAD", "../archive/nested/file"), directory); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{".git/HEAD", "nested/file"} {
+		data, err := os.ReadFile(filepath.Join(directory, name))
+		if err != nil || string(data) != "payload" {
+			t.Fatalf("bad extracted file: %q %v", data, err)
+		}
 	}
 }
