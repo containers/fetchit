@@ -22,7 +22,11 @@ Addressed findings:
 - The new workflow pins external Actions and the Alpine test image. Fedora uses
   a disposable GitHub-hosted runner with a privileged nested Podman container;
   the host cgroup namespace and explicit host cgroup mount are not exposed.
-  This verifies Fedora userspace, not native Fedora SELinux policy enforcement.
+  Fedora uses vfs storage and a pinned pause image to avoid nested overlay mount
+  constraints. The rootless Ubuntu fixture uses host networking to avoid the
+  runner AppArmor policy denying rootless network-helper termination; production
+  networking is not changed. This verifies Fedora userspace, not native Fedora
+  SELinux policy enforcement.
 
 Findings retained as deliberate choices:
 - Podman 5's supported kind list excludes Service and StatefulSet. The supported
