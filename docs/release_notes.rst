@@ -26,6 +26,16 @@ build and test the checked-in samples, HTTP responses, non-root user, and archiv
 loading, then publish a multi-platform sample image after successful main-branch
 tests. See :doc:`samples` for source, image, port, and volume instructions.
 
+Native ARM image builds and publishing
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FetchIt, Ansible, and legacy Systemd helper images now build on native Ubuntu
+arm64 runners without QEMU. PR checks build all three ARM images and verify
+combined amd64/arm64 indexes from the actual run's downloaded artifacts. Registry
+publishing remains limited to main/release pushes. This fixes Ubuntu 26.04's
+removal of the old ``qemu-user-static`` package and prevents stale registry images
+from entering a new release's platform index.
+
 Release cleanup
 ~~~~~~~~~~~~~~~
 
