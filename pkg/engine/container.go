@@ -2,6 +2,9 @@ package engine
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
@@ -9,6 +12,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	"github.com/containers/podman/v5/pkg/domain/entities"
+	"github.com/containers/podman/v5/pkg/errorhandling"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -131,30 +135,30 @@ func createAndStartContainer(conn context.Context, s *specgen.SpecGenerator) (en
 }
 
 func waitAndRemoveContainer(conn context.Context, ID string) error {
-	_, err := containers.Wait(conn, ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
+	code, err := containers.Wait(conn, ID, new(containers.WaitOptions).WithCondition([]define.ContainerStatus{stopped}))
 	if err != nil {
 		return err
 	}
+	var exitErr error
+	if code != 0 {
+		exitErr = fmt.Errorf("helper container %s exited with status %d", ID, code)
+	}
+	return errors.Join(exitErr, removeHelperContainer(conn, ID))
+}
 
-	_, err = containers.Remove(conn, ID, new(containers.RemoveOptions).WithForce(true))
-	if err != nil {
-		// Known Podman v4 bug - log it before suppressing
-		// TODO: Verify if this bug still exists in Podman v5.7.0
-		if strings.Contains(err.Error(), "unexpected end of JSON input") {
-			logger.Errorf("Container removal for %s returned JSON parse error (known Podman v4 bug), container may still be removed. Error: %v", ID, err)
-			// Verify container was actually removed
-			exists, checkErr := containers.Exists(conn, ID, nil)
-			if checkErr == nil && !exists {
-				logger.Infof("Verified container %s was successfully removed despite JSON error", ID)
-				return nil
-			}
-			logger.Warnf("Could not verify removal of container %s", ID)
+// Some older Podman services return a malformed successful removal response.
+// Suppress that error only when a second API call proves the container is gone.
+func removeHelperContainer(conn context.Context, ID string) error {
+	err := deleteContainer(conn, ID)
+	if err != nil && strings.Contains(err.Error(), "unexpected end of JSON input") {
+		_, checkErr := containers.Inspect(conn, ID, nil)
+		var apiError *errorhandling.ErrorModel
+		if errors.As(checkErr, &apiError) && apiError.Code() == http.StatusNotFound {
 			return nil
 		}
-		return err
+		return errors.Join(err, checkErr)
 	}
-
-	return nil
+	return err
 }
 
 func detectOrFetchImage(conn context.Context, imageName string, force bool) error {

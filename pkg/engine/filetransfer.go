@@ -68,14 +68,7 @@ func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.C
 }
 
 func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ft.GetTarget(), ft.GetTargetPath(), ft.Glob, currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChanges(ctx, conn, ft, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return ft.applyGitChanges(ctx, conn, ft, currentState, desiredState, tags)
 }
 
 func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest string, prev *string) error {

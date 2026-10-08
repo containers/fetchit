@@ -47,7 +47,8 @@ func applyWithRecovery(ctx, conn context.Context, m Method, current, desired plu
 	}
 	key := m.GetKind() + "/" + m.GetName() + "/" + current.String()
 	target.badCommitMu.Lock()
-	skip := target.trackBadCommits && target.badCommits[key] == desired
+	failed, recorded := target.badCommits[key]
+	skip := target.trackBadCommits && recorded && failed == desired
 	target.badCommitMu.Unlock()
 	if skip {
 		return ErrBadCommitSkipped

@@ -50,7 +50,6 @@ type TargetConfig struct {
 	image        *Image
 	prune        *Prune
 	configReload *ConfigReload
-	mu           sync.Mutex
 }
 
 type Target struct {

@@ -4,6 +4,20 @@ Release notes
 Unreleased
 ----------
 
+Release cleanup
+~~~~~~~~~~~~~~~
+
+Git reconciliation and change dispatch now share common engine routines. Unused
+scheduler state and unnecessary container filesystem-size inspections have been
+removed. Error wrappers retain their causes, and helper-container completion
+reports failed commands and unverified removal failures. Bad-commit tracking no
+longer mistakes an unrecorded empty state for a failed revision. Legacy systemd
+helpers pass ``ROOT`` only in their container environment. Configuration fields
+and defaults are unchanged.
+
+The `release cleanup review <https://github.com/containers/fetchit/blob/main/docs/design/release-cleanup-review.md>`_
+records the changes, regression coverage, and remaining legacy-method findings.
+
 Method removal cleanup and apply rollback
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

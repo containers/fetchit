@@ -137,7 +137,7 @@ func localDevicePull(name, device, trimDir string, image bool) (id string, err e
 	if exitCode == 0 {
 		// List currently running containers to ensure we don't create a duplicate
 		containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + "-" + trimDir)
-		inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
+		inspectData, err := containers.Inspect(conn, containerName, nil)
 		if err == nil || inspectData == nil {
 			logger.Error("The container already exists..requeuing")
 			return "", err
@@ -171,7 +171,7 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 	}
 	// List currently running containers to ensure we don't create a duplicate
 	containerName := string(filetransferMethod + "-" + name + "-" + "disconnected" + trimDir)
-	inspectData, err := containers.Inspect(conn, containerName, new(containers.InspectOptions).WithSize(true))
+	inspectData, err := containers.Inspect(conn, containerName, nil)
 	if err == nil && inspectData != nil {
 		logger.Errorf("Container %s already exists, cannot proceed", containerName)
 		return "", 0, err
@@ -189,21 +189,7 @@ func localDeviceCheck(name, device, trimDir string) (id string, exitcode int32, 
 		return "", exitCode, err
 	}
 
-	_, err = containers.Remove(conn, createResponse.ID, new(containers.RemoveOptions).WithForce(true))
-	if err != nil {
-		// Known Podman v4 bug - log it before suppressing
-		// TODO: Verify if this bug still exists in Podman v5.7.0
-		if strings.Contains(err.Error(), "unexpected end of JSON input") {
-			logger.Errorf("Container removal for %s returned JSON parse error (known Podman v4 bug), container may still be removed. Error: %v", createResponse.ID, err)
-			// Verify container was actually removed
-			exists, checkErr := containers.Exists(conn, createResponse.ID, nil)
-			if checkErr == nil && !exists {
-				logger.Infof("Verified container %s was successfully removed despite JSON error", createResponse.ID)
-				return "", exitCode, nil
-			}
-			logger.Warnf("Could not verify removal of container %s", createResponse.ID)
-			return "", exitCode, nil
-		}
+	if err := removeHelperContainer(conn, createResponse.ID); err != nil {
 		return "", exitCode, err
 	}
 

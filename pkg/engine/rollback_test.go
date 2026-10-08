@@ -93,3 +93,12 @@ func TestRollbackPreflightAndDisabledPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestRollbackUnrecordedEmptyStateIsApplied(t *testing.T) {
+	calls := 0
+	method := &lifecycleFake{CommonMethod: CommonMethod{Name: "empty", target: &Target{rollback: true, trackBadCommits: true}}, kind: rawMethod}
+	method.apply = func(from, to plumbing.Hash) error { calls++; return nil }
+	if err := applyWithRecovery(context.Background(), context.Background(), method, plumbing.ZeroHash, plumbing.ZeroHash, nil); err != nil || calls != 1 {
+		t.Fatalf("unrecorded empty state skipped: calls=%d err=%v", calls, err)
+	}
+}

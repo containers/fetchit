@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -152,4 +153,36 @@ func readChangeInput(change *object.Change, path string) ([]byte, error) {
 		}
 	}
 	return os.ReadFile(path)
+}
+
+// processGit serializes methods sharing a target and retries startup replay until
+// both the saved revision and latest revision have applied successfully.
+func (m *CommonMethod) processGit(ctx, conn context.Context, method Method, skew int, tags *[]string) {
+	time.Sleep(time.Duration(skew) * time.Millisecond)
+	target := m.GetTarget()
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if m.initialRun {
+		if err := getRepo(target); err != nil {
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
+			return
+		}
+		if err := zeroToCurrent(ctx, conn, method, target, tags); err != nil {
+			logger.Errorf("Error moving to current: %v", err)
+			return
+		}
+	}
+	if err := currentToLatest(ctx, conn, method, target, tags); err != nil {
+		logger.Errorf("Error moving current to latest: %v", err)
+		return
+	}
+	m.initialRun = false
+}
+
+func (m *CommonMethod) applyGitChanges(ctx, conn context.Context, method Method, current, desired plumbing.Hash, tags *[]string) error {
+	changes, err := applyChanges(ctx, m.GetTarget(), m.TargetPath, m.Glob, current, desired, tags)
+	if err != nil {
+		return err
+	}
+	return runChanges(ctx, conn, method, changes)
 }

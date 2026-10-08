@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v5/pkg/bindings"
@@ -38,34 +37,8 @@ func (k *Kube) GetKind() string {
 }
 
 func (k *Kube) Process(ctx, conn context.Context, skew int) {
-	target := k.GetTarget()
-	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target.mu.Lock()
-	defer target.mu.Unlock()
-
-	initial := k.initialRun
-	tag := []string{"yaml", "yml"}
-	if initial {
-		err := getRepo(target)
-		if err != nil {
-			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
-			return
-		}
-
-		err = zeroToCurrent(ctx, conn, k, target, &tag)
-		if err != nil {
-			logger.Errorf("Error moving to current: %v", err)
-			return
-		}
-	}
-
-	err := currentToLatest(ctx, conn, k, target, &tag)
-	if err != nil {
-		logger.Errorf("Error moving current to latest: %v", err)
-		return
-	}
-
-	k.initialRun = false
+	tags := []string{"yaml", "yml"}
+	k.processGit(ctx, conn, k, skew, &tags)
 }
 
 func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
@@ -91,10 +64,7 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 	if k.SOPS != nil {
 		return k.applyPreparedSOPS(ctx, conn, changeMap)
 	}
-	if err := runChanges(ctx, conn, k, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return runChanges(ctx, conn, k, changeMap)
 }
 
 func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
