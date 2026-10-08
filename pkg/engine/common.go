@@ -12,6 +12,8 @@ import (
 )
 
 type CommonMethod struct {
+	// Opt-in cleanup of owned workloads when this method leaves configuration.
+	CleanupOnRemoval bool `mapstructure:"cleanupOnRemoval"`
 	// Name must be unique within target method
 	Name string `mapstructure:"name"`
 	// Schedule is how often to check for git updates and/or restart the fetchit service

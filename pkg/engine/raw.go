@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/containers/podman/v5/pkg/errorhandling"
 	"io/ioutil"
-	"strings"
+	"net/http"
 	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
@@ -117,6 +119,17 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, skew int) {
 
 func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
 
+	if path == deleteFile {
+		if prev == nil {
+			return nil
+		}
+		raw, err := rawPodFromBytes([]byte(*prev))
+		if err != nil {
+			return err
+		}
+		return removeExisting(conn, raw.Name)
+	}
+
 	logger.Infof("Creating podman container from %s", path)
 
 	rawFile, err := ioutil.ReadFile(path)
@@ -168,6 +181,10 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 	}
 
 	s := createSpecGen(*raw)
+	for key, value := range r.workloadLabels() {
+		s.Labels[key] = value
+	}
+	s.Labels[kubeMethodLabel] = rawMethod
 
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
@@ -270,14 +287,14 @@ func createSpecGen(raw RawPod) *specgen.SpecGenerator {
 }
 
 func deleteContainer(conn context.Context, podName string) error {
-	err := containers.Stop(conn, podName, nil)
-	if err != nil {
-		return utils.WrapErr(err, "Failed to stop container %s", podName)
-	}
-
-	_, err = containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
+	reports, err := containers.Remove(conn, podName, new(containers.RemoveOptions).WithForce(true))
 	if err != nil {
 		return utils.WrapErr(err, "Failed to remove container %s", podName)
+	}
+	for _, report := range reports {
+		if report != nil && report.Err != nil {
+			return report.Err
+		}
 	}
 
 	return nil
@@ -286,6 +303,9 @@ func deleteContainer(conn context.Context, podName string) error {
 func rawPodFromBytes(b []byte) (*RawPod, error) {
 	b = bytes.TrimSpace(b)
 	raw := RawPod{}
+	if len(b) == 0 {
+		return nil, errors.New("empty Raw container definition")
+	}
 	if b[0] == '{' {
 		err := json.Unmarshal(b, &raw)
 		if err != nil {
@@ -305,7 +325,8 @@ func removeExisting(conn context.Context, podName string) error {
 	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
 	if err != nil {
 		// Container doesn't exist or inspect failed
-		if strings.Contains(err.Error(), "no such container") {
+		var apiError *errorhandling.ErrorModel
+		if errors.As(err, &apiError) && apiError.Code() == http.StatusNotFound {
 			return nil // Container doesn't exist, nothing to remove
 		}
 		return utils.WrapErr(err, "Failed to inspect container %s", podName)

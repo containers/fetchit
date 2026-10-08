@@ -2,8 +2,10 @@
 # Arguments: parent, runtime (empty for system manager), namespace, old service
 # list, desired service list, start flag, restart service list, expected current
 # revision, desired revision, configuration ID. Service lists use newlines.
-[ "$#" -eq 10 ] || { echo "Expected ten Quadlet helper arguments" >&2; exit 1; }
+[ "$#" -eq 10 ] || [ "$#" -eq 11 ] || { echo "Expected ten or eleven Quadlet helper arguments" >&2; exit 1; }
 parent=$1 runtime=$2 namespace=$3 old_services=$4 new_services=$5 start=$6 restart_units=$7 current=$8 desired_revision=$9 config_id=${10}
+removal=${11:-false}
+case "$removal" in true|false) ;; *) echo "Invalid removal mode" >&2; exit 1;; esac
 host=${FETCHIT_QUADLET_HOST_ROOT:-/host}
 control="$parent/.${namespace}"
 live="$parent/systemd/$namespace"
@@ -25,7 +27,7 @@ exec 9>"$host$control/lock"
 flock -x 9
 # Compare-and-set the applied receipt under the lock. A stale process must not
 # replace a newer commit. A new settings identity may initialize its own Git tag.
-if [ -f "$host$control/receipt" ]; then
+if [ "$removal" != true ] && [ -f "$host$control/receipt" ]; then
  installed_revision=$(sed -n '1p' "$host$control/receipt")
  installed_config=$(sed -n '2p' "$host$control/receipt")
  if [ "$installed_revision" != "$current" ] && [ "$installed_revision" != "$desired_revision" ]; then
