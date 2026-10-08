@@ -10,6 +10,7 @@ FetchIt was designed to allow for the hands off management of containers running
 
 .. toctree::
    quick_start
+   samples
    purpose
    methods
    lifecycle

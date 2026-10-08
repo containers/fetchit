@@ -9,7 +9,7 @@ spec:
         claimName: task-pv-claim
   containers:
   - name: nginx-server
-    image: docker.io/nginx:latest
+    image: docker.io/library/nginx:stable-alpine
     ports:
     - containerPort: 80
       hostPort: 8080

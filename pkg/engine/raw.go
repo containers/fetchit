@@ -37,12 +37,12 @@ func (r *Raw) GetKind() string {
 }
 
 /* below is an example.json file:
-{"Image":"docker.io/mmumshad/simple-webapp-color:latest",
+{"Image":"docker.io/library/httpd:2.4-alpine",
 "Name": "colors",
 "Env": {"color": "blue", "tree": "trunk"},
 "Ports": [{
     "HostIP":        "",
-    "ContainerPort": 8080,
+    "ContainerPort": 80,
     "HostPort":      8080,
     "Range":         0,
     "Protocol":      ""}]

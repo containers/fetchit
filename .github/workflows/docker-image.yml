@@ -103,10 +103,10 @@ jobs:
       - uses: ./.github/actions/setup-podman
 
       - name: pull the colors image
-        run: podman pull docker.io/mmumshad/simple-webapp-color:latest
+        run: podman pull docker.io/library/httpd:2.4-alpine
 
       - name: archive the image
-        run: podman save -o /tmp/colors.tar docker.io/mmumshad/simple-webapp-color:latest
+        run: podman save -o /tmp/colors.tar docker.io/library/httpd:2.4-alpine
 
       - name: save the container as an artifact
         uses: actions/upload-artifact@v4
@@ -871,10 +871,10 @@ jobs:
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
       - name: Pull test httpd image
-        run: sudo podman pull quay.io/sallyom/httpd-ex:latest
+        run: sudo podman pull registry.access.redhat.com/ubi8/httpd-24:latest
 
-      - name: tag the image
-        run: sudo podman tag quay.io/sallyom/httpd-ex:latest registry.access.redhat.com/ubi8/httpd-24:latest
+      - name: Verify the official httpd image
+        run: sudo podman image exists registry.access.redhat.com/ubi8/httpd-24:latest
 
       - name: Debug - Check what curl returns
         run: curl -v http://localhost:8080/ || true
@@ -1569,7 +1569,7 @@ jobs:
         run: sudo podman load -i /tmp/colors.tar
 
       - name: Tag with a new name
-        run: sudo podman tag docker.io/mmumshad/simple-webapp-color:latest quay.io/notreal/httpd:latest
+        run: sudo podman tag docker.io/library/httpd:2.4-alpine quay.io/notreal/httpd:latest
 
       - name: archive the image
         run: |

@@ -1,9 +1,9 @@
-Image: "docker.io/mmumshad/simple-webapp-color:latest"
+Image: "docker.io/library/httpd:2.4-alpine"
 Name: "rollback1"
 Env:
   APP_COLOR: "pink"
   tree: "trunk"
 Ports:
-  - container_port: 8080
+  - container_port: 80
     host_port: 8080
     range: 0

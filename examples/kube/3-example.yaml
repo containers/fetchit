@@ -13,9 +13,9 @@ metadata:
 spec:
   containers:
   - name: colors-kubeplay
-    image: docker.io/mmumshad/simple-webapp-color:latest
+    image: docker.io/library/httpd:2.4-alpine
     ports:
-    - containerPort: 8080
+    - containerPort: 80
       hostPort: 7080
     envFrom:
     - configMapRef:

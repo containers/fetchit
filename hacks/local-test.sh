@@ -23,7 +23,7 @@ FAILED_TESTS=()
 
 # Configuration
 FETCHIT_IMAGE="quay.io/fetchit/fetchit:local-test"
-COLORS_IMAGE="docker.io/mmumshad/simple-webapp-color:latest"
+COLORS_IMAGE="docker.io/library/httpd:2.4-alpine"
 SYSTEMD_IMAGE="quay.io/fetchit/fetchit-systemd:local-test"
 ANSIBLE_IMAGE="quay.io/fetchit/fetchit-ansible:local-test"
 

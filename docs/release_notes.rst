@@ -4,6 +4,18 @@ Release notes
 Unreleased
 ----------
 
+Sample applications on amd64 and arm64
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The quick-start welcome app and Raw, Kube, and rollback examples now use the
+official ``httpd:2.4-alpine`` multi-platform image. Container ports change from
+8080 to 80 where required; existing host ports stay the same. ``APP_COLOR`` remains
+an environment-variable example and no longer changes the website color. The
+capability-drop example drops ``NET_RAW`` rather than all capabilities so Apache
+can change user/group IDs during startup. The nginx sample uses
+``nginx:stable-alpine``. Native amd64 and arm64 Actions test the checked-in
+samples and HTTP responses, including local archive loading. See :doc:`samples`.
+
 Release cleanup
 ~~~~~~~~~~~~~~~
 

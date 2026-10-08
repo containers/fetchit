@@ -1,4 +1,4 @@
-Image: quay.io/fetchit/fetchit-sample-app:latest
+Image: docker.io/library/httpd:2.4-alpine
 Name: welcome
 Ports:
   - container_port: 80

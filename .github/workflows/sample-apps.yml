@@ -1,0 +1,44 @@
+name: Sample applications (amd64 and arm64)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '27 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  samples:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-26.04, ubuntu-26.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: '0'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs samples_integration
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-podman
+      - name: Enable Podman socket
+        run: sudo systemctl enable --now podman.socket
+      - name: Compile sample integration tests
+        run: go test -mod=readonly -tags "$BUILDTAGS" -c -o /tmp/fetchit-samples.test ./pkg/engine
+      - name: Run checked-in samples on the native architecture
+        working-directory: pkg/engine
+        run: sudo env SAMPLE_TEST_SOCKET=unix:///run/podman/podman.sock /tmp/fetchit-samples.test -test.v -test.run '^TestSampleApplications$'
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          sudo podman ps -a
+          for id in $(sudo podman ps -aq); do sudo podman logs "$id" || true; done
+          sudo journalctl -u podman.service --no-pager -n 100
