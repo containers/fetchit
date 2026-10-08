@@ -35,3 +35,10 @@ including the matching OpenTelemetry core, metric, trace, and SDK modules select
 by Go's dependency graph. This incorporates dependency PR #395. Podman remains on
 major version 5, currently the v5.8.8 Go libraries, with the existing OCI runtime
 specification compatibility replacement retained.
+
+CI reliability
+~~~~~~~~~~~~~~
+
+The existing secret-config integration now polls running workload names while a
+configuration reload recreates containers, rather than failing on a transient
+single snapshot during reconciliation.
