@@ -33,6 +33,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 RUN microdnf -y install rsync tar coreutils-single util-linux findutils grep sed device-mapper-libs libseccomp && command -v chroot && command -v flock && microdnf clean all
 
 COPY --from=builder /usr/local/bin/sops /usr/local/bin/
+COPY licenses/sops/LICENSE /usr/share/licenses/sops/LICENSE
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 COPY --from=builder /usr/local/bin/entry.sh /usr/local/bin/
 

@@ -4,7 +4,9 @@ Encrypted Kube manifests with SOPS
 FetchIt can decrypt SOPS-encrypted YAML when deploying a Kube method. This is
 optional; methods without a ``sops`` block keep their existing behavior. FetchIt's
 images include SOPS 3.13.3 for amd64 and arm64, installed with pinned checksums.
-Only local age recipients are supported. Cloud KMS, PGP, key groups, external key
+SOPS is distributed under MPL-2.0; its license is included at
+``/usr/share/licenses/sops/LICENSE`` and its upstream source is available at
+https://github.com/getsops/sops/tree/v3.13.3. Only local age recipients are supported. Cloud KMS, PGP, key groups, external key
 services, Raw, Quadlet, and encrypted FetchIt configuration are not supported.
 
 Prepare an encrypted repository

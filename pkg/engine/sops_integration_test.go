@@ -101,7 +101,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	}
 	readSecret := func(want string) {
 		t.Helper()
-		out, err := exec.Command("podman", "exec", container, "printenv", "PASSWORD").Output()
+		out, err := exec.Command("podman", "exec", pod+"-"+container, "printenv", "PASSWORD").Output()
 		if err != nil || strings.TrimSpace(string(out)) != want {
 			t.Fatal("deployed secret did not match expected value")
 		}

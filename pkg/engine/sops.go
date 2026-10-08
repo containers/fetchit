@@ -56,10 +56,12 @@ func (w *limitedSOPSOutput) Write(p []byte) (int, error) {
 }
 
 func (s *SOPS) decrypt(ctx context.Context, input []byte) ([]byte, error) {
-	return s.decryptWithExecutable(ctx, input, sopsExecutable)
+	return s.decryptWithCommand(ctx, input, func(childCtx context.Context) *exec.Cmd {
+		return exec.CommandContext(childCtx, sopsExecutable, "decrypt", "--input-type", "yaml", "--output-type", "yaml")
+	})
 }
 
-func (s *SOPS) decryptWithExecutable(ctx context.Context, input []byte, executable string) ([]byte, error) {
+func (s *SOPS) decryptWithCommand(ctx context.Context, input []byte, createCommand func(context.Context) *exec.Cmd) ([]byte, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func (s *SOPS) decryptWithExecutable(ctx context.Context, input []byte, executab
 	defer cancel()
 	output := &limitedSOPSOutput{cancel: cancel}
 	defer func() { clear(output.buffer.Bytes()) }()
-	command := exec.CommandContext(childCtx, executable, "decrypt", "--input-type", "yaml", "--output-type", "yaml")
+	command := createCommand(childCtx)
 	command.Env = []string{"HOME=/nonexistent", "PATH=/usr/bin:/bin", "SOPS_AGE_KEY_FILE=" + s.AgeKeyFile}
 	command.Stdin = bytes.NewReader(input)
 	command.Stdout = output

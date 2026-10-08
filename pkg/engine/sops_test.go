@@ -148,7 +148,7 @@ func TestSOPSRealAgeMultiDocument(t *testing.T) {
 		t.Fatal("secret not encrypted")
 	}
 	settings := &SOPS{AgeKeyFile: key}
-	plain, err := settings.decryptWithExecutable(context.Background(), ciphertext, binary)
+	plain, err := decryptSOPSTest(settings, context.Background(), ciphertext, binary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,12 +158,12 @@ func TestSOPSRealAgeMultiDocument(t *testing.T) {
 	}
 	// Change authenticated visible metadata; MAC verification must reject it.
 	tampered := bytes.Replace(ciphertext, []byte("application-secret"), []byte("tampered-secret"), 1)
-	if _, err := settings.decryptWithExecutable(context.Background(), tampered, binary); err == nil {
+	if _, err := decryptSOPSTest(settings, context.Background(), tampered, binary); err == nil {
 		t.Fatal("tampered input decrypted")
 	}
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := settings.decryptWithExecutable(cancelled, ciphertext, binary); err == nil {
+	if _, err := decryptSOPSTest(settings, cancelled, ciphertext, binary); err == nil {
 		t.Fatal("cancelled decryption succeeded")
 	}
 	t.Setenv("SOPS_AGE_KEY_FILE", key)
@@ -171,7 +171,7 @@ func TestSOPSRealAgeMultiDocument(t *testing.T) {
 	if err := exec.Command(age, "-o", wrongKey).Run(); err != nil {
 		t.Fatal("age key generation failed")
 	}
-	if _, err := (&SOPS{AgeKeyFile: wrongKey}).decryptWithExecutable(context.Background(), ciphertext, binary); err == nil {
+	if _, err := decryptSOPSTest(&SOPS{AgeKeyFile: wrongKey}, context.Background(), ciphertext, binary); err == nil {
 		t.Fatal("wrong key decrypted")
 	}
 }
@@ -183,7 +183,7 @@ func TestSOPSExecutableFailuresDoNotExposeOutput(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	plain, err := settings.decryptWithExecutable(context.Background(), []byte(testEncryptedMetadata), binary)
+	plain, err := decryptSOPSTest(settings, context.Background(), []byte(testEncryptedMetadata), binary)
 	if err == nil || len(plain) != 0 || strings.Contains(err.Error(), "secret-sentinel") {
 		t.Fatalf("unsafe executable error: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestSOPSOutputLimitCancelsExecution(t *testing.T) {
 	if err := os.WriteFile(binary, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if plain, err := settings.decryptWithExecutable(context.Background(), []byte(testEncryptedMetadata), binary); err == nil || len(plain) != 0 {
+	if plain, err := decryptSOPSTest(settings, context.Background(), []byte(testEncryptedMetadata), binary); err == nil || len(plain) != 0 {
 		t.Fatal("accepted oversized plaintext")
 	}
 }
@@ -256,4 +256,28 @@ func TestSOPSPreparationUsesGitVersionsForUpdateAndDeletion(t *testing.T) {
 	if len(inputs) != 1 || inputs[0] != "old ciphertext" || prepared[0].next != nil {
 		t.Fatal("deletion did not use old Git content")
 	}
+}
+
+func TestSOPSEmptyBlockIsInvalid(t *testing.T) {
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(strings.NewReader("targetConfigs:\n- url: repository\n  kube:\n  - name: app\n    sops: {}\n")); err != nil {
+		t.Fatal(err)
+	}
+	var config FetchitConfig
+	if err := v.UnmarshalExact(&config); err != nil {
+		t.Fatal(err)
+	}
+	settings := config.TargetConfigs[0].Kube[0].SOPS
+	if settings == nil || settings.validate() == nil {
+		t.Fatal("empty SOPS block silently disabled decryption")
+	}
+}
+
+// Alternate executables are confined to test code; production always uses the
+// fixed checksum-verified /usr/local/bin/sops binary.
+func decryptSOPSTest(settings *SOPS, ctx context.Context, input []byte, binary string) ([]byte, error) {
+	return settings.decryptWithCommand(ctx, input, func(child context.Context) *exec.Cmd {
+		return exec.CommandContext(child, binary, "decrypt", "--input-type", "yaml", "--output-type", "yaml")
+	})
 }
