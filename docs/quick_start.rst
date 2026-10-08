@@ -1,6 +1,6 @@
 Quick Start
 ============
-If you want to to try FetchIt out run the following commands. This document will assume that the OS is Fedora, CentOS, or RHEL but FetchIt is also tested on Ubuntu. Use Podman 5.7 or newer within major version 5. For host-managed Quadlet services, see :doc:`quadlet`.
+If you want to try FetchIt out run the following commands. This document will assume that the OS is Fedora, CentOS, or RHEL but FetchIt is also tested on Ubuntu. Use Podman 5.7 or newer within major version 5. For host-managed Quadlet services, see :doc:`quadlet`.
 
 We will assume that FetchIt will be ran as a non-privileged user. The first step will be to install Podman.
 
@@ -46,8 +46,18 @@ To view the running containers, run the following command.
    
    podman ps
 
-The sample application can be found by visting the following URL `on your localhost <http://localhost:9191>`_
+The sample application can be found by visiting the following URL `on your localhost <http://localhost:9191>`_
 
+
+The sample uses the Red Hat UBI-based ``quay.io/fetchit/fetchit-sample-app:latest`` image, which
+provides native Linux amd64 and arm64 variants. You should see the FetchIt welcome page. The server runs as user 1001 on
+container port 8080 without capability overrides. The same configuration works on either architecture; Podman
+selects the appropriate image automatically. See :doc:`samples` for the other
+examples, ports, and architecture regression tests.
+
+.. code-block:: bash
+
+   curl --fail http://localhost:9191/
 
 With this demonstration in mind you can fork the FetchIt repository or create your own repository and start defining your own applications for FetchIt.
 

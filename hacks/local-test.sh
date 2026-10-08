@@ -23,7 +23,7 @@ FAILED_TESTS=()
 
 # Configuration
 FETCHIT_IMAGE="quay.io/fetchit/fetchit:local-test"
-COLORS_IMAGE="docker.io/mmumshad/simple-webapp-color:latest"
+COLORS_IMAGE="quay.io/fetchit/fetchit-sample-app:latest"
 SYSTEMD_IMAGE="quay.io/fetchit/fetchit-systemd:local-test"
 ANSIBLE_IMAGE="quay.io/fetchit/fetchit-ansible:local-test"
 
@@ -140,16 +140,16 @@ test_raw_validate() {
         return 1
     fi
 
-    # Verify capabilities
-    if ! sudo podman container inspect cap1 --format '{{.EffectiveCaps}}' | grep -q NET_ADMIN; then
-        print_error "cap1 missing NET_ADMIN capability"
+    # Verify the image's non-root user
+    if ! test "$(sudo podman exec cap1 id -u)" = 1001; then
+        print_error "cap1 is not running as the non-root sample user"
         record_test "raw-validate" "fail"
         return 1
     fi
 
-    # Verify no capabilities on cap2
-    if [ "$(sudo podman container inspect cap2 --format '{{.EffectiveCaps}}' | jq length)" != "0" ]; then
-        print_error "cap2 should have no capabilities"
+    # Verify non-root execution on cap2
+    if [ "$(sudo podman exec cap2 id -u)" != "1001" ]; then
+        print_error "cap2 should run as UID 1001"
         record_test "raw-validate" "fail"
         return 1
     fi
@@ -397,9 +397,9 @@ test_glob_validate() {
         return 1
     fi
 
-    # Verify capabilities of cap1
-    if ! sudo podman container inspect cap1 --format '{{.EffectiveCaps}}' | grep -q NET_ADMIN; then
-        print_error "cap1 missing NET_ADMIN capability"
+    # Verify the image's non-root user of cap1
+    if ! test "$(sudo podman exec cap1 id -u)" = 1001; then
+        print_error "cap1 is not running as the non-root sample user"
         record_test "glob-validate" "fail"
         return 1
     fi
@@ -415,8 +415,8 @@ test_imageload_validate() {
     sudo mkdir -p /tmp/image
 
     if ! sudo podman image exists "$COLORS_IMAGE"; then
-        print_warning "Colors image not available, pulling..."
-        sudo podman pull "$COLORS_IMAGE" 2>/dev/null || true
+        print_info "Building the sample image..."
+        pull_colors_image
     fi
 
     sudo podman tag "$COLORS_IMAGE" quay.io/notreal/httpd:latest 2>/dev/null || true
@@ -478,20 +478,8 @@ build_fetchit_image() {
 }
 
 pull_colors_image() {
-    print_header "Pulling colors test image"
-
-    if sudo podman image exists "$COLORS_IMAGE"; then
-        print_info "Image already exists: $COLORS_IMAGE"
-        return 0
-    fi
-
-    print_info "Pulling colors image..."
-    if ! sudo podman pull "$COLORS_IMAGE"; then
-        print_error "Failed to pull colors image"
-        return 1
-    fi
-
-    print_success "Pulled colors image"
+    print_header "Building the Red Hat-based sample image"
+    sudo podman build -t "$COLORS_IMAGE" -f examples/sample-app/Containerfile examples/sample-app
 }
 
 build_systemd_image() {

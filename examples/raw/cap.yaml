@@ -1,10 +1,9 @@
 {
-    "Image":"docker.io/mmumshad/simple-webapp-color:latest",
+    "Image":"quay.io/fetchit/fetchit-sample-app:latest",
     "Name": "cap2",
     "Env": {"APP_COLOR": "blue", "tree": "trunk"},
     "Mounts": [],
     "Volumes": [],
-    "CapDrop": ["all"],
     "Ports": [{
         "host_ip":        "",
         "container_port": 8080,

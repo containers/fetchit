@@ -133,6 +133,6 @@ gh pr create
 
 The script uses these by default:
 - `FETCHIT_IMAGE=quay.io/fetchit/fetchit:local-test`
-- `COLORS_IMAGE=docker.io/mmumshad/simple-webapp-color:latest`
+- `COLORS_IMAGE=quay.io/fetchit/fetchit-sample-app:latest`
 - `SYSTEMD_IMAGE=quay.io/fetchit/fetchit-systemd:local-test`
 - `ANSIBLE_IMAGE=quay.io/fetchit/fetchit-ansible:local-test`

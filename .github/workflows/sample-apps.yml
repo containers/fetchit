@@ -1,0 +1,102 @@
+name: Sample applications (amd64 and arm64)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '27 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  samples:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            arch: amd64
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: '0'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs samples_integration
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-podman
+      - name: Enable Podman socket
+        run: sudo systemctl enable --now podman.socket
+      # Disposable hosted runners; PR tests receive no publishing credentials.
+      - name: Build the native Red Hat-based sample
+        run: sudo podman build -t quay.io/fetchit/fetchit-sample-app:latest -f examples/sample-app/Containerfile examples/sample-app
+      - name: Compile sample integration tests
+        run: go test -mod=readonly -tags "$BUILDTAGS" -c -o /tmp/fetchit-samples.test ./pkg/engine
+      - name: Run checked-in samples on the native architecture
+        working-directory: pkg/engine
+        run: sudo env SAMPLE_TEST_SOCKET=unix:///run/podman/podman.sock /tmp/fetchit-samples.test -test.v -test.run '^TestSampleApplications$'
+      - name: Save the tested native image
+        run: |
+          sudo podman tag quay.io/fetchit/fetchit-sample-app:latest localhost/fetchit-sample:${{ matrix.arch }}
+          sudo podman save -o /tmp/sample-${{ matrix.arch }}.tar localhost/fetchit-sample:${{ matrix.arch }}
+          sudo chmod 644 /tmp/sample-${{ matrix.arch }}.tar
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sample-app-${{ matrix.arch }}
+          path: /tmp/sample-${{ matrix.arch }}.tar
+          retention-days: 3
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          sudo podman ps -a
+          for id in $(sudo podman ps -aq); do
+            sudo podman logs "$id" || echo "::warning::Could not read logs for $id"
+          done
+          sudo journalctl -u podman.service --no-pager -n 100
+
+  assemble:
+    needs: samples
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-podman
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: sample-app-*
+          merge-multiple: true
+          path: _output/samples
+      - name: Assemble the tested platform images
+        run: |
+          for arch in amd64 arm64; do
+            podman load -i "_output/samples/sample-$arch.tar"
+            test "$(podman image inspect --format '{{.Architecture}}' "localhost/fetchit-sample:$arch")" = "$arch"
+          done
+          podman manifest create localhost/fetchit-sample-index
+          podman manifest add localhost/fetchit-sample-index localhost/fetchit-sample:amd64
+          podman manifest add localhost/fetchit-sample-index localhost/fetchit-sample:arm64
+      - name: Verify the assembled platform index
+        run: |
+          podman manifest inspect localhost/fetchit-sample-index > /tmp/sample-index.json
+          python3 - <<'PYTHON'
+          import json
+          with open('/tmp/sample-index.json') as source:
+              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          PYTHON
+      - name: Publish the multi-platform sample to Quay
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          printf '%s' "$REGISTRY_PASSWORD" | podman login --username "$REGISTRY_USER" --password-stdin quay.io
+          podman manifest push --all localhost/fetchit-sample-index docker://quay.io/fetchit/fetchit-sample-app:latest

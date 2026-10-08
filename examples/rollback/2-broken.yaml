@@ -1,5 +1,5 @@
-# Typo below
-Image: "docker.io/mmumshad/simple-webapp-clor:latest"
+# Intentional failure to demonstrate rollback; not a runnable sample application.
+Image: "example.invalid/fetchit/intentional-failure:latest"
 Name: "rollback3"
 Env:
   APP_COLOR: "pink"

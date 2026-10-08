@@ -211,7 +211,7 @@ A Raw JSON file can contain the following fields.
 .. code-block:: json
 
    {
-    "Image":"docker.io/mmumshad/simple-webapp-color:latest",
+    "Image":"quay.io/fetchit/fetchit-sample-app:latest",
     "Name": "colors1",
     "Env": {"APP_COLOR": "pink", "tree": "trunk"},
     "Mounts": "",
@@ -225,6 +225,10 @@ A Raw JSON file can contain the following fields.
    }
 
 Volume and host mounts can be provided in the JSON file.
+
+The sample HTTP image supports amd64 and arm64 and runs as user 1001 and listens on container port 8080 without capability overrides.
+``APP_COLOR`` and ``tree`` illustrate environment propagation; Apache does not
+change its welcome-page color based on these values. See :doc:`samples`.
 
 PodmanAutoUpdate
 ----------------
@@ -349,7 +353,7 @@ An example Kube play YAML file will look similiar to the following. This will la
    spec:
    containers:
    - name: colors-kubeplay
-     image: docker.io/mmumshad/simple-webapp-color:latest
+     image: quay.io/fetchit/fetchit-sample-app:latest
      ports:
      - containerPort: 8080
        hostPort: 7080
