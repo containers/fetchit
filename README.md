@@ -1,183 +1,182 @@
-# Fetchit
-The purpose of FetchIt is to allow for GitOps management of podman managed containers.
+# FetchIt
 
-This project is currently under development. For a more detailed explanation of the project visit the docs page.
-https://fetchit.readthedocs.io/
+FetchIt brings GitOps to hosts running Podman. Define containers, pods, host
+services, or files in Git, and FetchIt reconciles them on a configured schedule—
+without requiring a Kubernetes cluster.
 
-A quickstart example is available at https://github.com/containers/fetchit/blob/main/docs/quick_start.rst
+The project is under active development. The guides describe current `main`;
+new features are **unreleased** until included in a published release. Use an
+engine and compatible helper built from current main to try them. A cached
+`latest` image may not include the newest changes.
+
+## What you can do
+
+- **Deploy Quadlet bundles:** Manage Podman/systemd services from Git, including
+  rootless operation, supporting files, drop-ins, and update/removal handling.
+  [Quadlet guide](docs/quadlet.rst)
+- **Opt into lifecycle cleanup and recovery:** Track owned containers, pods,
+  copied files, and service units when methods leave configuration. Raw, Kube,
+  and Quadlet targets can also opt into best-effort apply rollback.
+  [Lifecycle guide](docs/lifecycle.rst)
+- **Use Podman kube play:** Deploy ordinary or SOPS-encrypted YAML, attach Pods
+  to existing Podman networks, and discover workloads through ownership labels.
+  [Methods and networks](docs/methods.rst) · [SOPS guide](docs/sops.rst)
+- **Keep Git sources available:** Authenticate with verified SSH host keys and
+  configure trusted fallback repositories.
+  [SSH configuration](docs/methods.rst) · [Mirrors guide](docs/mirrors.rst)
+- **Monitor and try real examples:** Enable optional health/status endpoints and
+  run Red Hat UBI-based HTTP samples on amd64 or arm64.
+  [Status guide](docs/status.rst) · [Sample applications](docs/samples.rst)
+
+Cleanup and rollback default to **off**. They do not undo arbitrary Ansible
+changes or persistent-data writes. Preserve the engine volume and host ownership
+journals, and read the lifecycle guide before enabling cleanup on existing files
+or services. Trailing `/` in Git `targetPath` is optional; FileTransfer retains
+its basename-based destination layout.
+
+[Full documentation](https://fetchit.readthedocs.io/) ·
+[Release notes](docs/release_notes.rst) · [Running guide](docs/running.rst)
 
 ## Requirements
 
-- **Podman v5.7+ and below v6** (Go libraries use v5.8.8; Fedora 44 packages provide v5.8.7)
-- **Go 1.27.1+** (for building from source)
-- **Linux Kernel 5.2+** (required by Podman)
+- A Linux Podman host. For the documented host-managed features, use **Podman
+  5.7 or newer within major version 5**. Podman 6 is not supported by Quadlet.
+- An accessible Podman API socket for the intended rootful or rootless instance.
+- Host systemd and cgroup v2 for Quadlet; a running host systemd manager for
+  Systemd methods. Rootless services require the matching host user manager.
+- **Go 1.27.1** or automatic Go toolchain downloads when building from source.
 
-## Developing
-To develop and test changes of FetchIt, the FetchIt image can be built locally and then run on the development system.
+CI tests Ubuntu 26.04 and Fedora 44 userspace with Podman 5. ARM image builds and
+sample checks run on native arm64 runners. Rootful and rootless image, network,
+container, and volume stores are separate; use one scope consistently.
 
-Run the unit tests on Linux with Go 1.27.1 and the GPGME, device-mapper,
-and libseccomp development packages installed:
+## Quick start
+
+On a Linux host with Podman installed, run these commands as the intended host
+user. For Fedora, install Podman with `sudo dnf install -y podman` first.
+
+```sh
+systemctl --user enable --now podman.socket
+mkdir -p "$HOME/.fetchit"
+```
+
+Save this as `$HOME/.fetchit/config.yaml`:
+
+```yaml
+targetConfigs:
+- url: https://github.com/containers/fetchit
+  branch: main
+  raw:
+  - name: welcome-to-fetchit
+    targetPath: examples/single-raw
+    schedule: "*/1 * * * *"
+    pullImage: true
+```
+
+Start FetchIt:
+
+```sh
+podman run -d --name fetchit \
+  -v fetchit-volume:/opt \
+  -v "$HOME/.fetchit:/opt/mount" \
+  -v "/run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock" \
+  --security-opt label=disable \
+  quay.io/fetchit/fetchit:latest
+
+podman logs -f fetchit
+```
+
+FetchIt reads `/opt/mount/config.yaml`. After deployment, open
+<http://localhost:9191/> or run:
+
+```sh
+curl --fail http://localhost:9191/
+podman ps
+```
+
+The HTTP sample uses `quay.io/fetchit/fetchit-sample-app:latest`, built from Red
+Hat UBI HTTP Server with native amd64/arm64 variants. It runs as user 1001 on
+container port 8080 without capability overrides. See the
+[sample guide](docs/samples.rst) for other ports, PVCs, and offline image archives.
+
+For this static configuration, restart FetchIt after changing `config.yaml`.
+Workload changes in Git are applied on schedule. To reload configuration without
+a restart, configure `configReload` and retain the writable directory mount;
+see [remote configuration updates](docs/running.rst).
+
+For workloads that must survive logout, enable lingering for the host user:
+
+```sh
+sudo loginctl enable-linger "$(id -un)"
+```
+
+See [Running](docs/running.rst) for rootful launches, engine systemd services, and
+host identity settings. See [Quadlet](docs/quadlet.rst) for rootless/rootful bundle
+examples. FileTransfer destinations must already exist on the host.
+
+### Stop the demonstration
+
+```sh
+podman stop fetchit
+podman rm fetchit
+podman rm -f welcome
+```
+
+Stopping the engine does not stop its workloads automatically. These commands
+remove only this demonstration's engine and named sample container. Keep
+`fetchit-volume` for Git baselines and pending cleanup receipts; delete it only
+when intentionally abandoning that state after completing any required cleanup.
+
+## Build and try current main
+
+From a checkout, prepare vendored dependencies and build for the host's
+architecture:
+
+```sh
+go mod vendor
+podman build --build-arg ARCH=amd64 -t localhost/fetchit:development .
+```
+
+Use `ARCH=arm64` on arm64. Substitute `localhost/fetchit:development` for the
+engine image in the launch command. Build and launch in the same Podman store;
+use `sudo podman` consistently for rootful deployments.
+
+Set Quadlet's `helperImage: localhost/fetchit:development` to use the matching
+helper. Tracked FileTransfer/Systemd cleanup currently uses the fixed helper
+reference `quay.io/fetchit/fetchit:latest`; tag the reviewed local build with that
+name in the same store before testing those features:
+
+```sh
+podman tag localhost/fetchit:development quay.io/fetchit/fetchit:latest
+```
+
+For production Quadlet deployments, use an approved immutable helper digest.
+See [image compatibility and build guidance](docs/documentation.rst) and
+[helper integrity guidance](docs/quadlet.rst).
+
+## Develop and validate
+
+On Linux, install the GPGME, device-mapper, and libseccomp development packages
+before running unit tests:
 
 ```sh
 go test -mod=readonly -tags 'containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs' ./...
 ```
 
-CI runs these tests on Ubuntu 26.04 and Fedora 44. Integration tests use
-Ubuntu 26.04's packaged Podman 5 and crun, installed by a shared CI action
-without building Podman from source. The action requires Podman 5.7+ and below
-6, and crun 1.18+ (the runtime baseline previously used by this project).
-Ubuntu 26.04 is a [generally available GitHub runner](https://github.com/actions/runner-images/issues/14747).
+Real SOPS tests additionally require `SOPS_TEST_BINARY` and `AGE_TEST_BINARY`
+pointing to the supported SOPS executable and `age-keygen`. CI installs these
+tools and runs the unit, ownership, rollback, and runtime lifecycle checks.
+Integration tests use disposable hosts and packaged Podman 5/crun; do not run
+host service tests against a personal Podman socket.
 
-```
-go mod tidy
-go mod vendor
-podman build . --file Dockerfile --tag quay.io/fetchit/fetchit-amd:latest
-podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
-```
+Build all documentation with the pinned dependencies:
 
-Once the image has been successfully built the image can be ran using the following command.
-
+```sh
+python3 -m venv /tmp/fetchit-docs-venv
+/tmp/fetchit-docs-venv/bin/python -m pip install -r docs/requirements.txt
+/tmp/fetchit-docs-venv/bin/python -m sphinx -W -E -b html docs /tmp/fetchit-docs
 ```
 
-podman run -d --rm --name fetchit --security-opt label=disable -v fetchit-volume:/opt -v ./examples/readme-config.yaml:/opt/config.yaml -v /run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock quay.io/fetchit/fetchit:latest
-```
-
-##  Running
-FetchIt requires the podman socket to be running on the host. The socket can be enabled for a specific user or for root.
-
-To enable the socket for $USER:
-
-```
-systemctl --user enable podman.socket --now
-```
-
-To enable the socket for root:
-
-```
-systemctl enable podman.socket --now
-```
-
-
-#### Verify running containers before deploying fetchit.
-
-```
-podman ps
-
-CONTAINER ID  IMAGE       COMMAND     CREATED     STATUS      PORTS       NAMES
-```
-
-
-### FetchIt launch options
-FetchIt and can be started manually or launched via systemd.
-
-Define the parameters in your `$HOME/.fetchit/config.yaml` to relate to your git repository.
-This example can be found in [./examples/readme-config.yaml](examples/readme-config.yaml)
-
-```
-targetConfigs:
-- url: https://github.com/containers/fetchit
-  branch: main
-  filetransfer:
-  - name: ft-ex
-    targetPath: examples/filetransfer
-    destinationDirectory: /tmp
-    schedule: "*/1 * * * *"
-  raw:
-  - name: raw-ex
-    targetPath: examples/raw
-    schedule: "*/1 * * * *"
-```
-
-#### Launch using systemd
-Two systemd files are provided to allow for FetchIt to run as a user or as root. The files are under the systemd folder, differentiated by fetchit-root and fetchit-user.
-
-Ensure that there is a config at `$HOME/.fetchit/config.yaml` before attempting to start the service.
-
-For root
-```
-cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
-systemctl enable fetchit --now
-```
-
-For $USER
-```
-mkdir -p ~/.config/systemd/user/
-cp systemd/fetchit-user.service ~/.config/systemd/user/fetchit.service
-systemctl --user enable fetchit --now
-```
-
-#### Manually launch the fetchit container using a podman volume
-
-```
-podman run -d --rm --name fetchit \
-    -v fetchit-volume:/opt \
-    -v $HOME/.fetchit:/opt/mount \
-    -v /run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock \
-    --security-opt label=disable \
-    quay.io/fetchit/fetchit:latest
-```
-
-**NOTE:**
-* If a podman volume is not the preferred storage solution a directory can be used as well.
-An example would be `-v ~/fetchit-volume:/opt` instead of `-v fetchit-volume:/opt`.
-* For filetransfer, the `destination directory must exist` on the host.
-
-The container will be started and will run in the background. To view the logs:
-
-```
-podman logs -f fetchit
-
-
-```
-
-#### Verify the sample applications are running
-
-```
-podman ps
-
-```
-
-The Raw HTTP samples use `quay.io/fetchit/fetchit-sample-app:latest` on both amd64 and arm64.
-The image is built from Red Hat UBI HTTP Server, runs as user 1001, and needs no capability overrides.
-View the FetchIt welcome page at `http://localhost:8080` and `http://localhost:9080`,
-or run `curl --fail http://localhost:8080/`. Container port 8080 maps to the existing
-host ports. `APP_COLOR` demonstrates environment propagation and does not change
-the page color. See [sample applications](https://fetchit.readthedocs.io/en/latest/samples.html)
-for all examples, image-archive instructions, and native architecture tests.
-
-#### Verify the file is placed on the host
-
-```
-watch ls -al /tmp/hello.txt
-```
-
-#### Clean up
-
-```
-podman stop colors1 colors2 fetchit && podman rm colors1 colors2 && podman volume rm fetchit-volume
-```
-
-## Health and status endpoint
-
-Set `FETCHIT_STATUS_ADDR=127.0.0.1:8080` to enable optional `/healthz` and
-`/status` HTTP endpoints. For containers, add
-`-e FETCHIT_STATUS_ADDR=:8080 -p 127.0.0.1:8080:8080` to the launch command.
-The status endpoint reports scheduled invocation attempts, including Quadlet;
-liveness does not imply successful reconciliation. See the
-[full status guide](docs/status.rst) for response fields, reload behavior, and access configuration.
-
-### Building documentation
-
-Use the pinned documentation dependencies shared by Read the Docs and GitHub Actions:
-
-```bash
-python3 -m venv .venv-docs
-. .venv-docs/bin/activate
-python -m pip install -r docs/requirements.txt
-python -m sphinx -W -E -b html docs /tmp/fetchit-docs
-```
-
-Read the Docs must build a commit containing the current `.readthedocs.yml`.
-Historical versions keep their own build configuration. If a build still checks
-out an old commit, inspect the hosted project's version settings and trigger a
-build of `main` after merging; changing this repository does not rewrite old tags.
+Read the Docs must build the updated Git revision to publish these guides.
+Historical release tags retain their old configuration. See
+[documentation publishing](docs/documentation.rst) if the hosted site is stale.
