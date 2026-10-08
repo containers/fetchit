@@ -1,0 +1,48 @@
+name: Unit tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-26.04
+    env:
+      CGO_ENABLED: '1'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgpgme-dev libdevmapper-dev libseccomp-dev pkg-config
+      - name: Vet
+        run: go vet -mod=readonly -tags "$BUILDTAGS" ./cmd/... ./pkg/...
+      - name: Test
+        run: go test -mod=readonly -tags "$BUILDTAGS" ./...
+
+  fedora:
+    runs-on: ubuntu-26.04
+    container: quay.io/fedora/fedora:44
+    env:
+      CGO_ENABLED: '1'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs
+    steps:
+      - name: Install build dependencies
+        run: dnf install -y git tar gzip gcc make pkgconf-pkg-config gpgme-devel device-mapper-devel libseccomp-devel
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: go vet -mod=readonly -tags "$BUILDTAGS" ./cmd/... ./pkg/...
+      - name: Test
+        run: go test -mod=readonly -tags "$BUILDTAGS" ./...
