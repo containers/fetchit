@@ -74,3 +74,34 @@ release branch. Do not move historical release tags merely to repair docs.
 After a successful build, check :doc:`methods`, :doc:`quadlet`, :doc:`lifecycle`,
 and :doc:`release_notes` on the hosted version. A successful local/Actions build
 alone does not establish that Read the Docs has published the new revision.
+
+Scheduled Git update testing
+----------------------------
+
+The image workflow's ``make-change-to-repo`` job runs on pull requests and pushes
+using the engine and sample images built from that revision. It starts a
+job-local, read-only smart HTTP Git server, deploys two raw workloads, commits
+and pushes an update into a temporary bare repository, and waits for FetchIt's
+normal minute-based polling to reconcile the new commit. The changed workload
+must be replaced, the unchanged workload must retain its container ID, and the
+FetchIt process must remain running without a restart.
+
+The test does not write to GitHub, use repository-write credentials, force-push,
+or modify the shared ``ci`` branch. Every job has its own Git repository, port,
+containers, and state volume. Logs are printed on exit and fixtures are cleaned
+up. To reproduce on a Linux host with rootful Podman, enable the Podman socket,
+load or build the engine and sample images, then run:
+
+.. code-block:: bash
+
+   sudo systemctl enable --now podman.socket
+   sudo env FETCHIT_TEST_ENGINE_IMAGE=localhost/fetchit:reviewed \
+     bash tests/integration/live-update/test-live-update.sh
+
+The sample image must be tagged ``quay.io/fetchit/fetchit-sample-app:latest`` in
+the same rootful store. For a local build, use:
+
+.. code-block:: bash
+
+   sudo podman build -t quay.io/fetchit/fetchit-sample-app:latest \
+     -f examples/sample-app/Containerfile examples/sample-app

@@ -166,6 +166,9 @@ go test -mod=readonly -tags 'containers_image_openpgp gssapi providerless netgo 
 Real SOPS tests additionally require `SOPS_TEST_BINARY` and `AGE_TEST_BINARY`
 pointing to the supported SOPS executable and `age-keygen`. CI installs these
 tools and runs the unit, ownership, rollback, and runtime lifecycle checks.
+The image workflow also tests scheduled Git updates on PRs using a temporary
+local repository, without modifying GitHub branches. See the
+[testing guide](docs/documentation.rst#scheduled-git-update-testing).
 Integration tests use disposable hosts and packaged Podman 5/crun; do not run
 host service tests against a personal Podman socket.
 
