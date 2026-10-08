@@ -105,3 +105,31 @@ the same rootful store. For a local build, use:
 
    sudo podman build -t quay.io/fetchit/fetchit-sample-app:latest \
      -f examples/sample-app/Containerfile examples/sample-app
+
+Platform index verification
+---------------------------
+
+The publisher stages amd64 and arm64 child manifests in the destination
+repository and publishes one index referencing their immutable digests.
+Verification reads the index using the digest returned by the push. A local
+manifest with the same name as a public ``latest`` tag can shadow registry
+inspection in Podman; it must not be used as evidence of published content.
+The regression in ``tests/integration/publishing/test-platform-publish.sh``
+creates a conflicting local manifest under the destination's ``latest`` name,
+then verifies that registry clients can pull both amd64 and arm64 from the
+shared tag. ``tests/integration/publishing/test-publish-failures.sh`` checks
+missing and invalid digest output and rejects non-Linux images before a push.
+
+For an existing local index whose child manifests have already been pushed to
+``quay.io/fetchit/fetchit``, the equivalent digest-based inspection is:
+
+.. code-block:: bash
+
+   podman manifest push --all=false --format=docker --digestfile index.digest \
+     localhost/reviewed-index docker://quay.io/fetchit/fetchit:latest
+   index_digest=$(<index.digest)
+   podman manifest inspect "quay.io/fetchit/fetchit@$index_digest"
+
+This checks the content of the exact pushed index, avoiding inspection of a
+local manifest that shadows the mutable ``latest`` tag. The publishing script
+also validates the digest format and both Linux platform descriptors.

@@ -13,5 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
+      - name: Test publishing failure handling
+        run: bash tests/integration/publishing/test-publish-failures.sh
       - name: Test archive import and platform publishing with a local registry
         run: bash tests/integration/publishing/test-platform-publish.sh

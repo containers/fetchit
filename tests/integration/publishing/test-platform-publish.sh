@@ -35,8 +35,14 @@ expect_failure bash scripts/publish-platform-index.sh 127.0.0.1:5000/test:latest
 expect_failure bash scripts/publish-platform-index.sh 127.0.0.1:5000/test:latest localhost/publish-missing:amd64 localhost/publish-source:arm64
 # Seed an incorrect old architecture tag: the script must replace it.
 podman push --tls-verify=false localhost/publish-source:arm64 docker://127.0.0.1:5000/fetchit-test-amd:latest
+# Match the production failure: a stale local list has the destination tag.
+# Give it only the wrong architecture so inspecting that local tag cannot pass.
+podman manifest create 127.0.0.1:5000/fetchit-test:latest
+podman manifest add 127.0.0.1:5000/fetchit-test:latest localhost/publish-source:arm64
 FETCHIT_REGISTRY_TLS_VERIFY=false bash scripts/publish-platform-index.sh \
   127.0.0.1:5000/fetchit-test:latest localhost/publish-source:amd64 localhost/publish-source:arm64
+# Remove the intentionally stale local tag before the independent remote checks.
+podman manifest rm 127.0.0.1:5000/fetchit-test:latest
 # Check both architecture tags before deliberately moving one.
 for arch_tag in amd arm; do
   podman manifest inspect --tls-verify=false "127.0.0.1:5000/fetchit-test-$arch_tag:latest" > "/tmp/$arch_tag-tag.json"
