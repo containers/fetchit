@@ -4,14 +4,23 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	ErrSOPSConfig  = errors.New("invalid SOPS key configuration")
+	ErrSOPSInput   = errors.New("invalid encrypted SOPS input")
+	ErrSOPSSize    = errors.New("SOPS size limit exceeded")
+	ErrSOPSDecrypt = errors.New("SOPS decryption failed")
 )
 
 const (
@@ -27,15 +36,15 @@ type SOPS struct {
 
 func (s *SOPS) validate() error {
 	if s == nil || !filepath.IsAbs(s.AgeKeyFile) {
-		return errors.New("SOPS requires an absolute ageKeyFile")
+		return fmt.Errorf("%w: absolute ageKeyFile required", ErrSOPSConfig)
 	}
 	info, err := os.Stat(s.AgeKeyFile)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > 65536 || info.Mode().Perm()&0077 != 0 {
-		return errors.New("SOPS age key file must be readable, regular, at most 64 KiB, and private (0400 or 0600)")
+		return fmt.Errorf("%w: readable regular private file of at most 64 KiB required", ErrSOPSConfig)
 	}
 	file, err := os.Open(s.AgeKeyFile)
 	if err != nil {
-		return errors.New("SOPS age key file is not readable")
+		return ErrSOPSConfig
 	}
 	file.Close()
 	return nil
@@ -43,14 +52,16 @@ func (s *SOPS) validate() error {
 
 // limitedSOPSOutput stops a child process from allocating unbounded plaintext.
 type limitedSOPSOutput struct {
-	buffer bytes.Buffer
-	cancel context.CancelFunc
+	buffer   bytes.Buffer
+	cancel   context.CancelFunc
+	exceeded bool
 }
 
 func (w *limitedSOPSOutput) Write(p []byte) (int, error) {
 	if w.buffer.Len()+len(p) > sopsFileLimit {
+		w.exceeded = true
 		w.cancel()
-		return 0, errors.New("SOPS output limit exceeded")
+		return 0, ErrSOPSSize
 	}
 	return w.buffer.Write(p)
 }
@@ -66,30 +77,39 @@ func (s *SOPS) decryptWithCommand(ctx context.Context, input []byte, createComma
 		return nil, err
 	}
 	if len(input) == 0 || len(input) > sopsFileLimit {
-		return nil, errors.New("SOPS input is empty or exceeds 8 MiB")
+		return nil, ErrSOPSSize
 	}
 	if err := validateSOPSMetadata(input); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", ErrSOPSInput, err.Error())
 	}
 	childCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	output := &limitedSOPSOutput{cancel: cancel}
 	defer func() { clear(output.buffer.Bytes()) }()
 	command := createCommand(childCtx)
-	command.Env = []string{"HOME=/nonexistent", "PATH=/usr/bin:/bin", "SOPS_AGE_KEY_FILE=" + s.AgeKeyFile}
+	command.Env = []string{"HOME=/nonexistent", "PATH=/nonexistent", "SOPS_AGE_KEY_FILE=" + s.AgeKeyFile}
 	command.Stdin = bytes.NewReader(input)
 	command.Stdout = output
-	command.Stderr = io.Discard
+	stderr := &limitedSOPSStderr{cancel: cancel}
+	command.Stderr = stderr
 	command.WaitDelay = time.Second
 	if err := command.Run(); err != nil {
 		// Upstream diagnostics and process errors can contain plaintext or key data.
-		return nil, errors.New("SOPS decryption failed (check key, integrity, size limits, deadline, and installed executable)")
+		if output.exceeded || stderr.exceeded {
+			return nil, ErrSOPSSize
+		}
+		if childCtx.Err() != nil {
+			return nil, childCtx.Err()
+		}
+		return nil, ErrSOPSDecrypt
 	}
 	return bytes.Clone(output.buffer.Bytes()), nil
 }
 
 // Only ordinary age recipients are accepted. Other SOPS backends must not use
 // ambient credentials or contact remote key services in this first release.
+var ordinaryAgeRecipient = regexp.MustCompile(`^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$`)
+
 func validateSOPSMetadata(input []byte) error {
 	decoder := yaml.NewDecoder(bytes.NewReader(input))
 	count := 0
@@ -101,6 +121,22 @@ func validateSOPSMetadata(input []byte) error {
 		}
 		if err != nil {
 			return errors.New("invalid encrypted YAML")
+		}
+		{
+			for _, field := range []string{"data", "stringData"} {
+				if raw, exists := document[field]; exists {
+					values, ok := raw.(map[string]interface{})
+					if !ok {
+						return errors.New("encrypted Secret values must be a mapping")
+					}
+					for _, value := range values {
+						text, ok := value.(string)
+						if !ok || !strings.HasPrefix(text, "ENC[AES256_GCM,") {
+							return errors.New("SOPS methods require encrypted Secret values")
+						}
+					}
+				}
+			}
 		}
 		metadata, ok := document["sops"].(map[string]interface{})
 		if !ok {
@@ -135,7 +171,7 @@ func validateSOPSMetadata(input []byte) error {
 				return errors.New("invalid SOPS age recipient")
 			}
 			name, ok := recipient["recipient"].(string)
-			if !ok || !strings.HasPrefix(name, "age1") || strings.ContainsAny(name, " \t\n") {
+			if !ok || !ordinaryAgeRecipient.MatchString(name) {
 				return errors.New("SOPS supports only ordinary age recipients")
 			}
 		}
@@ -162,4 +198,21 @@ func readSOPSInput(path string) ([]byte, error) {
 		return nil, errors.New("encrypted manifest read failed or exceeds 8 MiB")
 	}
 	return data, nil
+}
+
+// Discard diagnostic content but bound its volume and stop a noisy child.
+type limitedSOPSStderr struct {
+	count    int
+	exceeded bool
+	cancel   context.CancelFunc
+}
+
+func (w *limitedSOPSStderr) Write(data []byte) (int, error) {
+	if w.count+len(data) > 65536 {
+		w.exceeded = true
+		w.cancel()
+		return 0, ErrSOPSSize
+	}
+	w.count += len(data)
+	return len(data), nil
 }

@@ -71,12 +71,7 @@ func (k *Kube) Process(ctx, conn context.Context, skew int) {
 
 func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
 	if k.SOPS != nil {
-		prepared, err := k.prepareSOPSChanges(ctx, map[*object.Change]string{change: path}, k.SOPS.decrypt)
-		if err != nil {
-			return err
-		}
-		defer clearPreparedKube(prepared)
-		return k.runPreparedSOPS(ctx, conn, prepared)
+		return k.applyPreparedSOPS(ctx, conn, map[*object.Change]string{change: path})
 	}
 	prev, err := getChangeString(change)
 	if err != nil {
@@ -91,12 +86,7 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 		return err
 	}
 	if k.SOPS != nil {
-		prepared, err := k.prepareSOPSChanges(ctx, changeMap, k.SOPS.decrypt)
-		if err != nil {
-			return err
-		}
-		defer clearPreparedKube(prepared)
-		return k.runPreparedSOPS(ctx, conn, prepared)
+		return k.applyPreparedSOPS(ctx, conn, changeMap)
 	}
 	if err := runChanges(ctx, conn, k, changeMap); err != nil {
 		return err

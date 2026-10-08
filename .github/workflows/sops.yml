@@ -18,8 +18,8 @@ jobs:
       CGO_ENABLED: '0'
       BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs sops_integration
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/setup-podman
@@ -54,7 +54,8 @@ jobs:
             -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD/_output:/work:ro" \
             localhost/fetchit-sops-fedora bash -euo pipefail -c '
               install -m 0755 /work/sops /usr/local/bin/sops
-              mkdir -p /run/podman
+              mkdir -p /run/podman /etc/containers
+              printf "[engine]\ncgroup_manager=\"cgroupfs\"\nevents_logger=\"file\"\n" > /etc/containers/containers.conf
               podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-service.log 2>&1 &
               timeout 30 bash -c "until test -S /run/podman/podman.sock; do sleep 1; done"
               podman pull docker.io/library/alpine:3.22

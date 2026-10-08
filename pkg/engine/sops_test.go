@@ -18,7 +18,8 @@ import (
 )
 
 const testPlainKube = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: application\nspec:\n  containers:\n  - name: app\n    image: alpine\n"
-const testEncryptedMetadata = "sops:\n  age:\n  - recipient: age1test\n    enc: dummy\n  mac: ENC[dummy]\n  version: 3.13.3\n"
+
+var testEncryptedMetadata = "sops:\n  age:\n  - recipient: age1" + strings.Repeat("q", 58) + "\n    enc: dummy\n  mac: ENC[dummy]\n  version: 3.13.3\n"
 
 func sopsTestSettings(t *testing.T) *SOPS {
 	t.Helper()
@@ -43,7 +44,7 @@ func TestSOPSMetadataPolicy(t *testing.T) {
 		{"cloud backend", testEncryptedMetadata + "  kms: [{arn: test}]\n", false},
 		{"partial integrity", testEncryptedMetadata + "  mac_only_encrypted: true\n", false},
 		{"keygroups", testEncryptedMetadata + "  key_groups: []\n", false},
-		{"plugin", strings.ReplaceAll(testEncryptedMetadata, "age1test", "age-plugin-test"), false},
+		{"plugin", strings.ReplaceAll(testEncryptedMetadata, "age1"+strings.Repeat("q", 58), "age1plugin1test"), false},
 		{"duplicate metadata", testEncryptedMetadata + testEncryptedMetadata, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -193,7 +194,7 @@ func TestSOPSOutputLimitCancelsExecution(t *testing.T) {
 	settings := sopsTestSettings(t)
 	binary := filepath.Join(t.TempDir(), "sops")
 	// A portable pipeline generates a result just above the limit without keys.
-	script := "#!/bin/sh\nhead -c 8388609 /dev/zero\n"
+	script := "#!/bin/sh\n/usr/bin/head -c 8388609 /dev/zero\n"
 	if err := os.WriteFile(binary, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}

@@ -5,10 +5,12 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +94,11 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	apply := func(hash plumbing.Hash) {
 		t.Helper()
 		if err := k.Apply(ctx, conn, applied, hash, &tags); err != nil {
+			var failure *SOPSPodmanError
+			if errors.As(err, &failure) {
+				diagnostic := regexp.MustCompile(`fetchit-secret-sentinel-[a-z-]+`).ReplaceAllString(failure.cause.Error(), "[redacted test secret]")
+				t.Logf("Podman lifecycle fixture failure: %s", diagnostic)
+			}
 			t.Fatal(err)
 		}
 		if err := updateCurrent(ctx, k.target, hash, k.GetKind(), k.GetName()); err != nil {

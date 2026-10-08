@@ -31,13 +31,19 @@ func (k *Kube) prepareSOPSChanges(ctx context.Context, changeMap map[*object.Cha
 		return nil, err
 	}
 	if target := k.GetTarget(); target != nil {
-		repository, _ := filepath.Abs(getDirectory(target))
+		repository, err := filepath.Abs(getDirectory(target))
+		if err != nil {
+			return nil, errors.New("cannot resolve repository path")
+		}
 		key, err := filepath.EvalSymlinks(k.SOPS.AgeKeyFile)
 		if err != nil {
 			return nil, errors.New("cannot resolve age key file")
 		}
 		repository, err = filepath.EvalSymlinks(repository)
-		if err == nil {
+		if err != nil {
+			return nil, errors.New("cannot resolve repository path")
+		}
+		{
 			relative, err := filepath.Rel(repository, key)
 			if err != nil || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
 				return nil, errors.New("age key file must be outside the repository")
@@ -71,11 +77,11 @@ func (k *Kube) prepareSOPSChanges(ctx context.Context, changeMap map[*object.Cha
 	decode := func(input []byte) ([]byte, error) {
 		plain, err := decrypt(ctx, input)
 		if err != nil {
-			return nil, errors.New("cannot decrypt manifest; check age keys and SOPS integrity")
+			return nil, &SOPSPreparationError{cause: err}
 		}
 		if len(plain) > sopsFileLimit || total+len(plain) > sopsBatchLimit {
 			clear(plain)
-			return nil, errors.New("decrypted manifests exceed size limits")
+			return nil, ErrSOPSSize
 		}
 		if err := validateDecryptedKube(plain); err != nil {
 			clear(plain)
@@ -173,21 +179,32 @@ func validateDecryptedKube(input []byte) error {
 }
 
 func (k *Kube) runPreparedSOPS(ctx, conn context.Context, changes []preparedKubeChange) error {
-	if err := validateNetworks(conn, k.Networks); err != nil {
-		return errors.New("encrypted workload network preflight failed")
+	for _, change := range changes {
+		if change.next != nil {
+			if err := validateNetworks(conn, k.Networks); err != nil {
+				return errors.New("encrypted workload network preflight failed")
+			}
+			break
+		}
 	}
 	for _, change := range changes {
 		if change.previous != nil {
 			if err := stopPods(conn, change.previous); err != nil && !strings.Contains(err.Error(), "no such pod") {
-				return errors.New("cannot stop previous encrypted workload")
+				return &SOPSPodmanError{Operation: "stop previous encrypted workload", cause: err}
 			}
 		}
 		if change.next != nil {
 			if err := stopPods(conn, change.next); err != nil && !strings.Contains(err.Error(), "no such pod") {
-				return errors.New("cannot stop existing encrypted workload")
+				return &SOPSPodmanError{Operation: "stop existing encrypted workload", cause: err}
 			}
-			if _, err := play.KubeWithBody(conn, bytes.NewReader(change.next), kubeNetworkOptions(k.Networks)); err != nil {
-				return errors.New("cannot play encrypted workload")
+			report, err := play.KubeWithBody(conn, bytes.NewReader(change.next), kubeNetworkOptions(k.Networks))
+			if err != nil {
+				return &SOPSPodmanError{Operation: "play encrypted workload", cause: err}
+			}
+			for _, pod := range report.Pods {
+				if len(pod.ContainerErrors) > 0 {
+					return &SOPSPodmanError{Operation: "start encrypted workload", cause: errors.New(pod.ContainerErrors[0])}
+				}
 			}
 		}
 	}
@@ -207,3 +224,30 @@ func readSOPSGitFile(file *object.File) ([]byte, error) {
 	}
 	return data, nil
 }
+
+// SOPSPodmanError keeps unsafe response text out of ordinary logs while retaining
+// the underlying error for callers that explicitly inspect it.
+type SOPSPodmanError struct {
+	Operation string
+	cause     error
+}
+
+func (e *SOPSPodmanError) Error() string { return "cannot " + e.Operation }
+func (e *SOPSPodmanError) Unwrap() error { return e.cause }
+
+func (k *Kube) applyPreparedSOPS(ctx, conn context.Context, changes map[*object.Change]string) error {
+	prepared, err := k.prepareSOPSChanges(ctx, changes, k.SOPS.decrypt)
+	if err != nil {
+		return err
+	}
+	defer clearPreparedKube(prepared)
+	return k.runPreparedSOPS(ctx, conn, prepared)
+}
+
+// SOPSPreparationError preserves typed causes without rendering upstream text.
+type SOPSPreparationError struct{ cause error }
+
+func (e *SOPSPreparationError) Error() string {
+	return "cannot decrypt manifest; check age keys, integrity, limits, and deadline"
+}
+func (e *SOPSPreparationError) Unwrap() error { return e.cause }

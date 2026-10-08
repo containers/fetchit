@@ -110,8 +110,16 @@ example by adding these arguments to the normal FetchIt container command:
 The ``Z`` suffix supplies a private SELinux label on Fedora. Ensure that the
 container user can read the mounted file without widening its permissions. Mount
 only the private key file, not your whole credentials directory. Alternatively,
-provision the identity through a Podman file secret, mounted at the configured
-path with private permissions. FetchIt does not inherit ambient age identities,
+provision the identity through a Podman file secret with explicit private mode:
+
+.. code-block:: shell
+
+   podman secret create fetchit-age-keys "$HOME/.config/fetchit/age.txt"
+   # Add to the normal FetchIt run command:
+   --secret fetchit-age-keys,type=mount,target=/run/secrets/fetchit-age-keys,mode=0400
+
+The default Podman secret mount mode (0444) is rejected. Configure the secret in
+the same rootful/rootless Podman instance that starts FetchIt. FetchIt does not inherit ambient age identities,
 Git/cloud credentials, or SOPS key-service settings into its decryption process.
 For a custom image or a native binary, install the supported SOPS executable at
 ``/usr/local/bin/sops``. Existing optional ``networks`` settings remain supported.
@@ -135,7 +143,7 @@ the key file alone does not redeploy unchanged manifests. Restore the required
 identity and FetchIt retries on the next scheduled attempt.
 
 Each encrypted input and decrypted output is limited to 8 MiB. Prepared plaintext
-for one apply attempt is limited to 32 MiB. Each SOPS invocation has a 30-second
+for one apply attempt is limited to 32 MiB. SOPS diagnostic output is discarded and limited to 64 KiB. Each invocation has a 30-second
 deadline. Split larger workloads across methods. Decrypted manifests are sent
 through the Podman API from memory; FetchIt does not write plaintext manifests to
 Git checkouts or temporary files. Memory clearing is best effort, not a guarantee
