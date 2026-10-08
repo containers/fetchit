@@ -169,6 +169,7 @@ func TestSampleApplications(t *testing.T) {
 		t.Cleanup(func() { exec.Command("podman", "rm", "-f", "sample-systemd").Run() })
 		sampleCommand(t, "run", "-d", "--name", "sample-systemd", "-p", "18080:8080", "-v", site+":/var/www/html:ro", image)
 		sampleArchitecture(t, image)
+		sampleNonRoot(t, "sample-systemd")
 		sampleHTTP(t, 18080, "Sample systemd site")
 	})
 	t.Run("quadlet-image", func(t *testing.T) {

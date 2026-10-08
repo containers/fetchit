@@ -874,8 +874,9 @@ jobs:
       - name: ensure httpd.service is running
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
-      - name: Pull test httpd image
-        run: sudo podman pull registry.access.redhat.com/ubi8/httpd-24:latest
+      - name: Build an updated website for local auto-update
+        # Replace the service's local tag with a different image, without publishing.
+        run: sudo podman build -t registry.access.redhat.com/ubi8/httpd-24:latest -f examples/sample-app/Containerfile examples/sample-app
 
       - name: Debug - Check what curl returns
         run: curl -v http://localhost:8080/ || true
@@ -890,7 +891,7 @@ jobs:
         run: sudo podman exec httpd ls -la /var/www/html/ || true
 
       - name: Wait for podman auto-update
-        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "Welcome to your static httpd application" | wc -l ); sleep 2; done'
+        run: timeout 150 bash -c -- 'msg=0 ; until [ $msg -ge 1 ]; do msg=$( curl -s localhost:8080/index.html | grep "FetchIt sample application" | wc -l ); sleep 2; done'
 
       - name: check the service
         if: always()

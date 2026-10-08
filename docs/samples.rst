@@ -52,6 +52,10 @@ Names such as ``colors1`` and environment values such as ``APP_COLOR`` are
 retained for configuration/reconciliation demonstrations. The sample does not
 use ``APP_COLOR`` to change its page.
 
+The Kube examples use ``imagePullPolicy: IfNotPresent`` so locally built/imported
+images are used, including in PR tests before publication. Remove a cached image
+or use ``Always`` when you want to fetch an updated ``latest`` tag.
+
 The PVC example mounts a volume over the bundled website at ``/var/www/html``.
 Supply readable content in that volume to get a successful homepage response.
 For example, initialize the volume as root while the HTTP server remains user
@@ -97,7 +101,7 @@ The ``Sample applications (amd64 and arm64)`` GitHub Actions workflow runs on
 native Ubuntu amd64 and arm64 runners for each PR, main push, weekly schedule,
 and manual dispatch. It uses FetchIt's actual Raw/Kube routines and the
 checked-in manifests, checks the loaded image architecture, and checks successful
-HTTP responses and the non-root HTTP sample user. It also tests local image-archive import and runs the Systemd
+HTTP responses and the non-root HTTP sample user. It also assembles and verifies the combined platform index, tests local image-archive import and runs the Systemd
 and Quadlet sample images. Full service/receipt lifecycle coverage remains in
 the existing Systemd and Quadlet workflows.
 

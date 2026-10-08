@@ -14,6 +14,7 @@ spec:
   containers:
   - name: colors-kubeplay
     image: quay.io/fetchit/fetchit-sample-app:latest
+    imagePullPolicy: IfNotPresent
     ports:
     - containerPort: 8080
       hostPort: 7080

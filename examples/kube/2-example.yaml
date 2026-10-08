@@ -10,6 +10,7 @@ spec:
   containers:
   - name: nginx-server
     image: quay.io/fetchit/fetchit-sample-app:latest
+    imagePullPolicy: IfNotPresent
     ports:
     - containerPort: 8080
       hostPort: 8080

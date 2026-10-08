@@ -415,8 +415,8 @@ test_imageload_validate() {
     sudo mkdir -p /tmp/image
 
     if ! sudo podman image exists "$COLORS_IMAGE"; then
-        print_warning "Colors image not available, pulling..."
-        sudo podman pull "$COLORS_IMAGE" 2>/dev/null || true
+        print_info "Building the sample image..."
+        pull_colors_image
     fi
 
     sudo podman tag "$COLORS_IMAGE" quay.io/notreal/httpd:latest 2>/dev/null || true
