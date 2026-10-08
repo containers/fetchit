@@ -27,6 +27,12 @@ method identities. Multiple trailing slashes are also accepted. Existing
 configurations without a trailing slash continue to work. This does not change
 absolute-path validation or normalize interior path components.
 
+``targetPath`` selects a path inside the Git repository. It is distinct from
+``destinationDirectory`` and Quadlet's ``hostHome``, ``hostConfigHome``, and
+``hostRuntimeDir``, which refer to the host filesystem. The trailing-slash
+normalization applies to ``targetPath``; tracked host destinations must still
+be canonical absolute paths without symlink components.
+
 FileTransfer continues to copy each file by its basename into
 ``destinationDirectory``; adding a trailing slash does not preserve nested source
 directories or change its destination layout.
@@ -43,7 +49,7 @@ pod is required to reload targetConfigs. The following fields are required with 
 
    configReload:
      schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+     configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
 
 Changes pushed to the ConfigURL will trigger a reloading of FetchIt target configs. It's recommended to include the ConfigReload
 in the FetchIt config to enable updates to target configs without requiring a restart.
@@ -55,56 +61,80 @@ that is stored in git will be used.
 For opt-in cleanup when a method leaves configuration, and recovery after a failed
 Git apply, see :doc:`lifecycle`.
 
-Dynamic Configuration Reload Using a Private Registry
------------------------------------------------------
+Private configuration downloads
+-------------------------------
 
-The ConfigReload method can be used to reload target configs from a private registry but this comes with the warning to ensure that
-the repository is not public. The config.yaml will need to include the credentials to access the private registry.
-
-When using a GitHub PAT token, the config.yaml will need to include the following fields:
+Keep credentials out of public repositories. Scheduled remote configuration
+updates use the top-level ``gitAuth`` credentials, which also apply to Git targets:
 
 .. code-block:: yaml
 
+   gitAuth:
+     envSecret: GH_PAT
    configReload:
      schedule: "*/5 * * * *"
-     pat: github-alphanumeric-token
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+     configURL: https://raw.githubusercontent.com/example/private/main/config.yaml
 
-When using basic authentication the config.yaml will need to include the following fields:
+Provide ``GH_PAT`` to the engine as an environment secret using the launch example
+below. Alternatively, top-level ``gitAuth.pat`` or ``gitAuth.username`` and
+``gitAuth.password`` supply credentials; protect the local configuration file.
+Do not put credentials only inside ``configReload``. Bootstrap with a local
+config containing the authentication settings: the initial URL download before
+configuration is loaded does not have those credentials available.
 
-.. code-block:: yaml
-
-  gitAuth:
-    username: bob
-    password: bobpassword
-   configReload:
-     schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
-
-NOTE: This is not recommended for public repositories. As your credentials will need to be in clear text in the config.yaml.
-
-PAT is the preferred method of authentication when available as the credentials can be reissued or locked. The PAT will be used both for the configuration file and the repo
-
-.. code-block:: yaml
-
-    gitAuth:
-      pat: github-alphanumeric-token
-   configReload:
-     schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
-
-
-Configuring FetchIt Using Environment Variables
+Remote configuration and environment variables
 -----------------------------------------------
 
-FetchIt can also be configured by providing the FetchIt config through the `FETCHIT_CONFIG` environment variable. 
-This approach will use the contents of `FETCHIT_CONFIG` to configure the FetchIt application.
-This variable takes precedence over the FetchIt config file and will overwrite its contents if both are provided. 
+Set ``FETCHIT_CONFIG_URL`` to supply a remote configuration URL. An existing local
+``/opt/mount/config.yaml`` takes priority on initial startup. Use ``configReload``
+for scheduled updates, and mount a writable configuration directory for atomic
+replacement. See :doc:`running` for validation, backups, and failure behavior.
+The current engine does not load YAML directly from ``FETCHIT_CONFIG``; use the
+configuration file or URL instead.
 
 Methods
 =======
-Various methods are available to lifecycle and manage the container environment on a host. Funcionality also exists to
-allow for files or directories of files to be deployed to the container host to be used by containers.
+Methods manage containers, host services, and files. The examples below show the
+configuration keys used inside ``targetConfigs``. For the features documented
+here, build engine and helper images from commit ``4e7964a`` or a descendant,
+until a release containing them is published. See :doc:`documentation` for
+revision-pinned builds and :doc:`release_notes` for unreleased changes.
+
+.. list-table:: Method selection
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * - Configuration key
+     - Use it for
+     - Removal behavior
+   * - ``raw``
+     - Podman container definitions in JSON/YAML
+     - Optional owned-container cleanup
+   * - ``kube``
+     - Podman kube play manifests, optionally encrypted with SOPS
+     - Optional owned-Pod cleanup
+   * - ``quadlet``
+     - Complete host-managed Podman/systemd bundles
+     - Optional cleanup using the host bundle journal
+   * - ``systemd``
+     - Authored host ``.service`` files
+     - Optional tracked-service cleanup
+   * - ``filetransfer``
+     - Copy files into an existing host directory
+     - Optional tracked-file cleanup
+   * - ``ansible``
+     - Host configuration through playbooks
+     - No automatic undo of playbook changes
+
+``cleanupOnRemoval`` defaults to false. Deleting a method entry or its entire
+Git target from configuration retains its resources unless cleanup was enabled
+before that change. The method sections
+and :doc:`lifecycle` explain ownership, migration, and recovery requirements.
+Trailing slashes in ``targetPath`` are optional; the Git target paths section
+above explains normalization and FileTransfer's flat destination layout.
+
+See :doc:`samples` for runnable applications, amd64/arm64 images, ports,
+and archive-loading instructions.
 
 
 All methods are defined within specific targetConfiguration sections. These sections are demonstrated below. For private repositories, a PAT token or a username/password combination is required.
@@ -173,9 +203,9 @@ An example of using username/password is shown below.
 
 .. code-block:: yaml
 
-    gitAuth:
-      username: bob
-      password: bobpassword
+   gitAuth:
+     username: bob
+     password: bobpassword
    targetConfigs:
    - url: https://github.com/containers/fetchit
      branch: main
@@ -192,7 +222,15 @@ This variable is defined as `--secret GH_PAT,type=env` in the `podman run` comma
 
    export GH_PAT_TOKEN=CHANGEME
    podman secret create --env GH_PAT GH_PAT_TOKEN 
-   podman run -d --name fetchit     -v fetchit-volume:/opt     -v $HOME/.fetchit:/opt/mount     -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock --secret GH_PAT,type=env --security-opt label=disable --secret GH_PAT,type=env quay.io/fetchit/fetchit:latest
+   podman run -d --name fetchit \
+     -v fetchit-volume:/opt \
+     -v "$HOME/.fetchit:/opt/mount" \
+     -v "/run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock" \
+     --secret GH_PAT,type=env --security-opt label=disable \
+     quay.io/fetchit/fetchit:latest
+
+Set ``gitAuth.envSecret: GH_PAT`` in the configuration so the engine reads this
+secret. Create it in the same rootful/rootless Podman store used to launch FetchIt.
 
 Ansible
 -------
@@ -211,6 +249,11 @@ In the examples directory, there is an Ansible playbook that is used to install 
        schedule: "*/5 * * * *"
 
 The field sshDirectory is unique for this method. This directory should contain the private key used to connect to the host and the public key should be copied into the `.ssh/authorized_keys` file to allow for connectivity. The .ssh directory should be owned by root.
+
+Write idempotent playbooks so retrying a revision is safe. Removing the method
+does not reverse its changes, and apply rollback is unsupported for Ansible.
+Recover through a reviewed compensating playbook or restore the host manually;
+reverting Git alone does not undo packages, users, or external state.
 
 Raw
 ---
@@ -308,9 +351,23 @@ and remove them when the method leaves configuration. The default is false.
 Tracked deployments require an existing, absolute destination directory and
 refuse to overwrite untracked files. See :doc:`lifecycle` for setup and recovery.
 
+During Git reconciliation, deletion removes the old destination filename, and
+rename removes the old filename before installing the new one. Filenames with
+spaces are passed as command arguments. These file-level changes are separate
+from removing an entire method from configuration: that requires prior opt-in
+with ``cleanupOnRemoval``. With tracking enabled, local edits or file replacements
+block destructive operations until the ownership conflict is resolved.
+
 Kube Play
 ---------
 The KubeTarget method will launch a container based upon a Kubernetes pod manifest. This is useful for launching containers to run the same way as they would in a Kubernetes environment.
+
+To attach the played Pods to existing Podman networks, configure ``networks``
+on the Kube method, alongside ``targetPath`` and ``schedule``. This is FetchIt
+configuration, not a field to add to the Kubernetes Pod manifest. See
+:ref:`method-podman-networks` for configuration, host scope, and verification.
+The same network setting applies to ordinary and SOPS-encrypted Kube methods.
+
 
 .. code-block:: yaml
 
@@ -398,8 +455,47 @@ An example Kube play YAML file will look similiar to the following. This will la
 Quadlet Method
 --------------
 
-See :doc:`quadlet` for host-managed Podman Quadlet bundles, configuration, and lifecycle behavior.
+The ``quadlet`` method deploys a complete Git bundle into the host's Quadlet
+search path, where the host Podman generator creates systemd services. Use Podman
+5.7 or newer within major version 5, cgroup v2, and a running systemd manager.
+Prefer rootless operation when workloads do not require root-owned host resources:
 
+.. code-block:: yaml
+
+   targetConfigs:
+   - name: quadlet-example
+     url: https://github.com/containers/fetchit.git
+     branch: main
+     quadlet:
+     - name: web
+       targetPath: examples/quadlet/units/
+       schedule: "*/1 * * * *"
+       root: false
+       hostHome: /home/operator
+       hostConfigHome: /home/operator/.config
+       hostRuntimeDir: /run/user/1234
+       start: true
+       restart: true
+       cleanupOnRemoval: true
+
+Replace the host paths with the actual socket user's paths. For this rootless
+example, change the bundled container's ``[Install]`` target to
+``WantedBy=default.target`` in your repository. It writes a message to a named
+volume and does not publish an HTTP port. Select the complete units directory.
+
+``start`` defaults to false; set it to true to start services after deployment.
+``restart`` defaults to false; setting it to true implies start and restarts
+workload services when the bundle changes. Cleanup defaults to false and must
+be enabled before removing the method entry or its entire Git target.
+
+See :doc:`quadlet` for rootful setup, validated host paths, bundle limits, image
+pinning, activation, and precise resource-retention rules. See :doc:`lifecycle`
+for removal receipts, retries, and rollback. Rootful helpers have host-wide
+administrative access; rootless helpers still administer the user's resources.
+Use trusted repositories and reviewed helper images in either scope.
+
+
+.. _method-podman-networks:
 
 Optional Podman networks
 ------------------------
@@ -441,6 +537,29 @@ fail before removing existing containers or pods. A network disappearing after
 this check, or another Podman runtime failure, can still interrupt redeployment. Network options are not applied
 to file-transfer or other helper containers.
 
+Rootful and rootless networks are separate. If FetchIt uses the rootful socket,
+create and inspect networks with ``sudo podman``. If it uses a user's socket,
+run these commands as that same host user. A network created in your personal
+rootless store is unavailable to a rootful FetchIt deployment.
+
+After deployment, inspect the selected network and the played Pods:
+
+.. code-block:: shell
+
+   podman network inspect backend
+   podman pod ps
+   podman ps --filter label=fetchit.containers.io/managed-by=fetchit
+
+Use ``sudo`` for the rootful case. Check the network inspection output for the
+expected attached workloads. Network attachment does not automatically publish
+ports: use the manifest's ``hostPort`` where host access is required, as in the
+Kube sample. Podman handles the runtime network; FetchIt does not implement
+Kubernetes cluster networking or NetworkPolicy enforcement.
+
+Quadlet networking is configured in the authored units, such as
+``Network=web.network`` with a bundled ``web.network`` definition. The Raw/Kube
+``networks`` option does not configure Quadlet or legacy Systemd units.
+
 Changing a network setting in FetchIt's config alone does not redeploy an
 unchanged Git manifest. Commit a change to the workload file to apply the new
 attachments; existing workloads keep their current attachments until recreated.
@@ -471,3 +590,41 @@ Kube methods can opt into authenticated SOPS decryption using a read-only age ke
 file. All changed manifests are prepared before teardown. See :doc:`sops` for a
 complete encrypted Secret/Pod example, configuration, key rotation, deletion,
 limits, and recovery. Ordinary Kube methods retain their current behavior.
+
+Cleanup, rollback, and method identity
+--------------------------------------
+
+Raw, Kube, Quadlet, FileTransfer, and Systemd support ``cleanupOnRemoval``.
+Resources are retained when a method entry or its entire Git target leaves
+configuration unless the flag was enabled beforehand. See :doc:`lifecycle` for
+migration, ownership, retries, and retained resources.
+
+Git targets may set ``rollback: true`` only when all their methods are Raw, Kube,
+or Quadlet. A mixed target containing FileTransfer, Systemd, Ansible, or another
+unsupported method is rejected, rather than partially rolled back. Rollback
+defaults to false; ``trackBadCommits`` requires rollback. Configuration examples
+and recovery limits are in :doc:`lifecycle`.
+
+Preserve the FetchIt volume and host journals across upgrades: they store applied
+Git baselines, pending cleanup receipts, and file/service ownership needed to
+retry safely. Deleting them loses that recovery information; FetchIt does not
+reconstruct ownership by deleting unknown host resources.
+
+Raw and Kube workloads carry ownership labels. Changing ``containers`` to
+``containers/`` retains the same normalized identity. The workload-label section
+above documents discovery commands and reserved keys.
+
+Git mirrors and service status
+-------------------------------
+
+Targets can configure ordered ``fallbackURLs`` while retaining ``url`` as their
+primary identity. See :doc:`mirrors` for trusted mirror configuration, Git history
+checks, and authentication. SSH setup is documented above; verify host keys
+rather than disabling verification.
+
+Set ``FETCHIT_STATUS_ADDR`` to expose optional ``/healthz`` and ``/status`` HTTP
+endpoints. For a native process, use ``FETCHIT_STATUS_ADDR=127.0.0.1:8080``.
+For containers, publish the port only on host loopback as shown in :doc:`status`.
+The endpoints have no authentication; remote exposure requires an authenticated
+TLS proxy and firewall policy. FetchIt does not enforce those controls or reject
+public binds itself. Neither endpoint is enabled by default.

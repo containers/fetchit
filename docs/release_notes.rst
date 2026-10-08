@@ -32,7 +32,8 @@ Documentation builds explicitly select Ubuntu 24.04 and Python 3.12 and install
 pinned Sphinx/theme requirements. This fixes the missing ``build.os`` validation
 error. The same Python dependencies build in GitHub Actions, with warnings treated
 as errors. Read the Docs must build a revision containing this configuration; old
-release versions retain their own historical configuration.
+release versions retain their own historical configuration. See :doc:`documentation`
+for local validation, version activation, and hosted build troubleshooting.
 
 Sample applications on amd64 and arm64
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -6,7 +6,13 @@
 
 FetchIt
 =======
-FetchIt was designed to allow for the hands off management of containers running on system running podman. Check out the :ref:`Quick Start` for a quick example of FetchIt.
+FetchIt reconciles Git-defined containers, host services, and files using Podman.
+Start with :doc:`quick_start`, choose a deployment method in :doc:`methods`, and
+use :doc:`quadlet` for host-managed Podman services. See :doc:`release_notes` for
+recent features and :doc:`lifecycle` for opt-in cleanup and rollback.
+
+The guides describe current main-branch functionality. Use engine and helper
+images containing those changes; an older published image may lack new options.
 
 .. toctree::
    quick_start
@@ -20,3 +26,4 @@ FetchIt was designed to allow for the hands off management of containers running
    status
    release_notes
    running
+   documentation

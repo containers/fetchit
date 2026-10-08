@@ -7,13 +7,13 @@ We will assume that FetchIt will be ran as a non-privileged user. The first step
 .. code-block:: bash
    
    sudo dnf install -y podman
-   systemctl start podman.socket --user
+   systemctl --user enable --now podman.socket
 
 Now that Podman is available and the Podman socket is running, we can use FetchIt to manage containers. Start by creating the directory that will hold the FetchIt configuration.
 
 .. code-block:: bash
    
-   mkdir ~/.fetchit
+   mkdir -p "$HOME/.fetchit"
 
 
 Next, create a configuration file.
@@ -61,5 +61,13 @@ examples, ports, and architecture regression tests.
 
 With this demonstration in mind you can fork the FetchIt repository or create your own repository and start defining your own applications for FetchIt.
 
-Any changes that you make to the configuration file require a restart of the FetchIt container.
+For this static configuration, restart FetchIt after editing the configuration
+file. To reload configuration without a restart, configure ``configReload`` as
+described in :doc:`methods` and use a writable directory mount; see :doc:`running`.
+Changes to workload files in Git are applied on the configured schedule.
+
+Keep ``fetchit-volume`` when recreating the engine. Deleting the engine container
+alone does not remove its managed workloads. Cleanup and rollback are opt-in;
+see :doc:`lifecycle` before removing a method from configuration. For services
+that must survive logout, follow the lingering setup in :doc:`running`.
 
