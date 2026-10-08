@@ -33,16 +33,20 @@ test "$(podman image inspect --format '{{.Architecture}}' "$amd_image")" = amd64
 test "$(podman image inspect --format '{{.Architecture}}' "$arm_image")" = arm64
 # A push may convert the archive's manifest and update its storage metadata. Do
 # not reuse an index assembled from those local instances before the pushes.
-podman push "${options[@]}" --format=v2s2 --digestfile "$scratch/amd.digest" "$amd_image" "docker://$repository-amd:latest"
-podman push "${options[@]}" --format=v2s2 --digestfile "$scratch/arm.digest" "$arm_image" "docker://$repository-arm:latest"
+# Retain legacy architecture repositories for existing consumers.
+podman push "${options[@]}" --format=v2s2 "$amd_image" "docker://$repository-amd:latest"
+podman push "${options[@]}" --format=v2s2 "$arm_image" "docker://$repository-arm:latest"
+# Registries require every index child manifest in the index's own repository.
+podman push "${options[@]}" --format=v2s2 --digestfile "$scratch/amd.digest" "$amd_image" "docker://$repository:amd64"
+podman push "${options[@]}" --format=v2s2 --digestfile "$scratch/arm.digest" "$arm_image" "docker://$repository:arm64"
 amd_digest=$(cat "$scratch/amd.digest")
 arm_digest=$(cat "$scratch/arm.digest")
 for digest in "$amd_digest" "$arm_digest"; do
   [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid pushed image digest' >&2; exit 1; }
 done
 podman manifest create "$manifest"
-podman manifest add "${options[@]}" "$manifest" "docker://$repository-amd@$amd_digest"
-podman manifest add "${options[@]}" "$manifest" "docker://$repository-arm@$arm_digest"
+podman manifest add "${options[@]}" "$manifest" "docker://$repository@$amd_digest"
+podman manifest add "${options[@]}" "$manifest" "docker://$repository@$arm_digest"
 # Child manifests and blobs already exist in this repository. Copying them again
 # can recompress layers and replace the exact digests pinned above. Publish only
 # the index; keep the registry verification below strict.
