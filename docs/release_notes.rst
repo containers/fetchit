@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+Optional Git repository mirrors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Git targets may set an ordered ``fallbackURLs`` list while retaining ``url`` as
+the primary identity. Clone and fetch retry trusted mirrors after primary failures;
+stale/divergent fallback histories are rejected for existing checkouts. Existing
+single-source behavior is unchanged. See :doc:`mirrors` for authentication, local
+mounts, history rules, initial clone behavior, and recovery.
+
 Quadlet bundles
 ~~~~~~~~~~~~~~~
 
@@ -50,13 +59,3 @@ Set ``FETCHIT_STATUS_ADDR`` to enable ``/healthz`` and ``/status``. The status
 response includes current method schedules and invocation statistics, including
 Quadlet methods. Snapshots are safe during concurrent reconciliations and config
 reloads. See :doc:`status` for deployment and monitoring details.
-
-
-Optional Git repository mirrors
--------------------------------
-
-Git targets may set an ordered ``fallbackURLs`` list while retaining ``url`` as
-the primary identity. Clone and fetch retry trusted mirrors after primary failures;
-stale/divergent fallback histories are rejected for existing checkouts. Existing
-single-source behavior is unchanged. See :doc:`mirrors` for authentication, local
-mounts, history rules, initial clone behavior, and recovery.
