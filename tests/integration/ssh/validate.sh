@@ -29,7 +29,8 @@ sed -e 's/colors_pod/ssh-network-pod/g' -e 's/colors-kubeplay/ssh-network-kube/g
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/config/.ssh/id_ed25519"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/server_key"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/wrong_key"
-sudo install -m 644 "$fixture/config/.ssh/id_ed25519.pub" "$fixture/authorized_keys"
+sudo install -d -o git -g git -m 700 /home/git/.ssh
+sudo install -o git -g git -m 600 "$fixture/config/.ssh/id_ed25519.pub" /home/git/.ssh/authorized_keys
 chmod 700 "$fixture/config/.ssh"
 git -C "$fixture/work" init -b main
 git -C "$fixture/work" config user.name 'SSH integration'
@@ -46,7 +47,7 @@ Port $port
 ListenAddress 127.0.0.1
 HostKey $fixture/server_key
 PidFile $fixture/sshd.pid
-AuthorizedKeysFile $fixture/authorized_keys
+AuthorizedKeysFile /home/git/.ssh/authorized_keys
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
@@ -99,6 +100,11 @@ wait_for_content() {
   echo "Timed out waiting for $path to contain $expected" >&2
   return 1
 }
+# Verify the SSH fixture itself before exercising FetchIt authentication.
+write_known_host "$fixture/server_key.pub"
+GIT_SSH_COMMAND="ssh -i $fixture/config/.ssh/id_ed25519 -o IdentitiesOnly=yes -o UserKnownHostsFile=$fixture/config/.ssh/known_hosts -o StrictHostKeyChecking=yes" \
+  git ls-remote --heads "ssh://git@127.0.0.1:$port$fixture/repo.git" main | grep -F refs/heads/main
+
 # Reject a valid but untrusted host key before deploying any files.
 write_known_host "$fixture/wrong_key.pub"
 start_fetchit
