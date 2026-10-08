@@ -105,7 +105,7 @@ func (q *Quadlet) reconcile(ctx, conn context.Context) error {
 		return err
 	}
 	q.forceReconcile = q.initialRun || q.dirty
-	err = q.Apply(ctx, conn, current, latest, nil)
+	err = applyWithRecovery(ctx, conn, q, current, latest, nil)
 	q.forceReconcile = false
 	if err != nil {
 		return err
@@ -283,8 +283,8 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 }
 
 func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Hash, _ *[]string) error {
-	if desired.IsZero() {
-		return fmt.Errorf("Quadlet desired commit is empty")
+	if desired.IsZero() && current.IsZero() {
+		return nil
 	}
 	parent, runtime, err := q.paths()
 	if err != nil {

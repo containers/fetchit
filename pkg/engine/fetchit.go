@@ -35,6 +35,7 @@ var (
 )
 
 var configRestartMu sync.Mutex
+var configReloadJobMu sync.Mutex
 
 type Fetchit struct {
 	runMu     sync.RWMutex
@@ -117,6 +118,16 @@ func (f *Fetchit) runMethod(m Method, ctx, conn context.Context, skew int) {
 	}
 	if m.GetKind() == configFileMethod {
 		f.runMu.RUnlock()
+		// Downloads/restarts from overlapping reload jobs must not overwrite one
+		// another. Recheck retirement after waiting for the previous reload.
+		configReloadJobMu.Lock()
+		defer configReloadJobMu.Unlock()
+		f.runMu.RLock()
+		retired := f.retired
+		f.runMu.RUnlock()
+		if retired {
+			return
+		}
 		status.recordRun(m)
 		m.Process(ctx, conn, skew)
 		return
@@ -139,6 +150,9 @@ func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 			logger.Info("Error with unmarshal of existing config file: %v", err)
 			return nil, false, err
 		}
+	}
+	if err := validateLifecycleConfig(config); err != nil {
+		return nil, false, err
 	}
 	return config, true, nil
 }
@@ -298,10 +312,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			url:          tc.Url,
-			fallbackURLs: append([]string(nil), tc.FallbackURLs...),
-			device:       tc.Device,
-			pat:          fetchit.pat,
+			rollback:        tc.Rollback,
+			trackBadCommits: tc.TrackBadCommits,
+			url:             tc.Url,
+			fallbackURLs:    append([]string(nil), tc.FallbackURLs...),
+			device:          tc.Device,
+			pat:             fetchit.pat,
 			// define the environment variable for envSecret
 			envSecret:    fetchit.envSecret,
 			ssh:          fetchit.ssh,

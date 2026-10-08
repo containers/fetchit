@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -45,6 +46,13 @@ type removalStore struct {
 
 func loadRemovalStore(path string) (*removalStore, error) {
 	s := &removalStore{path: path, state: removalState{Version: 1, Receipts: map[string]removalReceipt{}}, active: map[string]bool{}, remove: removeOwnedWorkloads}
+	pathInfo, pathErr := os.Lstat(path)
+	if pathErr == nil && (!pathInfo.Mode().IsRegular() || pathInfo.Mode().Perm()&0022 != 0) {
+		return nil, errors.New("unsafe method-removal state file")
+	}
+	if pathErr != nil && !os.IsNotExist(pathErr) {
+		return nil, pathErr
+	}
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return s, nil
@@ -96,7 +104,7 @@ func validRemovalReceipt(r removalReceipt) bool {
 		return false
 	}
 	q := r.Quadlet
-	return filepath.IsAbs(q.Parent) && filepath.Clean(q.Parent) == q.Parent && q.Parent != "/" && quadletSafeName.MatchString(q.Namespace) && filepath.IsAbs(q.Home) && (q.Runtime == "" || filepath.IsAbs(q.Runtime))
+	return strings.HasPrefix(q.Namespace, "fetchit-") && !strings.ContainsAny(q.Parent+q.Runtime+q.Home, "\n\r") && filepath.IsAbs(q.Parent) && filepath.Clean(q.Parent) == q.Parent && q.Parent != "/" && quadletSafeName.MatchString(q.Namespace) && filepath.IsAbs(q.Home) && (q.Runtime == "" || filepath.IsAbs(q.Runtime))
 }
 
 func methodRemovalReceipt(m Method) (removalReceipt, bool, error) {
@@ -148,6 +156,9 @@ func (s *removalStore) configure(methods map[Method]SchedInfo) error {
 			continue
 		}
 		key := receiptKey(r)
+		if active[key] {
+			return fmt.Errorf("duplicate removal identity for %s", r.Kind)
+		}
 		active[key] = true
 		if enabled {
 			next[key] = r
@@ -176,19 +187,38 @@ func (s *removalStore) save(state removalState) error {
 	if err != nil {
 		return err
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {
 		return errors.New("invalid removal-state directory")
 	}
 	data, err := json.Marshal(state)
 	if err != nil {
 		return err
 	}
+	if len(data) > 1<<20 {
+		return errors.New("method-removal state exceeds 1 MiB")
+	}
 	stage, err := stageConfig(s.path, data)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(stage)
-	return os.Rename(stage, s.path)
+	staged, err := os.OpenFile(stage, os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	syncErr := staged.Sync()
+	closeErr := staged.Close()
+	if err := errors.Join(syncErr, closeErr); err != nil {
+		return err
+	}
+	if err := os.Rename(stage, s.path); err != nil {
+		return err
+	}
+	directory, err := os.Open(parent)
+	if err != nil {
+		return err
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
 func (s *removalStore) reconcile(ctx context.Context) error {
 	s.mu.Lock()
@@ -296,4 +326,62 @@ func removeOwnedWorkloads(conn context.Context, r removalReceipt) error {
 		return errors.New("unsupported removal receipt")
 	}
 	return nil
+}
+
+// Validate before a downloaded config replaces the running configuration.
+func validateLifecycleConfig(config *FetchitConfig) error {
+	f := newFetchit()
+	targets := append([]*TargetConfig(nil), config.TargetConfigs...)
+	if config.ConfigReload != nil {
+		targets = append(targets, &TargetConfig{configReload: config.ConfigReload})
+	}
+	if config.Prune != nil {
+		targets = append(targets, &TargetConfig{prune: config.Prune})
+	}
+	if hasNilEntries(config.Images) {
+		return errors.New("nil image configuration")
+	}
+	for _, image := range config.Images {
+		targets = append(targets, &TargetConfig{image: image})
+	}
+	for _, target := range targets {
+		if target == nil || hasNilEntries(target.Raw) || hasNilEntries(target.Kube) || hasNilEntries(target.Quadlet) || hasNilEntries(target.Systemd) || hasNilEntries(target.FileTransfer) || hasNilEntries(target.Ansible) {
+			return errors.New("nil target or method configuration")
+		}
+		if target.TrackBadCommits && !target.Rollback {
+			return errors.New("trackBadCommits requires rollback: true")
+		}
+	}
+	getMethodTargetScheds(targets, f)
+	seen := map[string]bool{}
+	for m := range f.methodTargetScheds {
+		r, _, err := methodRemovalReceipt(m)
+		if err != nil {
+			return err
+		}
+		if m.GetTarget().rollback {
+			switch m.GetKind() {
+			case rawMethod, kubeMethod, quadletMethod:
+			default:
+				return fmt.Errorf("rollback is unsupported for %s", m.GetKind())
+			}
+		}
+		if r.Kind != "" {
+			key := receiptKey(r)
+			if seen[key] {
+				return errors.New("duplicate method lifecycle identity")
+			}
+			seen[key] = true
+		}
+	}
+	return nil
+}
+
+func hasNilEntries[T any](items []*T) bool {
+	for _, item := range items {
+		if item == nil {
+			return true
+		}
+	}
+	return false
 }

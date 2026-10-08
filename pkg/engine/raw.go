@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/containers/podman/v5/pkg/errorhandling"
-	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -118,6 +117,14 @@ func (r *Raw) Process(ctx context.Context, conn context.Context, skew int) {
 }
 
 func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
+	input, err := readChangeInput(nil, path)
+	if err != nil {
+		return err
+	}
+	return r.applyRawInput(ctx, conn, path, prev, input)
+}
+
+func (r *Raw) applyRawInput(ctx, conn context.Context, path string, prev *string, rawFile []byte) error {
 
 	if path == deleteFile {
 		if prev == nil {
@@ -131,11 +138,6 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 	}
 
 	logger.Infof("Creating podman container from %s", path)
-
-	rawFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
 
 	raw, err := rawPodFromBytes(rawFile)
 	if err != nil {
@@ -156,7 +158,7 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 		return err
 	}
 
-	// Delete previous file's podxz
+	// Delete the previous definition's container.
 	if prev != nil {
 		raw, err := rawPodFromBytes([]byte(*prev))
 		if err != nil {
@@ -205,7 +207,11 @@ func (r *Raw) MethodEngine(ctx context.Context, conn context.Context, change *ob
 	if err != nil {
 		return err
 	}
-	return r.rawPodman(ctx, conn, path, prev)
+	input, err := readChangeInput(change, path)
+	if err != nil {
+		return err
+	}
+	return r.applyRawInput(ctx, conn, path, prev, input)
 }
 
 func (r *Raw) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {

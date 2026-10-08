@@ -30,8 +30,8 @@ const (
 )
 
 func applyChanges(ctx context.Context, target *Target, targetPath string, globPattern *string, currentState, desiredState plumbing.Hash, tags *[]string) (map[*object.Change]string, error) {
-	if desiredState.IsZero() {
-		return nil, errors.New("Cannot run Apply if desired state is empty")
+	if desiredState.IsZero() && currentState.IsZero() {
+		return map[*object.Change]string{}, nil
 	}
 	directory := getDirectory(target)
 
@@ -261,7 +261,13 @@ func getSubTreeFromHash(directory string, hash plumbing.Hash, targetPath string)
 		return nil, utils.WrapErr(err, "Error getting tree from commit at hash %s from repository %s", hash, directory)
 	}
 
+	if targetPath == "." || targetPath == "" {
+		return tree, nil
+	}
 	subTree, err := tree.Tree(targetPath)
+	if errors.Is(err, object.ErrDirectoryNotFound) {
+		return &object.Tree{}, nil
+	}
 	if err != nil {
 		return nil, utils.WrapErr(err, "Error getting sub tree at %s from commit at %s from repository %s", targetPath, hash, directory)
 	}

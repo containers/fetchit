@@ -4,6 +4,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -65,8 +66,10 @@ func TestQuadletIntegration(t *testing.T) {
 	t.Cleanup(func() {
 		// Keep an unrelated file so Git can represent an empty Quadlet directory.
 		empty := quadletCommit(t, r, map[string]string{"README": "empty bundle"})
-		if err := q.Apply(ctx, conn, applied, empty, nil); err != nil {
-			t.Errorf("cleanup: %v", err)
+		if !applied.IsZero() {
+			if err := q.Apply(ctx, conn, applied, empty, nil); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
 		}
 		exec.Command("podman", "rm", "-f", name).Run()
 		exec.Command("podman", "network", "rm", "systemd-"+name).Run()
@@ -112,9 +115,13 @@ func TestQuadletIntegration(t *testing.T) {
 	files[name+".container"] = source(name, "second")
 	files[name+".container.d/10-override.conf"] = "[Service]\nExecStartPre=/usr/bin/test -f /tmp/" + name + "-allow\n"
 	broken := quadletCommit(t, r, files)
-	if err := q.Apply(ctx, conn, first, broken, nil); err == nil {
-		t.Fatal("failed service start accepted")
+	q.target.rollback = true
+	recoveryErr := applyWithRecovery(ctx, conn, q, first, broken, nil)
+	var recovery *ApplyRecoveryError
+	if !errors.As(recoveryErr, &recovery) || !recovery.RolledBack {
+		t.Fatal("failed Quadlet start did not restore prior bundle", recoveryErr)
 	}
+	marker("first")
 	allow := "/tmp/" + name + "-allow"
 	if err := os.WriteFile(allow, nil, 0644); err != nil {
 		t.Fatal(err)
@@ -157,5 +164,35 @@ func TestQuadletIntegration(t *testing.T) {
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("removed bundle directory retained files: %v %v", entries, err)
 	}
+	// Recreate, then remove the configuration method without Git checkout or old
+	// commit access. The host journal identifies every installed/pending service.
+	apply(removedDirectory, first)
+	q.CleanupOnRemoval = true
+	store, err := loadRemovalStore(filepath.Join(t.TempDir(), "removals.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.configure(map[Method]SchedInfo{q: {}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.configure(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.reconcile(conn); err != nil {
+		t.Fatal("Quadlet method removal failed", err)
+	}
+	if out, err := systemctl("is-active", unit); err == nil && out == "active" {
+		t.Fatal("removed Quadlet service remains active")
+	}
+	entries, err = os.ReadDir(liveDir)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("removed method retained Quadlet sources", err)
+	}
+	if err := store.reconcile(conn); err != nil {
+		t.Fatal("Quadlet cleanup retry failed", err)
+	}
+	// Cleanup has already removed the complete bundle; avoid replaying an obsolete
+	// Git receipt during test teardown.
+	applied = plumbing.ZeroHash
 
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -77,7 +76,11 @@ func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *o
 	if err != nil {
 		return err
 	}
-	return k.kubePodman(ctx, conn, path, prev)
+	input, err := readChangeInput(change, path)
+	if err != nil {
+		return err
+	}
+	return k.applyKubeInput(ctx, conn, path, prev, input)
 }
 
 func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
@@ -95,6 +98,14 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 }
 
 func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
+	input, err := readChangeInput(nil, path)
+	if err != nil {
+		return err
+	}
+	return k.applyKubeInput(ctx, conn, path, prev, input)
+}
+
+func (k *Kube) applyKubeInput(ctx, conn context.Context, path string, prev *string, input []byte) error {
 	if path != deleteFile {
 		if err := validateNetworks(conn, k.Networks); err != nil {
 			return err
@@ -104,10 +115,7 @@ func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) 
 
 	var kubeYaml []byte
 	if path != deleteFile {
-		input, err := ioutil.ReadFile(path)
-		if err != nil {
-			return utils.WrapErr(err, "Error reading file")
-		}
+		var err error
 		kubeYaml, err = labelKubeManifest(input, k.kubeLabels())
 		if err != nil {
 			return err
@@ -116,7 +124,7 @@ func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) 
 
 	if prev != nil {
 		err := stopPods(conn, []byte(*prev))
-		if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "no such pod") {
 			return utils.WrapErr(err, "Error stopping pods")
 		}
 	}
@@ -171,11 +179,16 @@ func createPods(ctx context.Context, path string, specs []byte, networks []strin
 		}
 	}
 
-	_, err = play.KubeWithBody(ctx, bytes.NewReader(specs), kubeNetworkOptions(networks))
+	report, err := play.KubeWithBody(ctx, bytes.NewReader(specs), kubeNetworkOptions(networks))
 	if err != nil {
 		return utils.WrapErr(err, "Error playing kube spec")
 	}
 
+	for _, pod := range report.Pods {
+		if len(pod.ContainerErrors) > 0 {
+			return errors.New("Podman reported container start errors")
+		}
+	}
 	logger.Infof("Created pods from spec in %s", path)
 	return nil
 }

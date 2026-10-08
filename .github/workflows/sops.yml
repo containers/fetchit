@@ -1,4 +1,4 @@
-name: SOPS Kube integration
+name: Workload lifecycle (Podman 5)
 on:
   pull_request:
     branches: [main]
@@ -32,7 +32,7 @@ jobs:
           bash scripts/install-sops.sh amd64 _output/sops
           sudo install -m 0755 _output/sops /usr/local/bin/sops
           go test -mod=readonly -tags "$BUILDTAGS" -c -o _output/sops.test ./pkg/engine
-      - name: Ubuntu lifecycle
+      - name: Ubuntu workload lifecycle
         if: matrix.environment != 'fedora-rootful'
         env:
           ENVIRONMENT: ${{ matrix.environment }}
@@ -40,15 +40,15 @@ jobs:
           if [ "$ENVIRONMENT" = ubuntu-rootful ]; then
             sudo systemctl enable --now podman.socket
             sudo podman pull "$SOPS_TEST_IMAGE"
-            sudo env SOPS_TEST_IMAGE="$SOPS_TEST_IMAGE" SOPS_TEST_SOCKET=unix:///run/podman/podman.sock ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
+            sudo env SOPS_TEST_IMAGE="$SOPS_TEST_IMAGE" SOPS_TEST_SOCKET=unix:///run/podman/podman.sock ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels|Removal|RawDeletion|Rollback)PodmanLifecycle"
           else
             sudo loginctl enable-linger "$(id -un)"
             export XDG_RUNTIME_DIR="/run/user/$(id -u)"
             systemctl --user enable --now podman.socket
             podman pull "$SOPS_TEST_IMAGE"
-            SOPS_TEST_HOST_NETWORK=1 SOPS_TEST_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
+            SOPS_TEST_HOST_NETWORK=1 SOPS_TEST_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels|Removal|RawDeletion|Rollback)PodmanLifecycle"
           fi
-      - name: Fedora lifecycle
+      - name: Fedora workload lifecycle
         if: matrix.environment == 'fedora-rootful'
         run: |
           sudo podman build -t localhost/fetchit-sops-fedora -f tests/integration/sops/Dockerfile .
@@ -62,5 +62,5 @@ jobs:
               podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-service.log 2>&1 &
               timeout 30 bash -c "until test -S /run/podman/podman.sock; do sleep 1; done"
               podman pull "$SOPS_TEST_IMAGE"
-              SOPS_TEST_SOCKET=unix:///run/podman/podman.sock /work/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
+              SOPS_TEST_SOCKET=unix:///run/podman/podman.sock /work/sops.test -test.v -test.run "Test(SOPS|KubeLabels|Removal|RawDeletion|Rollback)PodmanLifecycle"
             '

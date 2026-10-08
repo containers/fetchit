@@ -1,10 +1,10 @@
 targetConfigs:
 - name: fetchit
-  url: http://github.com/containers/fetchit
+  url: https://github.com/containers/fetchit
   raw:
   - name: raw
-    targetPath: examples/ci-rollback
+    targetPath: examples/rollback
     schedule: "*/1 * * * *"
   rollback: true
   trackBadCommits: true
-  branch: ci-rollback
+  branch: main
