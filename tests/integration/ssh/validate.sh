@@ -104,7 +104,7 @@ write_known_host "$fixture/wrong_key.pub"
 start_fetchit
 rejected=false
 for ((attempt=0; attempt<30; attempt++)); do
-  if sudo podman logs fetchit-ssh 2>&1 | grep -q 'knownhosts: key mismatch'; then rejected=true; break; fi
+  if sudo podman logs fetchit-ssh 2>&1 | grep -F 'knownhosts: key mismatch' >/dev/null; then rejected=true; break; fi
   sleep 1
 done
 if [[ $rejected != true ]] || [[ -e "$fixture/output/hello.txt" ]]; then
