@@ -20,8 +20,10 @@ existing single-source behavior:
 
 Configure a real synchronized mirror containing the same branch and commit
 history. FetchIt tries the primary first on every clone/fetch, then fallbacks in
-order after failure. Empty and duplicate fallback entries are ignored. Each
-attempt has a 30-second transport timeout when failover is enabled. A missing
+order after failure. Empty and duplicate fallback entries are ignored. A list with no distinct fallback
+uses the existing single-source path and its existing timeout behavior. Each
+attempt has a 30-second timeout for transport and configured signature verification
+when failover is enabled. A missing
 branch, transport/authentication failure, or failed configured signature check
 allows the next source to be tried. Without this feature, existing single-source
 transport behavior remains unchanged.
@@ -53,7 +55,12 @@ Authentication and local mirrors
 The existing ``gitAuth`` configuration applies to every listed source. All URLs
 must be trusted to receive that configured credential. Do not mix unrelated hosts
 that require different credentials; per-source credentials are not supported.
-Avoid embedding credentials in URLs. Source attempts are reported by their list
+Authenticated plain HTTP is rejected before any source is contacted. HTTPS URLs
+with embedded user information and unsupported transport schemes are rejected.
+Unauthenticated HTTP remains available; HTTPS, verified SSH, and explicitly
+configured absolute local ``file://`` paths are supported. Configured URLs are
+the explicit trust list; there is no separate host allowlist. Avoid embedding
+credentials in URLs. Source attempts are reported by their list
 position in new failover errors to avoid logging credentials from transport errors.
 Use Git-provider and SSH-server diagnostics for underlying transport details.
 

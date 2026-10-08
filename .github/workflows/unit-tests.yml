@@ -28,8 +28,8 @@ jobs:
         run: go vet -mod=readonly -tags "$BUILDTAGS" ./cmd/... ./pkg/...
       - name: Test
         run: go test -mod=readonly -tags "$BUILDTAGS" ./...
-      - name: Status concurrency race check
-        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run TestStatus
+      - name: Status and repository concurrency race checks
+        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror'
 
   fedora:
     runs-on: ubuntu-26.04

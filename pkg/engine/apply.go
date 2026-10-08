@@ -55,6 +55,8 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 
 // getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
+	unlock := lockRepositoryCache(target)
+	defer unlock()
 	ctx := context.Background()
 	directory := getDirectory(target)
 
@@ -98,7 +100,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		}
 		fOptions.Auth = authValue
 	}
-	if len(target.fallbackURLs) > 0 && !target.disconnected {
+	if hasRepositoryMirrors(target) && !target.disconnected {
 		err = fetchWithMirrors(repo, target, fOptions)
 	} else {
 		err = repo.Fetch(fOptions)

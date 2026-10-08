@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"strings"
+	"sync"
 )
 
 func mirrorSource(t *testing.T, directory string) *git.Repository {
@@ -220,5 +223,103 @@ func TestMirrorSignatureAndMissingBranchFailures(t *testing.T) {
 	target.fallbackURLs = nil
 	if len(repositoryURLs(target)) != 1 {
 		t.Fatal("single-source configuration changed")
+	}
+}
+
+func TestMirrorPreferenceWithMultipleUsableSources(t *testing.T) {
+	target, first, firstPath := mirrorTestTarget(t)
+	initial := mirrorCommit(t, first, "initial")
+	secondPath := filepath.Join(t.TempDir(), "second")
+	second, err := git.PlainClone(secondPath, false, &git.CloneOptions{URL: firstPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target.fallbackURLs = []string{"file://" + firstPath, "file://" + secondPath}
+	if err := getClone(target); err != nil {
+		t.Fatal(err)
+	}
+	repo, _ := git.PlainOpen(getDirectory(target))
+	head, _ := repo.Head()
+	if head.Hash() != initial {
+		t.Fatal("initial clone preference changed")
+	}
+	preferred := mirrorCommit(t, first, "preferred")
+	mirrorCommit(t, second, "second equally usable source")
+	got, err := getLatest(target)
+	if err != nil || got != preferred {
+		t.Fatalf("source order not respected: %s %v", got, err)
+	}
+}
+
+func TestMirrorURLPolicyAndNormalizedSelection(t *testing.T) {
+	for _, tc := range []struct {
+		url        string
+		credential bool
+		valid      bool
+	}{
+		{"https://mirror.example/repo.git", true, true},
+		{"http://mirror.example/repo.git", false, true},
+		{"http://mirror.example/repo.git", true, false},
+		{"https://user:secret@mirror.example/repo.git", false, false},
+		{"ssh://git@mirror.example/repo.git", true, true},
+		{"git@mirror.example:repo.git", true, true},
+		{"file:///opt/mirrors/repo.git", false, true},
+		{"file://untrusted-host/opt/repo.git", false, false},
+		{"git://mirror.example/repo.git", false, false},
+		{"", false, false},
+		{" /opt/repo.git ", false, false},
+	} {
+		target := &Target{url: tc.url}
+		if tc.credential {
+			target.pat = "temporary-secret"
+		}
+		err := validateRepositorySources(target)
+		if (err == nil) != tc.valid {
+			t.Fatalf("URL policy %q: %v", tc.url, err)
+		}
+		if err != nil && strings.Contains(err.Error(), "secret") {
+			t.Fatal("credential leaked in validation error")
+		}
+	}
+	target := &Target{url: "https://primary.example/repo.git", fallbackURLs: []string{"", "https://primary.example/repo.git"}}
+	if hasRepositoryMirrors(target) {
+		t.Fatal("duplicates enabled shortened mirror timeout")
+	}
+	cause := context.DeadlineExceeded
+	err := &mirrorSourceError{Source: 2, Operation: "fetch", Err: cause}
+	if !errors.Is(err, cause) {
+		t.Fatal("source error loses timeout classification")
+	}
+}
+
+func TestMirrorConcurrentFetchesShareCacheSafely(t *testing.T) {
+	target, source, _ := mirrorTestTarget(t)
+	mirrorCommit(t, source, "initial")
+	if err := getClone(target); err != nil {
+		t.Fatal(err)
+	}
+	want := mirrorCommit(t, source, "updated")
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Go(func() {
+			got, err := getLatest(target)
+			if err != nil || got != want {
+				t.Errorf("concurrent fetch: %s %v", got, err)
+			}
+		})
+	}
+	wg.Wait()
+	repo, _ := git.PlainOpen(getDirectory(target))
+	refs, err := repo.References()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := refs.ForEach(func(ref *plumbing.Reference) error {
+		if strings.HasPrefix(ref.Name().String(), "refs/fetchit/incoming/") {
+			t.Error("temporary ref leaked")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

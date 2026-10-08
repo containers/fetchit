@@ -402,7 +402,9 @@ func getRepo(target *Target) error {
 }
 
 func getClone(target *Target) error {
-	if len(target.fallbackURLs) > 0 {
+	unlock := lockRepositoryCache(target)
+	defer unlock()
+	if hasRepositoryMirrors(target) {
 		return getCloneWithMirrors(target)
 	}
 	directory := getDirectory(target)
