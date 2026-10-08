@@ -56,3 +56,38 @@ for arch in amd64 arm64; do
 done
 podman manifest inspect --tls-verify=false 127.0.0.1:5000/fetchit-test:latest > /tmp/retagged-index.json
 cmp /tmp/original-index.json /tmp/retagged-index.json
+
+# Recompression must not rewrite the already-published child manifests. Force
+# different gzip levels for the architecture pushes and any attempted index-side
+# child copies. This reproduces the main-branch failure with tiny test images.
+wrapper_dir=$(mktemp -d)
+real_podman=$(command -v podman)
+export FETCHIT_TEST_REAL_PODMAN="$real_podman"
+cat > "$wrapper_dir/podman" <<'WRAPPER'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ ${FETCHIT_TEST_MISSING_CHILD:-false} == true && ${1:-} == manifest && ${2:-} == inspect && "$*" == *@sha256:* ]]; then
+  echo 'Simulated missing destination child manifest' >&2
+  exit 125
+fi
+if [[ ${1:-} == push ]]; then
+  shift
+  exec "$FETCHIT_TEST_REAL_PODMAN" push --compression-format=gzip --compression-level=1 --force-compression "$@"
+elif [[ ${1:-} == manifest && ${2:-} == push ]]; then
+  shift 2
+  exec "$FETCHIT_TEST_REAL_PODMAN" manifest push --compression-format=gzip --compression-level=9 --force-compression "$@"
+fi
+exec "$FETCHIT_TEST_REAL_PODMAN" "$@"
+WRAPPER
+chmod +x "$wrapper_dir/podman"
+PATH="$wrapper_dir:$PATH" FETCHIT_REGISTRY_TLS_VERIFY=false bash scripts/publish-platform-index.sh \
+  127.0.0.1:5000/fetchit-recompression:latest localhost/publish-source:amd64 localhost/publish-source:arm64
+# If a destination child cannot be read, fail before creating a public index.
+expect_failure env PATH="$wrapper_dir:$PATH" FETCHIT_TEST_MISSING_CHILD=true FETCHIT_REGISTRY_TLS_VERIFY=false \
+  bash scripts/publish-platform-index.sh 127.0.0.1:5000/fetchit-missing-child:latest localhost/publish-source:amd64 localhost/publish-source:arm64
+expect_failure podman manifest inspect --tls-verify=false 127.0.0.1:5000/fetchit-missing-child:latest
+rm -rf "$wrapper_dir"
+for arch in amd64 arm64; do
+  loaded=$(podman pull --quiet --tls-verify=false --policy=always --platform "linux/$arch" 127.0.0.1:5000/fetchit-recompression:latest)
+  test "$(podman image inspect --format '{{.Architecture}}' "$loaded")" = "$arch"
+done
