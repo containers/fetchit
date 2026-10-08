@@ -43,7 +43,10 @@ done
 podman manifest create "$manifest"
 podman manifest add "${options[@]}" "$manifest" "docker://$repository-amd@$amd_digest"
 podman manifest add "${options[@]}" "$manifest" "docker://$repository-arm@$arm_digest"
-podman manifest push --all "${options[@]}" --format=docker "$manifest" "docker://$destination"
+# Child manifests and blobs already exist in this repository. Copying them again
+# can recompress layers and replace the exact digests pinned above. Publish only
+# the index; keep the registry verification below strict.
+podman manifest push --all=false "${options[@]}" --format=docker "$manifest" "docker://$destination"
 podman manifest inspect "${options[@]}" "$destination" > "$scratch/index.json"
 python3 - "$scratch/index.json" "$amd_digest" "$arm_digest" <<'PYTHON'
 import json
