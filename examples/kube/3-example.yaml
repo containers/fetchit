@@ -13,9 +13,9 @@ metadata:
 spec:
   containers:
   - name: colors-kubeplay
-    image: docker.io/library/httpd:2.4-alpine
+    image: quay.io/fetchit/fetchit-sample-app:latest
     ports:
-    - containerPort: 80
+    - containerPort: 8080
       hostPort: 7080
     envFrom:
     - configMapRef:

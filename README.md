@@ -137,9 +137,10 @@ podman ps
 
 ```
 
-The sample applications use `docker.io/library/httpd:2.4-alpine` on both amd64 and arm64.
-View the Apache welcome page at `http://localhost:8080` and `http://localhost:9080`,
-or run `curl --fail http://localhost:8080/`. Container port 80 maps to the existing
+The Raw HTTP samples use `quay.io/fetchit/fetchit-sample-app:latest` on both amd64 and arm64.
+The image is built from Red Hat UBI HTTP Server, runs as user 1001, and needs no capability overrides.
+View the FetchIt welcome page at `http://localhost:8080` and `http://localhost:9080`,
+or run `curl --fail http://localhost:8080/`. Container port 8080 maps to the existing
 host ports. `APP_COLOR` demonstrates environment propagation and does not change
 the page color. See [sample applications](https://fetchit.readthedocs.io/en/latest/samples.html)
 for all examples, image-archive instructions, and native architecture tests.

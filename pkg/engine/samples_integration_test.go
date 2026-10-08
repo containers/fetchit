@@ -53,6 +53,13 @@ func sampleArchitecture(t *testing.T, image string) {
 	}
 }
 
+func sampleNonRoot(t *testing.T, name string) {
+	t.Helper()
+	if got := sampleCommand(t, "exec", name, "id", "-u"); got != "1001" {
+		t.Fatalf("sample %s ran as UID %s, want 1001", name, got)
+	}
+}
+
 func TestSampleApplications(t *testing.T) {
 	oldLogger := logger
 	logger = zap.NewNop().Sugar()
@@ -78,12 +85,16 @@ func TestSampleApplications(t *testing.T) {
 				t.Fatal(err)
 			}
 			sampleArchitecture(t, raw.Image)
-			sampleHTTP(t, int(raw.Ports[0].HostPort), "It works!")
+			sampleNonRoot(t, raw.Name)
+			if len(raw.CapAdd) > 0 || len(raw.CapDrop) > 0 {
+				t.Fatal("sample must not require capability overrides")
+			}
+			sampleHTTP(t, int(raw.Ports[0].HostPort), "FetchIt sample application")
 		})
 	}
 	t.Run("image-load", func(t *testing.T) {
 		image := "quay.io/notreal/httpd:latest" // Local archive tag; no registry request.
-		sampleCommand(t, "tag", "docker.io/library/httpd:2.4-alpine", image)
+		sampleCommand(t, "tag", "quay.io/fetchit/fetchit-sample-app:latest", image)
 		archive := filepath.Join(t.TempDir(), "httpd.tar")
 		sampleCommand(t, "save", "-o", archive, image)
 		sampleCommand(t, "image", "rm", image)
@@ -103,7 +114,8 @@ func TestSampleApplications(t *testing.T) {
 			t.Fatal(err)
 		}
 		sampleArchitecture(t, image)
-		sampleHTTP(t, 9090, "It works!")
+		sampleNonRoot(t, "local")
+		sampleHTTP(t, 9090, "FetchIt sample application")
 	})
 	t.Run("kube", func(t *testing.T) {
 		var input []byte
@@ -124,11 +136,12 @@ func TestSampleApplications(t *testing.T) {
 			t.Fatal(err)
 		}
 		// The PVC example intentionally supplies its own website rather than the image's page.
-		sampleCommand(t, "exec", "nginx-pod-nginx-server", "sh", "-c", "printf 'Sample PVC site' > /usr/share/nginx/html/index.html")
+		sampleCommand(t, "exec", "--user", "0", "nginx-pod-nginx-server", "sh", "-c", "printf 'Sample PVC site' > /var/www/html/index.html")
 		sampleHTTP(t, 8080, "Sample PVC site")
-		sampleHTTP(t, 7080, "It works!")
-		sampleArchitecture(t, "docker.io/library/httpd:2.4-alpine")
-		sampleArchitecture(t, "docker.io/library/nginx:stable-alpine")
+		sampleHTTP(t, 7080, "FetchIt sample application")
+		sampleArchitecture(t, "quay.io/fetchit/fetchit-sample-app:latest")
+		sampleNonRoot(t, "nginx-pod-nginx-server")
+		sampleNonRoot(t, "colors_pod-colors-kubeplay")
 	})
 	t.Run("systemd-image", func(t *testing.T) {
 		// The legacy service's image also has to be runnable on the native architecture.

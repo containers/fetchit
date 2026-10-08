@@ -1,9 +1,9 @@
-Image: "docker.io/library/httpd:2.4-alpine"
+Image: "quay.io/fetchit/fetchit-sample-app:latest"
 Name: "rollback1"
 Env:
   APP_COLOR: "pink"
   tree: "trunk"
 Ports:
-  - container_port: 80
+  - container_port: 8080
     host_port: 8080
     range: 0

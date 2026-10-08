@@ -16,14 +16,15 @@ release versions retain their own historical configuration.
 Sample applications on amd64 and arm64
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The quick-start welcome app and Raw, Kube, and rollback examples now use the
-official ``httpd:2.4-alpine`` multi-platform image. Container ports change from
-8080 to 80 where required; existing host ports stay the same. ``APP_COLOR`` remains
-an environment-variable example and no longer changes the website color. The
-capability-drop example drops ``NET_RAW`` rather than all capabilities so Apache
-can change user/group IDs during startup. The nginx sample uses
-``nginx:stable-alpine``. Native amd64 and arm64 Actions test the checked-in
-samples and HTTP responses, including local archive loading. See :doc:`samples`.
+The quick-start welcome app and Raw, Kube, and rollback examples use a FetchIt
+sample built from Red Hat UBI HTTP Server. It runs as user 1001 on container port
+8080 without capability overrides; existing host ports stay the same. The welcome
+sample's container port changes from 80 to 8080. The PVC sample now serves
+``/var/www/html`` on port 8080. ``APP_COLOR`` remains an environment-variable
+example and no longer changes the website color. Native amd64 and arm64 Actions
+build and test the checked-in samples, HTTP responses, non-root user, and archive
+loading, then publish a multi-platform sample image after successful main-branch
+tests. See :doc:`samples` for source, image, port, and volume instructions.
 
 Release cleanup
 ~~~~~~~~~~~~~~~

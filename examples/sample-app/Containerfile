@@ -1,0 +1,4 @@
+# Multi-platform UBI index: amd64, arm64, ppc64le, and s390x.
+FROM registry.access.redhat.com/ubi8/httpd-24:latest@sha256:97df0d4b58ade8b1265b8cd55715d901d2fd03548e9546a0ae02fcea6b769c1e
+COPY --chown=1001:0 index.html /var/www/html/index.html
+USER 1001

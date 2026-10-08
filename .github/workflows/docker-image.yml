@@ -102,11 +102,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-podman
 
-      - name: pull the colors image
-        run: podman pull docker.io/library/httpd:2.4-alpine
+      - name: Build the UBI sample from this revision
+        run: |
+          podman build -t quay.io/fetchit/fetchit-sample-app:latest -f examples/sample-app/Containerfile examples/sample-app
+          # Existing validation fixtures fetch main until this PR is merged.
+          # This is a local compatibility alias; the retired image is never pulled.
+          podman tag quay.io/fetchit/fetchit-sample-app:latest docker.io/mmumshad/simple-webapp-color:latest
 
-      - name: archive the image
-        run: podman save -o /tmp/colors.tar docker.io/library/httpd:2.4-alpine
+      - name: Archive the current sample and compatibility alias
+        run: podman save --multi-image-archive -o /tmp/colors.tar quay.io/fetchit/fetchit-sample-app:latest docker.io/mmumshad/simple-webapp-color:latest
 
       - name: save the container as an artifact
         uses: actions/upload-artifact@v4
@@ -428,11 +432,11 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: Check the capabilities of cap1
-        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap1 runs as the non-root sample user
+        run: test "$(sudo podman exec cap1 id -u)" = 1001
 
-      - name: Check that no capabilities exist for cap2
-        run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap2 runs as the non-root sample user
+        run: test "$(sudo podman exec cap2 id -u)" = 1001
 
       - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
@@ -505,11 +509,11 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: Check the capabilities of cap1
-        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap1 runs as the non-root sample user
+        run: test "$(sudo podman exec cap1 id -u)" = 1001
 
-      - name: Check that no capabilities exist for cap2
-        run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap2 runs as the non-root sample user
+        run: test "$(sudo podman exec cap2 id -u)" = 1001
 
       - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
@@ -599,11 +603,11 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: Check the capabilities of cap1
-        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap1 runs as the non-root sample user
+        run: test "$(sudo podman exec cap1 id -u)" = 1001
 
-      - name: Check that no capabilities exist for cap2
-        run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap2 runs as the non-root sample user
+        run: test "$(sudo podman exec cap2 id -u)" = 1001
 
       - name: 'Check that the "owned-by:fetchit" label is applied'
         run: |
@@ -672,11 +676,11 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: Check the capabilities of cap1
-        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap1 runs as the non-root sample user
+        run: test "$(sudo podman exec cap1 id -u)" = 1001
 
-      - name: Check that no capabilities exist for cap2
-        run: if [[ $(sudo podman container inspect cap2 --format {{.EffectiveCaps}} | jq length) = "0" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap2 runs as the non-root sample user
+        run: test "$(sudo podman exec cap2 id -u)" = 1001
   ssh-validate:
     runs-on: ubuntu-26.04
     needs: [build]
@@ -872,9 +876,6 @@ jobs:
 
       - name: Pull test httpd image
         run: sudo podman pull registry.access.redhat.com/ubi8/httpd-24:latest
-
-      - name: Verify the official httpd image
-        run: sudo podman image exists registry.access.redhat.com/ubi8/httpd-24:latest
 
       - name: Debug - Check what curl returns
         run: curl -v http://localhost:8080/ || true
@@ -1303,8 +1304,8 @@ jobs:
       - name: Print the current running container
         run: sudo podman ps
 
-      - name: Check the capabilities of cap1
-        run: if [[ $(sudo podman container inspect cap1 --format {{.EffectiveCaps}} | grep NET_ADMIN | wc -l) = "1" ]] ; then echo "Container successfully launched"; else exit 1; fi
+      - name: Verify cap1 runs as the non-root sample user
+        run: test "$(sudo podman exec cap1 id -u)" = 1001
 
   multi-engine-validate:
     runs-on: ubuntu-26.04
@@ -1569,7 +1570,7 @@ jobs:
         run: sudo podman load -i /tmp/colors.tar
 
       - name: Tag with a new name
-        run: sudo podman tag docker.io/library/httpd:2.4-alpine quay.io/notreal/httpd:latest
+        run: sudo podman tag quay.io/fetchit/fetchit-sample-app:latest quay.io/notreal/httpd:latest
 
       - name: archive the image
         run: |

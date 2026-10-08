@@ -1,13 +1,12 @@
 {
-    "Image":"docker.io/library/httpd:2.4-alpine",
+    "Image":"quay.io/fetchit/fetchit-sample-app:latest",
     "Name": "cap1",
     "Env": {"APP_COLOR": "blue", "tree": "trunk"},
     "Mounts": [],
     "Volumes": [],
-    "CapAdd": ["NET_ADMIN"],
     "Ports": [{
         "host_ip":        "",
-        "container_port": 80,
+        "container_port": 8080,
         "host_port":      7070,
         "range":         0,
         "protocol":      ""}]

@@ -9,10 +9,10 @@ spec:
         claimName: task-pv-claim
   containers:
   - name: nginx-server
-    image: docker.io/library/nginx:stable-alpine
+    image: quay.io/fetchit/fetchit-sample-app:latest
     ports:
-    - containerPort: 80
+    - containerPort: 8080
       hostPort: 8080
     volumeMounts:
-        - mountPath: "/usr/share/nginx/html"
+        - mountPath: "/var/www/html"
           name: task-pv-storage

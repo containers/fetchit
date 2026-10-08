@@ -49,9 +49,9 @@ To view the running containers, run the following command.
 The sample application can be found by visiting the following URL `on your localhost <http://localhost:9191>`_
 
 
-The sample uses the official ``docker.io/library/httpd:2.4-alpine`` image, which
-provides native Linux amd64 and arm64 variants. You should see Apache's
-``It works!`` page. The same configuration works on either architecture; Podman
+The sample uses the Red Hat UBI-based ``quay.io/fetchit/fetchit-sample-app:latest`` image, which
+provides native Linux amd64 and arm64 variants. You should see the FetchIt welcome page. The server runs as user 1001 on
+container port 8080 without capability overrides. The same configuration works on either architecture; Podman
 selects the appropriate image automatically. See :doc:`samples` for the other
 examples, ports, and architecture regression tests.
 

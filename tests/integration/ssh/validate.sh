@@ -23,8 +23,8 @@ printf 'git:temporary-ci-only\n' | sudo chpasswd
 mkdir -p "$fixture/config/.ssh" "$fixture/work/files" "$fixture/work/raw" "$fixture/work/kube" "$fixture/output"
 sudo podman network create ssh-front
 sudo podman network create ssh-back
-sudo podman pull docker.io/library/httpd:2.4-alpine
-printf '{"Image":"docker.io/library/httpd:2.4-alpine","Name":"ssh-network-raw"}\n' > "$fixture/work/raw/container.json"
+sudo podman build -t quay.io/fetchit/fetchit-sample-app:latest -f examples/sample-app/Containerfile examples/sample-app
+printf '{"Image":"quay.io/fetchit/fetchit-sample-app:latest","Name":"ssh-network-raw"}\n' > "$fixture/work/raw/container.json"
 sed -e 's/colors_pod/ssh-network-pod/g' -e 's/colors-kubeplay/ssh-network-kube/g' -e '/hostPort:/d' examples/kube/3-example.yaml > "$fixture/work/kube/pod.yaml"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/config/.ssh/id_ed25519"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/server_key"
