@@ -27,6 +27,12 @@ method identities. Multiple trailing slashes are also accepted. Existing
 configurations without a trailing slash continue to work. This does not change
 absolute-path validation or normalize interior path components.
 
+``targetPath`` selects a path inside the Git repository. It is distinct from
+``destinationDirectory`` and Quadlet's ``hostHome``, ``hostConfigHome``, and
+``hostRuntimeDir``, which refer to the host filesystem. The trailing-slash
+normalization applies to ``targetPath``; tracked host destinations must still
+be canonical absolute paths without symlink components.
+
 FileTransfer continues to copy each file by its basename into
 ``destinationDirectory``; adding a trailing slash does not preserve nested source
 directories or change its destination layout.
@@ -346,9 +352,23 @@ and remove them when the method leaves configuration. The default is false.
 Tracked deployments require an existing, absolute destination directory and
 refuse to overwrite untracked files. See :doc:`lifecycle` for setup and recovery.
 
+During Git reconciliation, deletion removes the old destination filename, and
+rename removes the old filename before installing the new one. Filenames with
+spaces are passed as command arguments. These file-level changes are separate
+from removing an entire method from configuration: that requires prior opt-in
+with ``cleanupOnRemoval``. With tracking enabled, local edits or file replacements
+block destructive operations until the ownership conflict is resolved.
+
 Kube Play
 ---------
 The KubeTarget method will launch a container based upon a Kubernetes pod manifest. This is useful for launching containers to run the same way as they would in a Kubernetes environment.
+
+To attach the played Pods to existing Podman networks, configure ``networks``
+on the Kube method, alongside ``targetPath`` and ``schedule``. This is FetchIt
+configuration, not a field to add to the Kubernetes Pod manifest. See
+:ref:`method-podman-networks` for configuration, host scope, and verification.
+The same network setting applies to ordinary and SOPS-encrypted Kube methods.
+
 
 .. code-block:: yaml
 
@@ -506,6 +526,8 @@ inspection commands, and migration limits, and :doc:`lifecycle` for retry and
 rollback behavior.
 
 
+.. _method-podman-networks:
+
 Optional Podman networks
 ------------------------
 
@@ -545,6 +567,29 @@ include the default network explicitly if needed. Configured networks are inspec
 fail before removing existing containers or pods. A network disappearing after
 this check, or another Podman runtime failure, can still interrupt redeployment. Network options are not applied
 to file-transfer or other helper containers.
+
+Rootful and rootless networks are separate. If FetchIt uses the rootful socket,
+create and inspect networks with ``sudo podman``. If it uses a user's socket,
+run these commands as that same host user. A network created in your personal
+rootless store is unavailable to a rootful FetchIt deployment.
+
+After deployment, inspect the selected network and the played Pods:
+
+.. code-block:: shell
+
+   podman network inspect backend
+   podman pod ps
+   podman ps --filter label=fetchit.containers.io/managed-by=fetchit
+
+Use ``sudo`` for the rootful case. Check the network inspection output for the
+expected attached workloads. Network attachment does not automatically publish
+ports: use the manifest's ``hostPort`` where host access is required, as in the
+Kube sample. Podman handles the runtime network; FetchIt does not implement
+Kubernetes cluster networking or NetworkPolicy enforcement.
+
+Quadlet networking is configured in the authored units, such as
+``Network=web.network`` with a bundled ``web.network`` definition. The Raw/Kube
+``networks`` option does not configure Quadlet or legacy Systemd units.
 
 Changing a network setting in FetchIt's config alone does not redeploy an
 unchanged Git manifest. Commit a change to the workload file to apply the new
