@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/go-git/go-git/v5"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/viper"
 )
@@ -196,5 +199,61 @@ func TestSOPSOutputLimitCancelsExecution(t *testing.T) {
 	}
 	if plain, err := settings.decryptWithExecutable(context.Background(), []byte(testEncryptedMetadata), binary); err == nil || len(plain) != 0 {
 		t.Fatal("accepted oversized plaintext")
+	}
+}
+
+func TestSOPSPreparationUsesGitVersionsForUpdateAndDeletion(t *testing.T) {
+	settings := sopsTestSettings(t)
+	t.Chdir(t.TempDir())
+	repo := mirrorSource(t, "repo")
+	if err := os.MkdirAll("repo/kube", 0755); err != nil {
+		t.Fatal(err)
+	}
+	tree, _ := repo.Worktree()
+	commit := func(value string) plumbing.Hash {
+		if err := os.WriteFile("repo/kube/manifest.yaml", []byte(value), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tree.Add("kube"); err != nil {
+			t.Fatal(err)
+		}
+		hash, err := tree.Commit("fixture", &git.CommitOptions{Author: &object.Signature{Name: "Test", Email: "test@example.invalid", When: time.Now()}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hash
+	}
+	first := commit("old ciphertext")
+	second := commit("new ciphertext")
+	k := &Kube{CommonMethod: CommonMethod{target: &Target{url: "https://example.invalid/repo.git"}, TargetPath: "kube"}, SOPS: settings}
+	changes, err := applyChanges(context.Background(), k.target, k.TargetPath, nil, first, second, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile("repo/kube/manifest.yaml", []byte("uncommitted ciphertext"), 0600)
+	var inputs []string
+	decode := func(_ context.Context, input []byte) ([]byte, error) {
+		inputs = append(inputs, string(input))
+		return []byte(testPlainKube), nil
+	}
+	prepared, err := k.prepareSOPSChanges(context.Background(), changes, decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clearPreparedKube(prepared)
+	if len(inputs) != 2 || inputs[0] != "old ciphertext" || inputs[1] != "new ciphertext" {
+		t.Fatalf("read wrong Git versions: %v", inputs)
+	}
+	for change := range changes {
+		changes[change] = deleteFile
+	}
+	inputs = nil
+	prepared, err = k.prepareSOPSChanges(context.Background(), changes, decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearPreparedKube(prepared)
+	if len(inputs) != 1 || inputs[0] != "old ciphertext" || prepared[0].next != nil {
+		t.Fatal("deletion did not use old Git content")
 	}
 }

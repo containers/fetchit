@@ -88,20 +88,17 @@ func (k *Kube) prepareSOPSChanges(ctx context.Context, changeMap map[*object.Cha
 		item := preparedKubeChange{path: changeMap[change]}
 		prepared = append(prepared, item)
 		itemPtr := &prepared[len(prepared)-1]
+		var nextFile *object.File
 		if change != nil {
-			old, _, err := change.Files()
+			old, next, err := change.Files()
 			if err != nil {
 				return nil, errors.New("cannot read previous encrypted manifest")
 			}
+			nextFile = next
 			if old != nil {
-				reader, err := old.Reader()
+				data, err := readSOPSGitFile(old)
 				if err != nil {
-					return nil, errors.New("cannot read previous encrypted manifest")
-				}
-				data, err := io.ReadAll(io.LimitReader(reader, sopsFileLimit+1))
-				reader.Close()
-				if err != nil || len(data) > sopsFileLimit {
-					return nil, errors.New("previous encrypted manifest exceeds read limits")
+					return nil, err
 				}
 				itemPtr.previous, err = decode(data)
 				if err != nil {
@@ -110,7 +107,13 @@ func (k *Kube) prepareSOPSChanges(ctx context.Context, changeMap map[*object.Cha
 			}
 		}
 		if item.path != deleteFile {
-			data, err := readSOPSInput(item.path)
+			var data []byte
+			var err error
+			if nextFile != nil {
+				data, err = readSOPSGitFile(nextFile)
+			} else {
+				data, err = readSOPSInput(item.path)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -189,4 +192,18 @@ func (k *Kube) runPreparedSOPS(ctx, conn context.Context, changes []preparedKube
 		}
 	}
 	return nil
+}
+
+// Read ciphertext from the commit rather than a mutable shared worktree.
+func readSOPSGitFile(file *object.File) ([]byte, error) {
+	reader, err := file.Reader()
+	if err != nil {
+		return nil, errors.New("cannot read encrypted Git blob")
+	}
+	defer reader.Close()
+	data, err := io.ReadAll(io.LimitReader(reader, sopsFileLimit+1))
+	if err != nil || len(data) > sopsFileLimit {
+		return nil, errors.New("encrypted Git blob exceeds read limits")
+	}
+	return data, nil
 }
