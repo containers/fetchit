@@ -1,0 +1,28 @@
+name: CI change scope
+on:
+  workflow_call:
+    outputs:
+      runtime:
+        description: Whether runtime and image checks are needed
+        value: ${{ jobs.scope.outputs.runtime }}
+permissions:
+  contents: read
+jobs:
+  scope:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Test change classification
+        run: python3 -m unittest discover -s tests/ci -v
+      - name: Classify changed files
+        id: scope
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CI_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/ci-change-scope.py

@@ -13,7 +13,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-scope.yml
+
   samples:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +68,8 @@ jobs:
           sudo journalctl -u podman.service --no-pager -n 100
 
   assemble:
-    needs: samples
+    needs: [changes, samples]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:

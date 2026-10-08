@@ -4,6 +4,18 @@ Release notes
 Unreleased
 ----------
 
+Documentation-only CI
+~~~~~~~~~~~~~~~~~~~~~~
+
+Docs-only pull requests and main pushes now skip Go, image-build, and Podman
+runtime jobs. A shared lightweight change check classifies ``docs/**``, root
+Markdown files, and ``.readthedocs.yml``/``.readthedocs.yaml`` as documentation.
+The strict Sphinx job continues to run. Code, examples, dependency files, scripts,
+workflow/action changes, and unknown paths keep the full runtime checks, including
+mixed code/docs changes. Scheduled/manual sample checks still run. Missing Git
+history conservatively runs tests. Job-level skips preserve check results without
+workflow-level path filtering.
+
 Trailing slashes in Git target paths
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

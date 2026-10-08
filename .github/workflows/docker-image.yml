@@ -10,8 +10,13 @@ env:
   CGO_ENABLED: 0
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-scope.yml
+
 
   build:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
 
     runs-on: ubuntu-26.04
 
@@ -38,6 +43,8 @@ jobs:
           path: /tmp/fetchit.tar
 
   build-ansible-amd:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -64,10 +71,10 @@ jobs:
           path: /tmp/ansible-amd.tar
 
   build-ansible-arm:
+    needs: [changes, build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate]
+    if: ${{ needs.changes.outputs.runtime == 'true' && (!cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')) }}
     runs-on: ubuntu-26.04-arm
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -96,6 +103,8 @@ jobs:
           path: /tmp/ansible-arm.tar
 
   pull-and-archive:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -118,6 +127,8 @@ jobs:
           path: /tmp/colors.tar
 
   build-systemd-amd:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -144,10 +155,10 @@ jobs:
           path: /tmp/systemd-amd.tar
 
   build-systemd-arm:
+    needs: [changes, build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate]
+    if: ${{ needs.changes.outputs.runtime == 'true' && (!cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')) }}
     runs-on: ubuntu-26.04-arm
-    needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -176,8 +187,9 @@ jobs:
           path: /tmp/systemd-arm.tar
 
   fetchit-config-target-no-config-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -227,8 +239,9 @@ jobs:
         run: sudo podman ps
 
   fetchit-config-reload-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -278,8 +291,9 @@ jobs:
         run: sudo podman ps
 
   fetchit-config-PAT-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -332,8 +346,9 @@ jobs:
         run: sudo podman ps
 
   fetchit-PAT-kube-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -383,8 +398,9 @@ jobs:
         run: sudo podman ps
 
   raw-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -455,8 +471,9 @@ jobs:
           fi
 
   podman-secret-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -532,8 +549,9 @@ jobs:
           fi
 
   podman-config-secret-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -626,8 +644,9 @@ jobs:
           fi
 
   config-env-raw-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -680,8 +699,9 @@ jobs:
       - name: Verify cap2 runs as the non-root sample user
         run: test "$(sudo podman exec cap2 id -u)" = 1001
   ssh-validate:
+    needs: [changes, build]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [build]
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -702,8 +722,9 @@ jobs:
         run: bash tests/integration/ssh/validate.sh
 
   filetransfer-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -744,8 +765,9 @@ jobs:
         run: sudo podman ps -a
 
   filetransfer-validate-exact-file:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -783,8 +805,9 @@ jobs:
         run: sudo podman ps -a
 
   systemd-validate:
+    needs: [changes, build, build-systemd-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -819,8 +842,9 @@ jobs:
         run: sudo podman ps -a
 
   systemd-autoupdate-validate:
+    needs: [changes, build, build-systemd-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -904,8 +928,9 @@ jobs:
         run: sudo podman ps -a
 
   systemd-enable-validate:
+    needs: [changes, build, build-systemd-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -955,8 +980,9 @@ jobs:
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   systemd-user-enable-validate:
+    needs: [changes, build, build-systemd-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1013,8 +1039,9 @@ jobs:
         run: timeout 150 bash -c -- 'c=0 ; until [ $c -eq 1 ]; do c=$(podman ps | grep httpd | wc -l); done'
 
   systemd-restart-validate:
+    needs: [changes, build, build-systemd-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-systemd-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1067,8 +1094,9 @@ jobs:
         run: timeout 150 bash -c -- 'sysd=inactive ; until [ $sysd = "active" ]; do sysd=$(sudo systemctl is-active httpd.service); done'
 
   ansible-validate:
+    needs: [changes, build, build-ansible-amd]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-ansible-amd ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1124,8 +1152,9 @@ jobs:
         run: sudo podman logs fetchit
 
   systemd-validate-exact-file:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1163,8 +1192,9 @@ jobs:
         run: sudo podman ps -a
 
   kube-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1202,8 +1232,9 @@ jobs:
         run: sudo podman ps
 
   clean-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1256,8 +1287,9 @@ jobs:
         run: if [[ $(sudo podman image ls | grep alpine) ]] ; then exit 1; else echo "Image correctly removed" 1; fi
 
   glob-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1307,8 +1339,9 @@ jobs:
         run: test "$(sudo podman exec cap1 id -u)" = 1001
 
   multi-engine-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1376,8 +1409,9 @@ jobs:
         run: if [[ $(sudo podman ps | grep -v CON= | grep colors | grep -v cap | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   multi-engine-skew-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1448,11 +1482,9 @@ jobs:
         run: if [[ $(sudo podman ps | grep -v CON= | grep -v cap | grep colors | wc -l) = "2" ]] ; then echo "Container successfully launched"; else exit 1; fi
 
   make-change-to-repo:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' && ((github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) }}
     runs-on: ubuntu-26.04
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -1543,8 +1575,9 @@ jobs:
         run: sudo podman logs fetchit
 
   loader-validate:
+    needs: [changes, build, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, pull-and-archive ]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -1600,8 +1633,9 @@ jobs:
         run: sudo podman logs fetchit
 
   disconnected-validate:
+    needs: [changes, build, build-ansible-amd, pull-and-archive]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build, build-ansible-amd, pull-and-archive ]
     steps:
       - name: checkout with token
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -1689,11 +1723,9 @@ jobs:
         run: sudo podman logs fetchit
 
   push-amd-image-to-registry:
+    needs: [changes, build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate]
+    if: ${{ needs.changes.outputs.runtime == 'true' && ((github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) }}
     runs-on: ubuntu-26.04
-    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
@@ -1719,10 +1751,10 @@ jobs:
 
 
   build-arm-and-manifest-list:
+    needs: [changes, build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate]
+    if: ${{ needs.changes.outputs.runtime == 'true' && (!cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')) }}
     runs-on: ubuntu-26.04-arm
-    needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
     # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
@@ -1750,8 +1782,9 @@ jobs:
           path: /tmp/fetchit-arm.tar
 
   push-manifest-list-to-registry:
+    needs: [changes, build-arm-and-manifest-list]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ build-arm-and-manifest-list ]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -1808,13 +1841,11 @@ jobs:
           podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest
 
   publish-binary-to-github:
+    needs: [changes, build-arm-and-manifest-list]
+    if: ${{ needs.changes.outputs.runtime == 'true' && ((github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) }}
     permissions:
       contents: write
     runs-on: ubuntu-26.04
-    needs: [ build-arm-and-manifest-list ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
@@ -1858,8 +1889,9 @@ jobs:
           gh release upload latest ./fetchit-arm ./fetchit-amd --clobber
 
   create-ansible-manifest:
+    needs: [changes, ansible-validate, build-ansible-arm]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ ansible-validate, build-ansible-arm ]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -1916,8 +1948,9 @@ jobs:
           podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest
 
   create-systemd-manifest:
+    needs: [changes, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, build-systemd-arm]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
-    needs: [ systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, build-systemd-arm ]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

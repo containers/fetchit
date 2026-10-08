@@ -10,7 +10,12 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-scope.yml
+
   test:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     env:
       CGO_ENABLED: '1'
@@ -39,6 +44,8 @@ jobs:
         run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror|TestCommonGit|TestHelperContainer|TestRetirement|TestConfigReloadCan|TestRollback|TestDisconnected|TestFileTransfer'
 
   fedora:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-26.04
     container: quay.io/fedora/fedora:44
     env:
