@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+Optional Git repository mirrors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Git targets may set an ordered ``fallbackURLs`` list while retaining ``url`` as
+the primary identity. Clone and fetch retry trusted mirrors after primary failures;
+stale/divergent fallback histories are rejected for existing checkouts. Existing
+single-source behavior is unchanged. See :doc:`mirrors` for authentication, local
+mounts, history rules, initial clone behavior, and recovery.
+
 Quadlet bundles
 ~~~~~~~~~~~~~~~
 

@@ -33,6 +33,7 @@ type FetchitConfig struct {
 type TargetConfig struct {
 	Name              string             `mapstructure:"name"`
 	Url               string             `mapstructure:"url"`
+	FallbackURLs      []string           `mapstructure:"fallbackURLs"`
 	Device            string             `mapstructure:"device"`
 	Disconnected      bool               `mapstructure:"disconnected"`
 	VerifyCommitsInfo *VerifyCommitsInfo `mapstructure:"verifyCommitsInfo"`
@@ -54,6 +55,7 @@ type Target struct {
 	ssh             bool
 	sshKey          string
 	url             string
+	fallbackURLs    []string
 	pat             string
 	envSecret       string
 	username        string

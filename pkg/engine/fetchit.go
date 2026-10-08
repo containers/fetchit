@@ -263,9 +263,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			url:    tc.Url,
-			device: tc.Device,
-			pat:    fetchit.pat,
+			url:          tc.Url,
+			fallbackURLs: append([]string(nil), tc.FallbackURLs...),
+			device:       tc.Device,
+			pat:          fetchit.pat,
 			// define the environment variable for envSecret
 			envSecret:    fetchit.envSecret,
 			ssh:          fetchit.ssh,
@@ -401,6 +402,11 @@ func getRepo(target *Target) error {
 }
 
 func getClone(target *Target) error {
+	unlock := lockRepositoryCache(target)
+	defer unlock()
+	if hasRepositoryMirrors(target) {
+		return getCloneWithMirrors(target)
+	}
 	directory := getDirectory(target)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {

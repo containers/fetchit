@@ -53,8 +53,10 @@ func applyChanges(ctx context.Context, target *Target, targetPath string, globPa
 	return changeMap, nil
 }
 
-//getLatest will get the head of the branch in the repository specified by the target's url
+// getLatest will get the head of the branch in the repository specified by the target's url
 func getLatest(target *Target) (plumbing.Hash, error) {
+	unlock := lockRepositoryCache(target)
+	defer unlock()
 	ctx := context.Background()
 	directory := getDirectory(target)
 
@@ -98,7 +100,12 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		}
 		fOptions.Auth = authValue
 	}
-	if err = repo.Fetch(fOptions); err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
+	if hasRepositoryMirrors(target) && !target.disconnected {
+		err = fetchWithMirrors(repo, target, fOptions)
+	} else {
+		err = repo.Fetch(fOptions)
+	}
+	if err != nil && err != git.NoErrAlreadyUpToDate && !target.disconnected {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error fetching branch %s from remote repository %s", target.branch, target.url)
 	}
 
@@ -117,7 +124,8 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		return plumbing.Hash{}, utils.WrapErr(err, "Error checking out %s on branch %s", hashStr, target.branch)
 	}
 
-	if target.gitsignVerify {
+	// Mirror candidates are verified inside the bounded attempt before branch updates.
+	if target.gitsignVerify && (!hasRepositoryMirrors(target) || target.disconnected) {
 		commit, err := repo.CommitObject(branch.Hash())
 		if err != nil {
 			return plumbing.Hash{}, utils.WrapErr(err, "Error getting verified commit at hash %s from repository %s", hashStr, directory)
