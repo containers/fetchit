@@ -1,0 +1,17 @@
+name: Platform publishing regression test
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  registry:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/setup-podman
+      - name: Test archive import and platform publishing with a local registry
+        run: bash tests/integration/publishing/test-platform-publish.sh
