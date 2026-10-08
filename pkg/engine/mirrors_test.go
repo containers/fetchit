@@ -2,7 +2,16 @@ package engine
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"errors"
+	"github.com/go-git/go-git/v5/config"
+	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	cryptossh "golang.org/x/crypto/ssh"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -234,6 +243,7 @@ func TestMirrorPreferenceWithMultipleUsableSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mirrorCommit(t, second, "second source already ahead")
 	target.fallbackURLs = []string{"file://" + firstPath, "file://" + secondPath}
 	if err := getClone(target); err != nil {
 		t.Fatal(err)
@@ -321,5 +331,60 @@ func TestMirrorConcurrentFetchesShareCacheSafely(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMirrorFetchContextCancellation(t *testing.T) {
+	_, repo, _ := mirrorTestTarget(t)
+	mirrorCommit(t, repo, "initial")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	incoming := plumbing.ReferenceName("refs/fetchit/test-canceled")
+	options := &git.FetchOptions{RemoteName: "fetchit-source", RefSpecs: []config.RefSpec{"+refs/heads/main:" + config.RefSpec(incoming.String())}, Tags: git.NoTags}
+	_, err := fetchCandidate(ctx, repo, server.URL, options, incoming)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("context cancellation lost: %v", err)
+	}
+}
+
+func TestMirrorSSHRequiresKnownHosts(t *testing.T) {
+	directory := t.TempDir()
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, err := cryptossh.MarshalPrivateKey(private, "test fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := filepath.Join(directory, "key")
+	if err := os.WriteFile(key, pem.EncodeToMemory(block), 0600); err != nil {
+		t.Fatal(err)
+	}
+	knownHosts := filepath.Join(directory, "known_hosts")
+	t.Setenv("SSH_KNOWN_HOSTS", knownHosts)
+	target := &Target{ssh: true, sshKey: key, branch: "main"}
+	if _, err := mirrorCloneOptions(target); err == nil {
+		t.Fatal("missing known_hosts accepted")
+	}
+	if err := os.WriteFile(knownHosts, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	options, err := mirrorCloneOptions(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth, ok := options.Auth.(*gitssh.PublicKeys)
+	if !ok || auth.HostKeyCallback == nil {
+		t.Fatal("SSH trust callback missing")
+	}
+	signer, err := cryptossh.NewSignerFromKey(private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := auth.HostKeyCallback("untrusted.example:22", &net.TCPAddr{}, signer.PublicKey()); err == nil {
+		t.Fatal("unknown host accepted")
 	}
 }
