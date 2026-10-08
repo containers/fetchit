@@ -3,8 +3,8 @@ package engine
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path"
@@ -19,17 +19,11 @@ import (
 func extractZip(url string) error {
 	trimDir := strings.TrimSuffix(url, path.Ext(url))
 	directory := filepath.Base(trimDir)
-	cache := "/opt/.cache/" + directory + "/"
-	dest := cache + "HEAD"
-	absPath, err := filepath.Abs(directory)
-
+	dest := "/opt/.cache/" + directory + "/HEAD"
 	data, err := http.Get(url)
 	if err != nil {
 		if _, err := os.Stat(dest); err == nil {
-			// remove the diff file
-			err = os.Remove(dest)
-			if err != nil {
-				logger.Info("Failed to remove file ", dest)
+			if err := os.Remove(dest); err != nil {
 				return err
 			}
 		}
@@ -38,87 +32,78 @@ func extractZip(url string) error {
 	}
 	defer data.Body.Close()
 	if data.StatusCode != http.StatusOK {
-		return fmt.Errorf("archive download returned HTTP %d", data.StatusCode)
+		return &HTTPStatusError{Kind: "archive", StatusCode: data.StatusCode}
 	}
-	if data.StatusCode == http.StatusOK {
-		if _, err := os.Stat(dest); os.IsNotExist(err) {
-			// Check the http response code and if not present exit
-			logger.Infof("loading disconnected archive from %s", url)
-			// Place the data into the placeholder file
+	if _, err := os.Stat(dest); err == nil {
+		logger.Info("No changes since last disconnected run...requeuing")
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	logger.Infof("loading disconnected archive from %s", url)
+	// Keep failed downloads outside the repository so they cannot block retries.
+	outFile, err := os.CreateTemp(".", ".fetchit-archive-*.zip")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(outFile.Name())
+	if err := copyAndClose(outFile, data.Body); err != nil {
+		return err
+	}
+	r, err := zip.OpenReader(outFile.Name())
+	if err != nil {
+		return fmt.Errorf("opening downloaded archive: %w", err)
+	}
+	defer r.Close()
+	if err := extractArchive(r.File, directory); err != nil {
+		return err
+	}
+	return createDiffFile(directory)
+}
 
-			// Unzip the data from the http response
-			// Create the destination file
-			os.MkdirAll(directory, 0755)
-
-			outFile, err := os.Create(absPath + "/" + directory + ".zip")
-			if err != nil {
-				logger.Error("Failed creating file ", absPath+"/"+directory+".zip")
+func extractArchive(files []*zip.File, directory string) error {
+	// Validate every entry before writing any files, including sibling-prefix escapes.
+	for _, f := range files {
+		relative, err := filepath.Rel(directory, filepath.Join(directory, f.Name))
+		if err != nil || filepath.IsAbs(f.Name) || relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("illegal file path in ZIP archive: %q", f.Name)
+		}
+		if f.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("unsupported ZIP symlink: %q", f.Name)
+		}
+	}
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, f := range files {
+		// os.Root also prevents writes through existing symlinks that escape the root.
+		if f.FileInfo().IsDir() {
+			if err := root.MkdirAll(f.Name, f.Mode().Perm()); err != nil {
 				return err
 			}
-
-			// Write the body to file
-			_, copyErr := io.Copy(outFile, data.Body)
-			closeErr := outFile.Close()
-			if copyErr != nil {
-				return copyErr
-			}
-			if closeErr != nil {
-				return closeErr
-			}
-
-			// Unzip the file
-			r, err := zip.OpenReader(outFile.Name())
-			if err != nil {
-				return fmt.Errorf("opening downloaded archive: %w", err)
-			}
-			defer r.Close()
-			for _, f := range r.File {
-				rc, err := f.Open()
-				if err != nil {
-					return err
-				}
-				defer rc.Close()
-
-				fpath := filepath.Join(directory, f.Name)
-				// Prevent path traversal attacks
-				cleanPath := filepath.Clean(fpath)
-				cleanDir := filepath.Clean(directory)
-				if !strings.HasPrefix(cleanPath, cleanDir) {
-					logger.Errorf("Illegal file path in ZIP archive (path traversal attempt): %s", f.Name)
-					return err
-				}
-
-				if f.FileInfo().IsDir() {
-					os.MkdirAll(fpath, f.Mode())
-				} else {
-					var fdir string
-					if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-						fdir = fpath[:lastIndex]
-					}
-
-					os.MkdirAll(fdir, f.Mode())
-					f, err := os.OpenFile(
-						fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-					if err != nil {
-						return err
-					}
-					defer f.Close()
-
-					_, err = io.Copy(f, rc)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			err = os.Remove(outFile.Name())
-			if err != nil {
-				logger.Error("Failed removing file ", outFile.Name())
-				return err
-			}
-			createDiffFile(directory)
-			return nil
-		} else {
-			logger.Info("No changes since last disonnected run...requeuing")
+			continue
+		}
+		if err := root.MkdirAll(filepath.Dir(f.Name), 0755); err != nil {
+			return err
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := root.OpenFile(f.Name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		writeErr := copyAndClose(out, rc)
+		readCloseErr := rc.Close()
+		if err := errors.Join(writeErr, readCloseErr); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -234,16 +219,11 @@ func createDiffFile(name string) error {
 		logger.Error("Failed to open file ", src)
 		return err
 	}
+	defer srcFile.Close()
 	destination, err := os.Create(dest)
 	if err != nil {
 		logger.Error("Failed to create file ", dest)
 		return err
 	}
-	defer destination.Close()
-	_, err = io.Copy(destination, srcFile)
-	if err != nil {
-		logger.Error("Failed to copy file ", src)
-		return err
-	}
-	return nil
+	return copyAndClose(destination, srcFile)
 }

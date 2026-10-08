@@ -7,11 +7,14 @@ Unreleased
 HTTP image and archive download errors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Image downloads and disconnected ZIP archive downloads now report an error when
+HTTP image downloads and disconnected ZIP archive downloads now report an error when
 the server returns anything other than HTTP 200, including 204, 401, 404, and
 500. Error responses are not written or imported. Response bodies are closed
 even when a download is skipped because its local file already exists. Archive
-body read failures and invalid ZIP files also return errors.
+body read failures and invalid ZIP files also return errors. Failed archive
+refreshes stop reconciliation; image failures are logged at error level. Incomplete
+download files are cleaned up, image file-close errors propagate before import,
+and ZIP extraction rejects escaping paths and symlinks.
 
 Optional Git repository mirrors
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

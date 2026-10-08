@@ -2,8 +2,6 @@ package engine
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path"
@@ -43,12 +41,12 @@ func (i *Image) Process(ctx, conn context.Context, skew int) {
 	if len(i.Url) > 0 {
 		err := i.loadHTTPPodman(ctx, conn, i.Url)
 		if err != nil {
-			logger.Debugf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
+			logger.Errorf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
 		}
 	} else if len(i.ImagePath) > 0 {
 		err := i.loadDevicePodman(ctx, conn)
 		if err != nil {
-			logger.Debugf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
+			logger.Errorf("Repository: %s Method: %s encountered error: %v, resetting...", target.url, imageMethod, err)
 		}
 	}
 }
@@ -62,12 +60,12 @@ func (i *Image) Apply(ctx, conn context.Context, currentState, desiredState plum
 }
 
 func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
-	imageName := (path.Base(url))
-	pathToLoad := "/opt/" + imageName
+	return i.loadHTTPPodmanAtPath(ctx, conn, url, "/opt/"+path.Base(url))
+}
+
+func (i *Image) loadHTTPPodmanAtPath(ctx, conn context.Context, url, pathToLoad string) error {
 	data, err := http.Get(url)
 	if err != nil {
-		// logger.Info("Failed to get image from url ", url) saving this for if we do various log levels
-		// remove the image if it exists
 		if _, err := os.Stat(pathToLoad); err != nil {
 			logger.Info("URL not present...requeuing")
 			return nil
@@ -78,38 +76,26 @@ func (i *Image) loadHTTPPodman(ctx, conn context.Context, url string) error {
 	}
 	defer data.Body.Close()
 	if data.StatusCode != http.StatusOK {
-		return fmt.Errorf("image download returned HTTP %d", data.StatusCode)
+		return &HTTPStatusError{Kind: "image", StatusCode: data.StatusCode}
 	}
-	if data.StatusCode == http.StatusOK {
-		if _, err := os.Stat(pathToLoad); os.IsNotExist(err) {
-			logger.Infof("Loading image from %s", url)
-			// Place the data into the placeholder file
-
-			// Create the file to write the data to
-			file, err := os.Create("/opt/" + imageName)
-			if err != nil {
-				logger.Error("Failed creating file ", file)
-				return err
-			}
-			defer file.Close()
-			// Write the data to the file
-			_, err = io.Copy(file, data.Body)
-			if err != nil {
-				logger.Error("Failed writing data to ", file)
-				return err
-			}
-
-			err = i.podmanImageLoad(ctx, conn, pathToLoad)
-			if err != nil {
-				logger.Error("Failed to load image from device")
-				return err
-			}
-			return nil
-		} else {
-			return nil
-		}
+	if _, err := os.Stat(pathToLoad); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
 	}
-	return nil
+	logger.Infof("Loading image from %s", url)
+	file, err := os.CreateTemp(filepath.Dir(pathToLoad), ".fetchit-image-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if err := copyAndClose(file, data.Body); err != nil {
+		return err
+	}
+	if err := os.Rename(file.Name(), pathToLoad); err != nil {
+		return err
+	}
+	return i.podmanImageLoad(ctx, conn, pathToLoad)
 }
 
 func (i *Image) loadDevicePodman(ctx, conn context.Context) error {

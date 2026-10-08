@@ -74,7 +74,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	directory := getDirectory(target)
 	if target.disconnected {
 		if len(target.url) > 0 {
-			extractZip(target.url)
+			if err := extractZip(target.url); err != nil {
+				return fmt.Errorf("refreshing disconnected archive: %w", err)
+			}
 		} else if len(target.device) > 0 {
 			localDevicePull(directory, target.device, "", false)
 		}

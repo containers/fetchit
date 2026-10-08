@@ -475,7 +475,7 @@ func getDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		extractZip(target.url)
+		return extractZip(target.url)
 	}
 	return nil
 }
