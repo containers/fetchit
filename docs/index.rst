@@ -20,6 +20,7 @@ images containing those changes; an older published image may lack new options.
    purpose
    methods
    lifecycle
+   volumes
    sops
    mirrors
    quadlet

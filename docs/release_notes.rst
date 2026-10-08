@@ -4,6 +4,11 @@ Release notes
 Unreleased
 ----------
 
+* Per-declaration named-volume creation: raw mounts support ``create: true``;
+  kube workloads can generate missing PVC declarations with the
+  ``fetchit.containers.io/create-volumes`` annotation. Existing volumes and data
+  are retained. See :doc:`volumes` for examples and native systemd/Quadlet mounts.
+
 Trailing slashes in Git target paths
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

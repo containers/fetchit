@@ -67,6 +67,7 @@ type mount struct {
 }
 
 type namedVolume struct {
+	Create  bool     `json:"create,omitempty" yaml:"create,omitempty"`
 	Name    string   `json:"name" yaml:"name"`
 	Dest    string   `json:"dest" yaml:"dest"`
 	Options []string `json:"options" yaml:"options"`
@@ -121,6 +122,10 @@ func (r *Raw) applyRawInput(ctx, conn context.Context, path string, prev *string
 		raw.Networks = r.Networks
 	}
 	if err := validateNetworks(conn, raw.Networks); err != nil {
+		return err
+	}
+
+	if err := ensureRawVolumes(conn, raw.Volumes); err != nil {
 		return err
 	}
 
