@@ -93,7 +93,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		if err := m.Apply(ctx, conn, current, latest, tag); err != nil {
 			return fmt.Errorf("Failed to apply changes: %v", err)
 		}
-		updateCurrent(ctx, target, latest, m.GetKind(), m.GetName())
+		if err := updateCurrent(ctx, target, latest, m.GetKind(), m.GetName()); err != nil {
+			return err
+		}
 		logger.Infof("Moved %s from %s to %s for git target %s", m.GetName(), current.String()[:hashReportLen], latest, target.url)
 	} else {
 		logger.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current.String()[:hashReportLen])

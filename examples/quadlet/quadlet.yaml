@@ -1,0 +1,11 @@
+targetConfigs:
+  - name: quadlet-example
+    url: https://github.com/containers/fetchit.git
+    branch: main
+    quadlet:
+      - name: web
+        schedule: "*/1 * * * *"
+        targetPath: examples/quadlet/units
+        root: true
+        start: true
+        restart: true

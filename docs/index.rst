@@ -12,4 +12,5 @@ FetchIt was designed to allow for the hands off management of containers running
    quick_start
    purpose
    methods
+   quadlet
    running

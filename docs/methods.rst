@@ -4,7 +4,7 @@ The YAML configuration file defines git targets and the methods to use, how freq
 and various configuration values that relate to that method.
 
 A target is a unique value that holds methods. Mutiple git targets (targetConfigs) can be defined. Methods that can be configured
-include `Raw`, `Systemd`, `Kube`, `Ansible`, `FileTransfer`, `Prune`, and `ConfigReload`.
+include `Raw`, `Systemd`, `Quadlet`, `Kube`, `Ansible`, `FileTransfer`, `Prune`, and `ConfigReload`.
 
 Examples of all methods are located in the `FetchIt repository <https://github.com/containers/fetchit/tree/main/examples>`_
 
@@ -293,3 +293,8 @@ An example Kube play YAML file will look similiar to the following. This will la
      - configMapRef:
          name: env
          optional: false
+
+Quadlet Method
+--------------
+
+See :doc:`quadlet` for host-managed Podman Quadlet bundles, configuration, and lifecycle behavior.

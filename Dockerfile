@@ -28,7 +28,7 @@ RUN mv ./scripts/entry.sh /usr/local/bin/
 # RUN STAGE
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf -y install rsync device-mapper-libs libseccomp && microdnf clean all
+RUN microdnf -y install rsync tar coreutils util-linux device-mapper-libs libseccomp && microdnf clean all
 
 COPY --from=builder /usr/local/bin/fetchit /usr/local/bin/
 COPY --from=builder /usr/local/bin/entry.sh /usr/local/bin/
