@@ -123,6 +123,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	})
 	first := commit("application.enc.yaml", encrypt("fetchit-secret-sentinel-first"))
 	apply(first)
+	assertKubeRuntimeLabels(t, k)
 	readSecret("fetchit-secret-sentinel-first")
 	secondCipher := encrypt("fetchit-secret-sentinel-second")
 	second := commit("application.enc.yaml", secondCipher)
@@ -148,6 +149,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	readSecret("fetchit-secret-sentinel-first")
 	recovered := commit("application.enc.yaml", secondCipher)
 	apply(recovered)
+	assertKubeRuntimeLabels(t, k)
 	readSecret("fetchit-secret-sentinel-second")
 	// Rotate the actual age identity with an overlap window for old Git content.
 	oldIdentity, err := os.ReadFile(key)
@@ -170,6 +172,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	}
 	rotated := commit("application.enc.yaml", encrypt("fetchit-secret-sentinel-rotated"))
 	apply(rotated)
+	assertKubeRuntimeLabels(t, k)
 	readSecret("fetchit-secret-sentinel-rotated")
 	if err := os.WriteFile(key, newIdentity, 0600); err != nil {
 		t.Fatal("cannot retire old test identity")
@@ -184,6 +187,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	apply(renamed)
+	assertKubeRuntimeLabels(t, k)
 	readSecret("fetchit-secret-sentinel-rotated")
 	if _, err := tree.Remove("kube/renamed.enc.yaml"); err != nil {
 		t.Fatal(err)

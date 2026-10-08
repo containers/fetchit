@@ -40,13 +40,13 @@ jobs:
           if [ "$ENVIRONMENT" = ubuntu-rootful ]; then
             sudo systemctl enable --now podman.socket
             sudo podman pull "$SOPS_TEST_IMAGE"
-            sudo env SOPS_TEST_IMAGE="$SOPS_TEST_IMAGE" SOPS_TEST_SOCKET=unix:///run/podman/podman.sock ./_output/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+            sudo env SOPS_TEST_IMAGE="$SOPS_TEST_IMAGE" SOPS_TEST_SOCKET=unix:///run/podman/podman.sock ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
           else
             sudo loginctl enable-linger "$(id -un)"
             export XDG_RUNTIME_DIR="/run/user/$(id -u)"
             systemctl --user enable --now podman.socket
             podman pull "$SOPS_TEST_IMAGE"
-            SOPS_TEST_HOST_NETWORK=1 SOPS_TEST_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+            SOPS_TEST_HOST_NETWORK=1 SOPS_TEST_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
           fi
       - name: Fedora lifecycle
         if: matrix.environment == 'fedora-rootful'
@@ -62,5 +62,5 @@ jobs:
               podman system service --time=0 unix:///run/podman/podman.sock >/tmp/podman-service.log 2>&1 &
               timeout 30 bash -c "until test -S /run/podman/podman.sock; do sleep 1; done"
               podman pull "$SOPS_TEST_IMAGE"
-              SOPS_TEST_SOCKET=unix:///run/podman/podman.sock /work/sops.test -test.v -test.run TestSOPSPodmanLifecycle
+              SOPS_TEST_SOCKET=unix:///run/podman/podman.sock /work/sops.test -test.v -test.run "Test(SOPS|KubeLabels)PodmanLifecycle"
             '

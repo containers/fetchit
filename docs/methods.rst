@@ -282,6 +282,50 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
        schedule: "*/5 * * * *"
      branch: main
 
+Workload labels
+~~~~~~~~~~~~~~~
+
+FetchIt automatically adds the following labels to newly created or recreated Pods and to the
+Pod templates of Deployments, DaemonSets, and Jobs. Podman 5 propagates these
+labels to the resulting Pods and workload containers, including init containers:
+
+* ``fetchit.containers.io/managed-by=fetchit``
+* ``fetchit.containers.io/owner=<32-character hexadecimal identity>``
+
+The owner identity is the first 16 bytes of a SHA-256 digest of the JSON array
+containing the configured repository URL, branch, method name, and target path,
+in that order. It is stable across FetchIt restarts and commit changes. Changing
+one of those configuration fields changes the identity. The label contains no
+literal repository URL or credentials; it is an identifier, not a security token.
+
+Existing application labels and controller selectors are preserved. FetchIt
+replaces values for its two reserved label keys. Labels are added in memory,
+including after authenticated SOPS decryption; repository manifests are unchanged.
+Secrets, ConfigMaps, and volumes do not receive these labels.
+
+Use labels to find workloads managed by FetchIt:
+
+.. code-block:: bash
+
+   podman pod ps --filter label=fetchit.containers.io/managed-by=fetchit
+   podman ps -a --filter label=fetchit.containers.io/managed-by=fetchit
+   # Replace POD with a Pod name shown by the first command.
+   owner_id=$(podman pod inspect POD --format '{{ index .Labels "fetchit.containers.io/owner" }}')
+   podman ps -a --filter "label=fetchit.containers.io/owner=$owner_id"
+
+This is an Unreleased feature; older images do not add these labels. Existing
+workloads acquire labels on their next successful recreation by FetchIt. A
+restart with no manifest changes does not relabel an existing workload.
+
+Labels support discovery; this version does not use them to authorize teardown.
+FetchIt retains its existing name-based replacement/deletion behavior, including
+for unlabeled workloads. Use unique resource names and avoid sharing workload
+names between methods or with manually created workloads. Enforcing ownership
+checks requires a separate migration policy for pre-existing unlabeled workloads.
+
+Manifest example
+~~~~~~~~~~~~~~~~
+
 An example Kube play YAML file will look similiar to the following. This will launch a container as well as the coresponding ConfigMap.
 
 .. code-block:: yaml
