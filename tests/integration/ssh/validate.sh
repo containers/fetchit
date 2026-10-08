@@ -8,7 +8,7 @@ cleanup() {
   sudo podman logs fetchit-ssh 2>/dev/null || true
   sudo cat "$fixture/sshd.log" 2>/dev/null || true
   sudo podman rm -f fetchit-ssh 2>/dev/null || true
-  sudo podman volume rm fetchit-ssh-volume 2>/dev/null || true
+  sudo podman volume rm fetchit-volume 2>/dev/null || true
   sudo podman rm -f ssh-network-raw 2>/dev/null || true
   sudo podman pod rm -f ssh-network-pod 2>/dev/null || true
   sudo podman network rm ssh-front ssh-back 2>/dev/null || true
@@ -85,7 +85,7 @@ write_known_host() {
 }
 start_fetchit() {
   sudo podman run -d --name fetchit-ssh --network host \
-    -v fetchit-ssh-volume:/opt \
+    -v fetchit-volume:/opt \
     -v "$fixture/config:/opt/mount:ro" \
     -v /run/podman/podman.sock:/run/podman/podman.sock \
     --security-opt label=disable "$image"
@@ -112,7 +112,7 @@ if [[ $rejected != true ]] || [[ -e "$fixture/output/hello.txt" ]]; then
   exit 1
 fi
 sudo podman rm -f fetchit-ssh
-sudo podman volume rm fetchit-ssh-volume
+sudo podman volume rm fetchit-volume
 # Trust the fixture's exact public key, then verify clone and file deployment.
 write_known_host "$fixture/server_key.pub"
 start_fetchit
