@@ -282,3 +282,50 @@ func decryptSOPSTest(settings *SOPS, ctx context.Context, input []byte, binary s
 		return exec.CommandContext(child, binary, "decrypt", "--input-type", "yaml", "--output-type", "yaml")
 	})
 }
+
+func TestSOPSRejectsUnencryptedSecretAndMixedInput(t *testing.T) {
+	for _, input := range []string{
+		"apiVersion: v1\nkind: Secret\ndata:\n  password: exposed\n" + testEncryptedMetadata,
+		testEncryptedMetadata + "---\n" + testPlainKube,
+		strings.Replace(testEncryptedMetadata, "mac: ENC[dummy]", "mac: invalid", 1),
+	} {
+		if err := validateSOPSMetadata([]byte(input)); err == nil {
+			t.Fatal("accepted invalid encrypted input")
+		}
+	}
+}
+
+func TestSOPSStderrVolumeIsBounded(t *testing.T) {
+	settings := sopsTestSettings(t)
+	binary := filepath.Join(t.TempDir(), "sops")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n/usr/bin/head -c 65537 /dev/zero >&2\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	_, err := decryptSOPSTest(settings, context.Background(), []byte(testEncryptedMetadata), binary)
+	if !errors.Is(err, ErrSOPSSize) {
+		t.Fatalf("lost diagnostic size error: %v", err)
+	}
+}
+
+func TestSOPSDeletionAndNoChangesSkipNetworkPreflight(t *testing.T) {
+	k := &Kube{Networks: []string{"missing-network"}}
+	for _, changes := range [][]preparedKubeChange{nil, {{path: deleteFile}}} {
+		if err := k.runPreparedSOPS(context.Background(), context.Background(), changes); err != nil {
+			t.Fatalf("cleanup required unavailable network: %v", err)
+		}
+	}
+}
+
+func TestSOPSInvalidInputStopsBeforePodman(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manifest.yaml")
+	if err := os.WriteFile(path, []byte(testPlainKube), 0600); err != nil {
+		t.Fatal(err)
+	}
+	k := &Kube{SOPS: sopsTestSettings(t)}
+	// An absent connection would make stop/play fail. Invalid input must instead
+	// return the preparation classification before any mutation is attempted.
+	err := k.MethodEngine(context.Background(), context.Background(), nil, path)
+	if !errors.Is(err, ErrSOPSInput) {
+		t.Fatalf("did not stop at preparation: %v", err)
+	}
+}

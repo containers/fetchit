@@ -248,6 +248,19 @@ func (k *Kube) applyPreparedSOPS(ctx, conn context.Context, changes map[*object.
 type SOPSPreparationError struct{ cause error }
 
 func (e *SOPSPreparationError) Error() string {
-	return "cannot decrypt manifest; check age keys, integrity, limits, and deadline"
+	switch {
+	case errors.Is(e.cause, ErrSOPSConfig):
+		return "cannot decrypt manifest: invalid age key configuration"
+	case errors.Is(e.cause, ErrSOPSInput):
+		return "cannot decrypt manifest: invalid encrypted input"
+	case errors.Is(e.cause, ErrSOPSSize):
+		return "cannot decrypt manifest: size limit exceeded"
+	case errors.Is(e.cause, context.DeadlineExceeded):
+		return "cannot decrypt manifest: deadline exceeded"
+	case errors.Is(e.cause, context.Canceled):
+		return "cannot decrypt manifest: cancelled"
+	default:
+		return "cannot decrypt manifest: check age keys and SOPS integrity"
+	}
 }
 func (e *SOPSPreparationError) Unwrap() error { return e.cause }

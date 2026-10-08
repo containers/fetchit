@@ -76,7 +76,10 @@ func (s *SOPS) decryptWithCommand(ctx context.Context, input []byte, createComma
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	if len(input) == 0 || len(input) > sopsFileLimit {
+	if len(input) == 0 {
+		return nil, ErrSOPSInput
+	}
+	if len(input) > sopsFileLimit {
 		return nil, ErrSOPSSize
 	}
 	if err := validateSOPSMetadata(input); err != nil {

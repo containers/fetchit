@@ -1,6 +1,10 @@
 Encrypted Kube manifests with SOPS
 ==================================
 
+This feature is included in the Unreleased changes. Use an image built from a
+revision containing SOPS support; older published images do not support this
+configuration.
+
 FetchIt can decrypt SOPS-encrypted YAML when deploying a Kube method. This is
 optional; methods without a ``sops`` block keep their existing behavior. FetchIt's
 images include SOPS 3.13.3 for amd64 and arm64, installed with pinned checksums.

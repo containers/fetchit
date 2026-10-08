@@ -37,6 +37,10 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	if err != nil || !strings.Contains(string(version), "version 5.") {
 		t.Fatal("integration requires Podman 5")
 	}
+	image := os.Getenv("SOPS_TEST_IMAGE")
+	if image == "" {
+		t.Fatal("SOPS_TEST_IMAGE must identify the pinned test image")
+	}
 	directory := t.TempDir()
 	t.Chdir(directory)
 	key := filepath.Join(directory, "age.txt")
@@ -66,7 +70,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	k := &Kube{CommonMethod: CommonMethod{Name: name, TargetPath: "kube", target: &Target{url: "https://example.invalid/repo.git", branch: "main"}}, SOPS: &SOPS{AgeKeyFile: key}}
 	encrypt := func(value string) []byte {
 		t.Helper()
-		plain := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: %s\nstringData:\n  password: %s\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: %s\nspec:\n  containers:\n  - name: %s\n    image: docker.io/library/alpine:3.22\n    command: [sleep, infinity]\n    env:\n    - name: PASSWORD\n      valueFrom:\n        secretKeyRef:\n          name: %s\n          key: password\n", secret, value, pod, container, secret)
+		plain := fmt.Sprintf("apiVersion: v1\nkind: Secret\nmetadata:\n  name: %s\nstringData:\n  password: %s\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: %s\nspec:\n  containers:\n  - name: %s\n    image: %s\n    command: [sleep, infinity]\n    env:\n    - name: PASSWORD\n      valueFrom:\n        secretKeyRef:\n          name: %s\n          key: password\n", secret, value, pod, container, image, secret)
 		command := exec.Command(sopsExecutable, "encrypt", "--filename-override", "manifest.yaml", "--age", strings.TrimSpace(string(recipient)), "--encrypted-regex", "^(data|stringData)$", "--input-type", "yaml", "--output-type", "yaml")
 		command.Stdin = strings.NewReader(plain)
 		cipher, err := command.Output()

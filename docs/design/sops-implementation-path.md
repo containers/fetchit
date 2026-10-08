@@ -1,6 +1,7 @@
 # SOPS support for Kube methods
 
-Status: implementation in feature/kube-sops; not shipped until the feature PR merges.
+Status: implemented in PR #401. Availability follows the source/image version;
+see the Unreleased notes and SOPS guide.
 Tracks https://github.com/containers/fetchit/issues/349.
 Baseline: main 4828cf6, Podman Go bindings v5.8.8.
 
