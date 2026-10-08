@@ -81,7 +81,7 @@ func (q *Quadlet) GetName() string {
 		url = q.target.url
 		branch = q.target.branch
 	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%s\x00%s\x00%s\x00%t\x00%t\x00%s", url, branch, q.TargetPath, q.Root, q.HostHome, q.HostConfigHome, q.HostRuntimeDir, q.Start, q.Restart, q.HelperImage)))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%s\x00%s\x00%s\x00%t\x00%t\x00%s", url, branch, q.GetTargetPath(), q.Root, q.HostHome, q.HostConfigHome, q.HostRuntimeDir, q.Start, q.Restart, q.HelperImage)))
 	return fmt.Sprintf("%s-%x", q.Name, sum[:6])
 }
 
@@ -149,7 +149,7 @@ func (q *Quadlet) paths() (string, string, error) {
 	if len(q.Name) > 64 || !quadletSafeName.MatchString(q.Name) || strings.Contains(q.Name, "@") || strings.Contains(q.Name, ":") {
 		return "", "", fmt.Errorf("invalid Quadlet method name %q", q.Name)
 	}
-	if q.TargetPath == "" || path.Clean(q.TargetPath) != q.TargetPath || path.IsAbs(q.TargetPath) || strings.HasPrefix(q.TargetPath, "..") {
+	if q.GetTargetPath() == "" || path.Clean(q.GetTargetPath()) != q.GetTargetPath() || path.IsAbs(q.GetTargetPath()) || strings.HasPrefix(q.GetTargetPath(), "..") {
 		return "", "", fmt.Errorf("Quadlet requires a relative targetPath directory")
 	}
 	if q.Glob != nil {
@@ -184,8 +184,8 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 		return b, err
 	}
 	tree := root
-	if q.TargetPath != "." {
-		tree, err = root.Tree(q.TargetPath)
+	if q.GetTargetPath() != "." {
+		tree, err = root.Tree(q.GetTargetPath())
 	}
 	if errors.Is(err, object.ErrDirectoryNotFound) {
 		return b, nil
@@ -318,7 +318,7 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 }
 
 func (q *Quadlet) hostIdentity() (string, string) {
-	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.target.branch + "\x00" + q.Name + "\x00" + q.TargetPath))
+	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.target.branch + "\x00" + q.Name + "\x00" + q.GetTargetPath()))
 	home := q.HostHome
 	if q.Root {
 		home = "/root"

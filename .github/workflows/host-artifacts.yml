@@ -1,0 +1,64 @@
+name: Host artifact cleanup
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lifecycle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            mode: rootful
+          - runner: ubuntu-26.04
+            mode: rootless
+          - runner: ubuntu-26.04-arm
+            mode: rootful
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      CGO_ENABLED: '0'
+      BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs host_artifacts_integration
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-podman
+      - name: Compile engine and integration tests
+        run: |
+          mkdir -p _output
+          go build -mod=readonly -tags "$BUILDTAGS" -o _output/host-artifact-fetchit ./cmd/fetchit
+          go test -mod=readonly -tags "$BUILDTAGS" -c -o _output/host-artifacts.test ./pkg/engine
+      - name: Build the helper and test the real host lifecycle
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$MODE" = rootful ]; then
+            sudo systemctl enable --now podman.socket
+            sudo podman build -t quay.io/fetchit/fetchit:latest -f tests/integration/host-artifacts/Containerfile .
+            sudo env HOST_ARTIFACT_MODE=rootful HOST_ARTIFACT_SOCKET=unix:///run/podman/podman.sock ./_output/host-artifacts.test -test.v -test.run '^TestHostArtifactsPodmanLifecycle$'
+          else
+            sudo loginctl enable-linger "$(id -un)"
+            export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+            mkdir -p "$HOME/.config/systemd/user"
+            systemctl --user enable --now podman.socket
+            podman build -t quay.io/fetchit/fetchit:latest -f tests/integration/host-artifacts/Containerfile .
+            HOST_ARTIFACT_MODE=rootless HOST_ARTIFACT_SOCKET="unix://$XDG_RUNTIME_DIR/podman/podman.sock" ./_output/host-artifacts.test -test.v -test.run '^TestHostArtifactsPodmanLifecycle$'
+          fi
+      - name: Collect diagnostics
+        if: failure()
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          if [ "$MODE" = rootful ]; then
+            sudo journalctl --no-pager -n 100
+            sudo podman ps -a
+          else
+            journalctl --user --no-pager -n 100
+            podman ps -a
+          fi

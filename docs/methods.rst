@@ -8,6 +8,29 @@ include `Raw`, `Systemd`, `Quadlet`, `Kube`, `Ansible`, `FileTransfer`, `Prune`,
 
 Examples of all methods are located in the `FetchIt repository <https://github.com/containers/fetchit/tree/main/examples>`_
 
+Git target paths
+----------------
+
+A trailing ``/`` in ``targetPath`` is optional. For example, both configurations
+below select the same Git directory and use the same method ownership identity:
+
+.. code-block:: yaml
+
+   targetPath: examples/filetransfer
+
+.. code-block:: yaml
+
+   targetPath: examples/filetransfer/
+
+FetchIt removes trailing slashes before selecting Git changes and computing
+method identities. Multiple trailing slashes are also accepted. Existing
+configurations without a trailing slash continue to work. This does not change
+absolute-path validation or normalize interior path components.
+
+FileTransfer continues to copy each file by its basename into
+``destinationDirectory``; adding a trailing slash does not preserve nested source
+directories or change its destination layout.
+
 Dynamic Configuration Reload
 ----------------------------
 
@@ -258,6 +281,12 @@ SystemdTarget is a method that will place, enable, and restart systemd unit file
        enable: true
        schedule: "*/5 * * * *"
 
+Systemd also accepts ``cleanupOnRemoval: true`` to track deployed service files
+and stop, disable, and remove its owned services when the method is removed.
+The default is false. Rootless tracked deployments require the host user's
+``HOME`` and ``XDG_RUNTIME_DIR`` in FetchIt's environment. See :doc:`lifecycle`
+for prerequisites, existing-file migration, and recovery.
+
 File Transfer
 -------------
 The File Transfer method will copy files from the container to the host. This method is useful for transferring files from the container to the host to be used by the container either at start up or during runtime.
@@ -273,7 +302,11 @@ The File Transfer method will copy files from the container to the host. This me
        schedule: "*/5 * * * *"
      branch: main
 
-The destinationDirectory field is the directory on the host where the files will be copied to.
+The ``destinationDirectory`` field is the directory on the host where files
+will be copied. Set ``cleanupOnRemoval: true`` to track individual copied files
+and remove them when the method leaves configuration. The default is false.
+Tracked deployments require an existing, absolute destination directory and
+refuse to overwrite untracked files. See :doc:`lifecycle` for setup and recovery.
 
 Kube Play
 ---------

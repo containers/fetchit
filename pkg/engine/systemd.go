@@ -129,6 +129,22 @@ func (sd *Systemd) Process(ctx, conn context.Context, skew int) {
 }
 
 func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	if sd.CleanupOnRemoval {
+		receipt, _, err := hostMethodReceipt(sd)
+		if err != nil {
+			return err
+		}
+		plan := hostArtifactPlan{Receipt: receipt, Action: "apply", Enable: sd.Enable || sd.Restart, Restart: sd.Restart}
+		if change != nil && change.From.Name != "" {
+			plan.Previous = filepath.Base(change.From.Name)
+		}
+		if path == deleteFile {
+			plan.Action = "delete"
+		} else {
+			plan.Source = filepath.Join("/opt", path)
+		}
+		return deployHostArtifact(conn, plan)
+	}
 	var changeType string = "unknown"
 	var curr *string = nil
 	var prev *string = nil

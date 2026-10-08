@@ -24,6 +24,7 @@ type removalReceipt struct {
 	Owner   string          `json:"owner"`
 	Name    string          `json:"name"`
 	Quadlet *quadletRemoval `json:"quadlet,omitempty"`
+	Host    *hostRemoval    `json:"host,omitempty"`
 }
 type quadletRemoval struct {
 	Parent      string `json:"parent"`
@@ -98,9 +99,12 @@ func validRemovalReceipt(r removalReceipt) bool {
 		}
 	}
 	if r.Kind == kubeMethod || r.Kind == rawMethod {
-		return r.Quadlet == nil
+		return r.Quadlet == nil && r.Host == nil
 	}
-	if r.Kind != quadletMethod || r.Quadlet == nil {
+	if r.Kind == filetransferMethod || r.Kind == systemdMethod {
+		return r.Quadlet == nil && validHostRemoval(r.Kind, r.Host)
+	}
+	if r.Host != nil || r.Kind != quadletMethod || r.Quadlet == nil {
 		return false
 	}
 	q := r.Quadlet
@@ -110,6 +114,8 @@ func validRemovalReceipt(r removalReceipt) bool {
 func methodRemovalReceipt(m Method) (removalReceipt, bool, error) {
 	var common *CommonMethod
 	switch method := m.(type) {
+	case *FileTransfer, *Systemd:
+		return hostMethodReceipt(m)
 	case *Kube:
 		common = &method.CommonMethod
 	case *Raw:
@@ -315,6 +321,8 @@ func removeOwnedWorkloads(conn context.Context, r removalReceipt) error {
 				}
 			}
 		}
+	case filetransferMethod, systemdMethod:
+		return deployHostArtifact(conn, hostArtifactPlan{Receipt: r, Action: "cleanup"})
 	case quadletMethod:
 		q := r.Quadlet
 		if q == nil {

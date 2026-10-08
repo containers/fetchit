@@ -4,6 +4,27 @@ Release notes
 Unreleased
 ----------
 
+Trailing slashes in Git target paths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``targetPath: examples/filetransfer/`` now selects the same directory as
+``targetPath: examples/filetransfer`` (issue #201). Trailing slashes are removed
+before Git change filtering and ownership calculations for Git methods. This
+also makes configuration reloads between these spellings retain the same
+identity. FileTransfer's existing basename-based destination layout is unchanged;
+this does not add recursive directory preservation. See :doc:`methods`.
+
+Tracked host file and service cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FileTransfer and Systemd now accept opt-in ``cleanupOnRemoval``. Host journals
+record deployed files and their fingerprints; cleanup preserves unrelated or
+externally modified files. Systemd cleanup verifies service ownership, stops and
+disables services, removes tracked units, and reloads the manager. Defaults retain
+existing behavior. See :doc:`lifecycle` for prerequisites, migration, persistence,
+and retry instructions. Native rootful/rootless Actions tests exercise the real
+helper and host service lifecycle, including arm64.
+
 Read the Docs build configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
