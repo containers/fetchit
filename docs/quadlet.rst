@@ -62,7 +62,8 @@ Host access and rootless operation
 Fetchit needs access to the host Podman socket. The Quadlet helper runs through
 that socket with privileged container permissions. It mounts the host root
 read-only to use the actual generator, libraries, and systemd private socket,
-and mounts the configuration parent writable. This is host administration
+and mounts the configuration parent writable. It shares the host PID namespace
+so systemd can authenticate the client. This is host administration
 access; use trusted repositories and the existing commit-verification option
 where appropriate. Files are installed into a method-owned subdirectory, not
 into another method's directory. Rootful hosts must have ``/etc/containers``;
@@ -78,6 +79,7 @@ host paths explicitly:
        schedule: "*/1 * * * *"
        targetPath: deploy/quadlet
        root: false
+       hostHome: /home/operator
        hostConfigHome: /home/operator/.config
        hostRuntimeDir: /run/user/1234
        start: true
@@ -111,7 +113,7 @@ applications so the next run can retry safely, including when the desired commit
 changes. Application is not an atomic transaction and does not automatically
 roll back a partially applied batch. Network and volume resources may remain
 on the host after their units are removed; Fetchit does not force-delete data.
-An unchanged bundle is a no-op; this method does not continuously repair host drift.
+An unchanged Git commit is a no-op; this method does not continuously repair host drift.
 
 See the `runnable example <https://github.com/containers/fetchit/tree/main/examples/quadlet>`_
 and the `Podman 5.8 Quadlet manual <https://docs.podman.io/en/v5.8.0/markdown/podman-systemd.unit.5.html>`_.

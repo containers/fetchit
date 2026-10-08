@@ -28,6 +28,7 @@ func TestQuadletIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	q.HostHome = home
 	q.HostConfigHome = filepath.Join(home, ".config")
 	q.HostRuntimeDir = os.Getenv("XDG_RUNTIME_DIR")
 	socket := "unix:///run/podman/podman.sock"

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"path"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -39,6 +38,7 @@ type Quadlet struct {
 	Root           bool   `mapstructure:"root"`
 	Start          bool   `mapstructure:"start"`
 	Restart        bool   `mapstructure:"restart"`
+	HostHome       string `mapstructure:"hostHome"`
 	HostConfigHome string `mapstructure:"hostConfigHome"`
 	HostRuntimeDir string `mapstructure:"hostRuntimeDir"`
 	HelperImage    string `mapstructure:"helperImage"`
@@ -58,6 +58,7 @@ type quadletPlan struct {
 	parent    string
 	runtime   string
 	namespace string
+	home      string
 }
 
 var quadletSafeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:@-]*$`)
@@ -106,9 +107,9 @@ func (q *Quadlet) paths() (string, string, error) {
 	if q.Root {
 		return "/etc/containers", "", nil
 	}
-	for _, p := range []string{q.HostConfigHome, q.HostRuntimeDir} {
+	for _, p := range []string{q.HostHome, q.HostConfigHome, q.HostRuntimeDir} {
 		if !path.IsAbs(p) || path.Clean(p) != p || p == "/" || strings.ContainsAny(p, "\n\r") {
-			return "", "", fmt.Errorf("rootless Quadlet requires absolute hostConfigHome and hostRuntimeDir paths")
+			return "", "", fmt.Errorf("rootless Quadlet requires absolute hostHome, hostConfigHome and hostRuntimeDir paths")
 		}
 	}
 	return q.HostConfigHome, q.HostRuntimeDir, nil
@@ -244,12 +245,16 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 	if len(next.services) == 0 && (current.IsZero() || (len(next.files) > 0 && len(old.services) == 0)) {
 		return fmt.Errorf("Quadlet bundle contains no supported source units")
 	}
-	if reflect.DeepEqual(old.files, next.files) && reflect.DeepEqual(old.modes, next.modes) {
+	if current == desired {
 		return nil
 	}
 
 	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.Name))
-	plan := quadletPlan{old, next, parent, runtime, fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6])}
+	home := q.HostHome
+	if q.Root {
+		home = "/root"
+	}
+	plan := quadletPlan{previous: old, desired: next, parent: parent, runtime: runtime, namespace: fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6]), home: home}
 	run := q.runHost
 	if run == nil {
 		run = q.deploy
@@ -298,6 +303,7 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
 	s := specgen.NewSpecGenerator(image, false)
 	privileged := true
 	s.Privileged = &privileged
+	s.PidNS = specgen.Namespace{NSMode: "host"}
 	// Host binaries/generator and their libraries remain read-only. Only the
 	// containers/config directory is writable; systemd uses its private socket.
 	s.Mounts = []specs.Mount{
@@ -310,7 +316,11 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
 		restartUnits = strings.Join(p.desired.restartServices, "\n")
 	}
 	s.Command = []string{"-ceu", quadletHostScript, "quadlet", p.parent, p.runtime, p.namespace, strings.Join(p.previous.services, "\n"), strings.Join(p.desired.services, "\n"), fmt.Sprint(q.Start || q.Restart), restartUnits}
-	s.Env = map[string]string{"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
+	s.Env = map[string]string{"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": p.home}
+	if p.runtime != "" {
+		s.Env["XDG_CONFIG_HOME"] = p.parent
+		s.Env["XDG_RUNTIME_DIR"] = p.runtime
+	}
 	created, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		return err

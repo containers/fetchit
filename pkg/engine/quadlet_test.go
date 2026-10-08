@@ -164,6 +164,7 @@ func TestQuadletApplyKeepsHistoricalServiceNames(t *testing.T) {
 	if _, _, err := q.paths(); err == nil {
 		t.Fatal("rootless host identity guessed")
 	}
+	q.HostHome = "/home/operator"
 	q.HostConfigHome = "/home/operator/.config"
 	q.HostRuntimeDir = "/run/user/1234"
 	if _, _, err := q.paths(); err != nil {
@@ -313,4 +314,15 @@ func TestQuadletFailureDoesNotAdvanceAppliedCommit(t *testing.T) {
 	if err != nil || applied != next {
 		t.Fatalf("successful retry failed to advance: %s %v", applied, err)
 	}
+	// A new rollback commit can match the applied bundle after a failed attempt
+	// partially installed another bundle. It must still reach the host for repair.
+	rollback := quadletCommit(t, r, map[string]string{"a.container": "[Container]\nImage=example.com/old\n"})
+	before := calls
+	if err := q.Apply(context.Background(), context.Background(), old, rollback, nil); err != nil {
+		t.Fatal(err)
+	}
+	if calls != before+1 {
+		t.Fatal("rollback with matching historical contents skipped host repair")
+	}
+
 }
