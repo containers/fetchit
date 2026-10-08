@@ -3,8 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -12,6 +14,8 @@ import (
 )
 
 type CommonMethod struct {
+	// Opt-in cleanup of owned workloads when this method leaves configuration.
+	CleanupOnRemoval bool `mapstructure:"cleanupOnRemoval"`
 	// Name must be unique within target method
 	Name string `mapstructure:"name"`
 	// Schedule is how often to check for git updates and/or restart the fetchit service
@@ -56,7 +60,7 @@ func zeroToCurrent(ctx, conn context.Context, m Method, target *Target, tag *[]s
 	if current != plumbing.ZeroHash {
 		err = m.Apply(ctx, conn, plumbing.ZeroHash, current, tag)
 		if err != nil {
-			return fmt.Errorf("Failed to apply changes: %v", err)
+			return fmt.Errorf("Failed to apply changes: %w", err)
 		}
 
 		logger.Infof("Moved %s to commit %s for git target %s", m.GetName(), current.String()[:hashReportLen], target.url)
@@ -92,8 +96,8 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 	}
 
 	if latest != current {
-		if err := m.Apply(ctx, conn, current, latest, tag); err != nil {
-			return fmt.Errorf("Failed to apply changes: %v", err)
+		if err := applyWithRecovery(ctx, conn, m, current, latest, tag); err != nil {
+			return fmt.Errorf("Failed to apply changes: %w", err)
 		}
 		if err := updateCurrent(ctx, target, latest, m.GetKind(), m.GetName()); err != nil {
 			return err
@@ -107,10 +111,45 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 }
 
 func runChanges(ctx context.Context, conn context.Context, m Method, changeMap map[*object.Change]string) error {
-	for change, changePath := range changeMap {
-		if err := m.MethodEngine(ctx, conn, change, changePath); err != nil {
+	changes := make([]*object.Change, 0, len(changeMap))
+	for change := range changeMap {
+		changes = append(changes, change)
+	}
+	sort.Slice(changes, func(i, j int) bool {
+		return changeName(changes[i], changeMap[changes[i]]) < changeName(changes[j], changeMap[changes[j]])
+	})
+	for _, change := range changes {
+		if err := m.MethodEngine(ctx, conn, change, changeMap[change]); err != nil {
 			return err
 		}
 	}
+
 	return nil
+}
+
+func changeName(change *object.Change, path string) string {
+	if change != nil {
+		if change.To.Name != "" {
+			return change.To.Name
+		}
+		return change.From.Name
+	}
+	return path
+}
+
+func readChangeInput(change *object.Change, path string) ([]byte, error) {
+	if path == deleteFile {
+		return nil, nil
+	}
+	if change != nil {
+		_, next, err := change.Files()
+		if err != nil {
+			return nil, err
+		}
+		if next != nil {
+			content, err := next.Contents()
+			return []byte(content), err
+		}
+	}
+	return os.ReadFile(path)
 }

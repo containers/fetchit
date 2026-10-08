@@ -244,7 +244,10 @@ func decodeConfigExactly(data []byte) error {
 		return err
 	}
 	var config FetchitConfig
-	return v.UnmarshalExact(&config)
+	if err := v.UnmarshalExact(&config); err != nil {
+		return err
+	}
+	return validateLifecycleConfig(&config)
 }
 
 // Stage both files before touching either destination. Publish the backup only

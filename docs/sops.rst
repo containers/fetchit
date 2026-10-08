@@ -168,3 +168,13 @@ logs. If Podman play fails, check resource names, images, supported Podman 5 YAM
 fields, and network availability. Provisioning workload secrets outside Git
 remains an alternative; existing Git authentication secrets are independent of
 this feature.
+
+Removing a method from configuration
+------------------------------------
+
+Kube methods may opt into ``cleanupOnRemoval: true``. Removing that configured
+method then removes its owned Pods/containers using the method's labels, without
+reading or decrypting old Git manifests. It retains Secrets, volumes, and other
+non-Pod resources. This differs from deleting an encrypted manifest from Git,
+which still requires the old age identities for authenticated teardown. See
+:doc:`lifecycle` for registration, persistence, retries, and upgrade behavior.

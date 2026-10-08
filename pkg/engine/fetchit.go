@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/containers/podman/v5/pkg/bindings"
@@ -33,7 +34,14 @@ var (
 	fetchit       *Fetchit
 )
 
+var configRestartMu sync.Mutex
+var configReloadJobMu sync.Mutex
+
 type Fetchit struct {
+	runMu     sync.RWMutex
+	retired   bool
+	runCancel context.CancelFunc
+	removals  *removalStore
 	// conn holds podman client
 	conn               context.Context
 	volume             string
@@ -83,12 +91,50 @@ func Execute() {
 // new targets will be added, stale removed, and existing
 // will set last commit as last known.
 func (fc *FetchitConfig) Restart() {
-	for mt := range fetchit.allMethodTypes {
-		fetchit.scheduler.RemoveByTags(mt)
+	configRestartMu.Lock()
+	defer configRestartMu.Unlock()
+	old := fetchit
+	old.retire()
+	old.scheduler.Clear()
+	next := fc.InitConfig(false)
+	cobra.CheckErr(next.startTargets())
+}
+
+// Config reload runs outside this gate so it can wait for deployment jobs to
+// finish without waiting on itself. Queued jobs recheck retirement at entry.
+func (f *Fetchit) retire() {
+	f.runMu.Lock()
+	defer f.runMu.Unlock()
+	f.retired = true
+	if f.runCancel != nil {
+		f.runCancel()
 	}
-	fetchit.scheduler.Clear()
-	fetchit = fc.InitConfig(false)
-	fetchit.RunTargets()
+}
+func (f *Fetchit) runMethod(m Method, ctx, conn context.Context, skew int) {
+	f.runMu.RLock()
+	if f.retired {
+		f.runMu.RUnlock()
+		return
+	}
+	if m.GetKind() == configFileMethod {
+		f.runMu.RUnlock()
+		// Downloads/restarts from overlapping reload jobs must not overwrite one
+		// another. Recheck retirement after waiting for the previous reload.
+		configReloadJobMu.Lock()
+		defer configReloadJobMu.Unlock()
+		f.runMu.RLock()
+		retired := f.retired
+		f.runMu.RUnlock()
+		if retired {
+			return
+		}
+		status.recordRun(m)
+		m.Process(ctx, conn, skew)
+		return
+	}
+	defer f.runMu.RUnlock()
+	status.recordRun(m)
+	m.Process(ctx, conn, skew)
 }
 
 func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
@@ -104,6 +150,9 @@ func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 			logger.Info("Error with unmarshal of existing config file: %v", err)
 			return nil, false, err
 		}
+	}
+	if err := validateLifecycleConfig(config); err != nil {
+		return nil, false, err
 	}
 	return config, true, nil
 }
@@ -263,10 +312,12 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			url:          tc.Url,
-			fallbackURLs: append([]string(nil), tc.FallbackURLs...),
-			device:       tc.Device,
-			pat:          fetchit.pat,
+			rollback:        tc.Rollback,
+			trackBadCommits: tc.TrackBadCommits,
+			url:             tc.Url,
+			fallbackURLs:    append([]string(nil), tc.FallbackURLs...),
+			device:          tc.Device,
+			pat:             fetchit.pat,
 			// define the environment variable for envSecret
 			envSecret:    fetchit.envSecret,
 			ssh:          fetchit.ssh,
@@ -358,6 +409,24 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 }
 
 func (f *Fetchit) RunTargets() {
+	cobra.CheckErr(f.startTargets())
+	select {}
+}
+
+func (f *Fetchit) startTargets() error {
+	store, err := loadRemovalStore(defaultRemovalsPath)
+	if err != nil {
+		return err
+	}
+	if err := store.configure(f.methodTargetScheds); err != nil {
+		return err
+	}
+	f.removals = store
+	if err := store.reconcile(f.conn); err != nil {
+		logger.Errorf("Method removal cleanup: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	f.runCancel = cancel
 	status.replace(f.methodTargetScheds)
 	startStatusServer()
 	for method := range f.methodTargetScheds {
@@ -375,19 +444,28 @@ func (f *Fetchit) RunTargets() {
 		if schedInfo.skew != nil {
 			skew = rand.Intn(*schedInfo.skew)
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		mt := method.GetKind()
 		logger.Infof("Processing git target: %s Method: %s Name: %s", method.GetTarget().url, mt, method.GetName())
 		m := method
 		s.Cron(schedInfo.schedule).Tag(mt).Do(func(ctx, conn context.Context, skew int) {
-			status.recordRun(m)
-			m.Process(ctx, conn, skew)
+			f.runMethod(m, ctx, conn, skew)
 		}, ctx, f.conn, skew)
 		s.StartImmediately()
 	}
+	if _, err := s.Every(1).Minute().Tag("removal-cleanup").Do(func() {
+		f.runMu.RLock()
+		defer f.runMu.RUnlock()
+		if f.retired {
+			return
+		}
+		if err := store.reconcile(f.conn); err != nil {
+			logger.Errorf("Method removal cleanup retry: %v", err)
+		}
+	}); err != nil {
+		return err
+	}
 	s.StartAsync()
-	select {}
+	return nil
 }
 
 func getRepo(target *Target) error {

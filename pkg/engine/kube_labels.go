@@ -14,10 +14,13 @@ import (
 const (
 	kubeManagedByLabel = "fetchit.containers.io/managed-by"
 	kubeOwnerLabel     = "fetchit.containers.io/owner"
+	kubeMethodLabel    = "fetchit.containers.io/method"
 )
 
 // The owner is stable across restarts without exposing repository URLs or credentials.
-func (k *Kube) kubeLabels() map[string]string {
+func (k *Kube) kubeLabels() map[string]string { return k.workloadLabels() }
+
+func (k *CommonMethod) workloadLabels() map[string]string {
 	url, branch := "", ""
 	if k.target != nil {
 		url, branch = k.target.url, k.target.branch

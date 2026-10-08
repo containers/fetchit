@@ -218,7 +218,7 @@ func (k *Kube) runPreparedSOPS(ctx, conn context.Context, changes []preparedKube
 	for _, change := range changes {
 		if change.next != nil {
 			if err := validateNetworks(conn, k.Networks); err != nil {
-				return errors.New("encrypted workload network preflight failed")
+				return &SOPSPreflightError{cause: errors.New("encrypted workload network preflight failed")}
 			}
 			break
 		}
@@ -277,7 +277,7 @@ func (e *SOPSPodmanError) Unwrap() error { return e.cause }
 func (k *Kube) applyPreparedSOPS(ctx, conn context.Context, changes map[*object.Change]string) error {
 	prepared, err := k.prepareSOPSChanges(ctx, changes, k.SOPS.decrypt)
 	if err != nil {
-		return err
+		return &SOPSPreflightError{cause: err}
 	}
 	defer clearPreparedKube(prepared)
 	return k.runPreparedSOPS(ctx, conn, prepared)
@@ -303,3 +303,9 @@ func (e *SOPSPreparationError) Error() string {
 	}
 }
 func (e *SOPSPreparationError) Unwrap() error { return e.cause }
+
+// SOPSPreflightError certifies failure before any stop/play operation.
+type SOPSPreflightError struct{ cause error }
+
+func (e *SOPSPreflightError) Error() string { return e.cause.Error() }
+func (e *SOPSPreflightError) Unwrap() error { return e.cause }

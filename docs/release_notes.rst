@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+Method removal cleanup and apply rollback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Kube, Raw, and Quadlet can opt into ``cleanupOnRemoval`` with persistent receipts
+and retryable teardown on reload/startup. Raw Git deletion no longer opens the
+literal ``delete`` path. Git targets can opt into rollback and method-scoped failed
+commit tracking. See :doc:`lifecycle` for supported methods, retained resources,
+upgrade requirements, recovery limits, and regression coverage.
+
 Kube workload labels
 ~~~~~~~~~~~~~~~~~~~~
 

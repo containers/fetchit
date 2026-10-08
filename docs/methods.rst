@@ -29,6 +29,9 @@ The configuration above will pull in the file from the repository and reload the
 The YAML above demonstrates the minimal required objects to start FetchIt. Once FetchIt is running, the full configuration file 
 that is stored in git will be used.
 
+For opt-in cleanup when a method leaves configuration, and recovery after a failed
+Git apply, see :doc:`lifecycle`.
+
 Dynamic Configuration Reload Using a Private Registry
 -----------------------------------------------------
 
@@ -314,14 +317,15 @@ Use labels to find workloads managed by FetchIt:
    podman ps -a --filter "label=fetchit.containers.io/owner=$owner_id"
 
 This is an Unreleased feature; older images do not add these labels. Existing
-workloads acquire labels on their next successful recreation by FetchIt. A
-restart with no manifest changes does not relabel an existing workload.
+workloads acquire labels on their next successful recreation by FetchIt. Kube startup
+reconciliation may replay the saved applied revision and recreate workloads;
+labels are added during that recreation.
 
-Labels support discovery; this version does not use them to authorize teardown.
-FetchIt retains its existing name-based replacement/deletion behavior, including
-for unlabeled workloads. Use unique resource names and avoid sharing workload
-names between methods or with manually created workloads. Enforcing ownership
-checks requires a separate migration policy for pre-existing unlabeled workloads.
+Ordinary Git reconciliation retains its existing name-based replacement/deletion
+behavior, including for unlabeled workloads. Opt-in removal of a configuration
+method uses ownership labels; see :doc:`lifecycle` for that separate policy. Use unique resource names and avoid sharing workload
+names between methods or with manually created workloads. Labels are editable metadata and are not a security boundary against other
+users of the Podman socket.
 
 Manifest example
 ~~~~~~~~~~~~~~~~

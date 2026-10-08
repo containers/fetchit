@@ -57,6 +57,7 @@ type quadletBundle struct {
 }
 
 type quadletPlan struct {
+	removal         bool
 	previous        quadletBundle
 	desired         quadletBundle
 	parent          string
@@ -104,7 +105,7 @@ func (q *Quadlet) reconcile(ctx, conn context.Context) error {
 		return err
 	}
 	q.forceReconcile = q.initialRun || q.dirty
-	err = q.Apply(ctx, conn, current, latest, nil)
+	err = applyWithRecovery(ctx, conn, q, current, latest, nil)
 	q.forceReconcile = false
 	if err != nil {
 		return err
@@ -282,8 +283,8 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 }
 
 func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Hash, _ *[]string) error {
-	if desired.IsZero() {
-		return fmt.Errorf("Quadlet desired commit is empty")
+	if desired.IsZero() && current.IsZero() {
+		return nil
 	}
 	parent, runtime, err := q.paths()
 	if err != nil {
@@ -304,12 +305,8 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 		return nil
 	}
 
-	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.target.branch + "\x00" + q.Name + "\x00" + q.TargetPath))
-	home := q.HostHome
-	if q.Root {
-		home = "/root"
-	}
-	plan := quadletPlan{previous: old, desired: next, parent: parent, runtime: runtime, namespace: fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6]), home: home, current: current.String(), desiredRevision: desired.String(), configID: q.GetName()}
+	namespace, home := q.hostIdentity()
+	plan := quadletPlan{previous: old, desired: next, parent: parent, runtime: runtime, namespace: namespace, home: home, current: current.String(), desiredRevision: desired.String(), configID: q.GetName()}
 	run := q.runHost
 	if run == nil {
 		run = q.deploy
@@ -318,6 +315,15 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 	err = run(ctx, conn, plan)
 	q.dirty = err != nil
 	return err
+}
+
+func (q *Quadlet) hostIdentity() (string, string) {
+	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.target.branch + "\x00" + q.Name + "\x00" + q.TargetPath))
+	home := q.HostHome
+	if q.Root {
+		home = "/root"
+	}
+	return fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6]), home
 }
 
 func quadletArchive(files map[string][]byte, modes map[string]int64) ([]byte, error) {
@@ -374,7 +380,7 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) (resultErr er
 	if q.Restart {
 		restartUnits = strings.Join(p.desired.restartServices, "\n")
 	}
-	s.Command = []string{"-ceu", quadletHostScript, "quadlet", p.parent, p.runtime, p.namespace, strings.Join(p.previous.services, "\n"), strings.Join(p.desired.services, "\n"), fmt.Sprint(q.Start || q.Restart), restartUnits, p.current, p.desiredRevision, p.configID}
+	s.Command = []string{"-ceu", quadletHostScript, "quadlet", p.parent, p.runtime, p.namespace, strings.Join(p.previous.services, "\n"), strings.Join(p.desired.services, "\n"), fmt.Sprint(q.Start || q.Restart), restartUnits, p.current, p.desiredRevision, p.configID, fmt.Sprint(p.removal)}
 	s.Env = map[string]string{"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": p.home}
 	if p.runtime != "" {
 		s.Env["XDG_CONFIG_HOME"] = p.parent
