@@ -129,6 +129,13 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 		return err
 	}
 
+	if raw.Networks == nil {
+		raw.Networks = r.Networks
+	}
+	if err := validateNetworks(conn, raw.Networks); err != nil {
+		return err
+	}
+
 	logger.Infof("Identifying if image exists locally")
 
 	err = detectOrFetchImage(conn, raw.Image, r.PullImage)
@@ -160,9 +167,6 @@ func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) er
 		return err
 	}
 
-	if raw.Networks == nil {
-		raw.Networks = r.Networks
-	}
 	s := createSpecGen(*raw)
 
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)

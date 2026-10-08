@@ -83,7 +83,11 @@ and downloaded configs are limited to 1 MiB. Explicit empty lists such as
 ``targetConfigs: []`` are valid; an empty document is not.
 
 A failed download or validation leaves ``config.yaml`` and its existing backup
-unchanged. Successful changed downloads save the previous bytes to
+unchanged. Config and backup are staged before replacement. Failed config replacement leaves
+the old backup untouched; failed backup publication rolls the config back. A
+rollback failure is reported explicitly and the installed config is loaded. The
+two-file update is recoverable during ordinary errors, not a crash-atomic
+transaction. Successful changed downloads save the previous bytes to
 ``config-backup.yaml`` and replace ``config.yaml`` using a staged file and atomic
 rename, with mode 0600. Identical downloads do not trigger a reload. Validation
 checks syntax and field decoding; it does not test network connectivity, image

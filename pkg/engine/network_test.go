@@ -1,6 +1,10 @@
 package engine
 
 import (
+	"context"
+	"go.uber.org/zap"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containers/podman/v5/pkg/specgen"
@@ -54,5 +58,27 @@ func TestNetworkConfigurationDecode(t *testing.T) {
 	}
 	if len(config.TargetConfigs[0].Raw[0].Networks) != 2 || config.TargetConfigs[0].Kube[0].Networks[0] != "backend" {
 		t.Fatal("network configuration not decoded")
+	}
+}
+
+func TestNetworkPreflightBeforeTeardown(t *testing.T) {
+	oldLogger := logger
+	logger = zap.NewNop().Sugar()
+	t.Cleanup(func() { logger = oldLogger })
+	path := filepath.Join(t.TempDir(), "raw.json")
+	if err := os.WriteFile(path, []byte(`{"Image":"example.invalid/image","Name":"old-workload"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	previous := "invalid previous workload; teardown must not parse this"
+	raw := &Raw{Networks: []string{"missing-network"}}
+	if err := raw.rawPodman(context.Background(), context.Background(), path, &previous); err == nil || !strings.Contains(err.Error(), "inspect configured network") {
+		t.Fatalf("raw teardown happened before preflight: %v", err)
+	}
+	kube := &Kube{Networks: []string{"missing-network"}}
+	if err := kube.kubePodman(context.Background(), context.Background(), path, &previous); err == nil || !strings.Contains(err.Error(), "inspect configured network") {
+		t.Fatalf("kube teardown happened before preflight: %v", err)
+	}
+	if err := validateNetworks(context.Background(), nil); err != nil {
+		t.Fatal("defaults require network validation")
 	}
 }

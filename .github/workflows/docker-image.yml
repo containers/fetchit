@@ -307,11 +307,11 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
-      - name: swap in the GITHUB PAT token
-        run: sudo sed -i "s/CHANGEME/${{ secrets.GITHUB_TOKEN }}/g" ./examples/pat-testing-config.yaml
-
       - name: Prepare writable config directory
-        run: mkdir -p /tmp/fetchit-config && cp ./examples/pat-testing-config.yaml /tmp/fetchit-config/config.yaml
+        uses: ./.github/actions/prepare-config
+        with:
+          source: ./examples/pat-testing-config.yaml
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/fetchit-config:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest
@@ -567,7 +567,9 @@ jobs:
          podman secret create --env GH_PAT GH_PAT
 
       - name: Prepare writable config directory
-        run: mkdir -p /tmp/fetchit-config && cp ./examples/podman-secret-raw-config.yaml /tmp/fetchit-config/config.yaml
+        uses: ./.github/actions/prepare-config
+        with:
+          source: ./examples/podman-secret-raw-config.yaml
 
       - name: Start fetchit
         run: sudo podman run -d --name fetchit -v fetchit-volume:/opt -v /tmp/fetchit-config:/opt/mount -v /run/podman/podman.sock:/run/podman/podman.sock --security-opt label=disable quay.io/fetchit/fetchit-amd:latest

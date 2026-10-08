@@ -3,16 +3,17 @@ package engine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"os"
-	"time"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -193,26 +194,18 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 	if err := validateDownloadedConfig(newBytes); err != nil {
 		return false, fmt.Errorf("invalid downloaded config: %w", err)
 	}
+	var currentConfigBytes []byte
 	if !initial {
-		currentConfigBytes, err := ioutil.ReadFile(defaultConfigPath)
+		currentConfigBytes, err = os.ReadFile(defaultConfigPath)
 		if err != nil {
-			logger.Infof("unable to read current config, will try with new downloaded config file: %v", err)
 			existsAlready = false
-		} else {
-			if bytes.Equal(newBytes, currentConfigBytes) {
-				return false, nil
-			}
-		}
-
-		if existsAlready {
-			if err := writeConfigAtomically(defaultConfigBackup, currentConfigBytes); err != nil {
-				return false, fmt.Errorf("could not copy %s to path %s: %v", defaultConfigPath, defaultConfigBackup, err)
-			}
-			logger.Infof("Current config backup placed at %s", defaultConfigBackup)
+		} else if bytes.Equal(newBytes, currentConfigBytes) {
+			return false, nil
 		}
 	}
-	if err := writeConfigAtomically(defaultConfigPath, newBytes); err != nil {
-		return false, fmt.Errorf("unable to replace config; previous config preserved: %v", err)
+	updated, err := replaceConfigFiles(defaultConfigPath, defaultConfigBackup, newBytes, currentConfigBytes, existsAlready && !initial, os.Rename)
+	if err != nil {
+		return updated, err
 	}
 
 	logger.Infof("Config updates found from url: %s, will load new targets", urlStr)
@@ -222,6 +215,13 @@ func downloadUpdateConfigFile(urlStr string, existsAlready, initial bool, pat, u
 // Validate one nonempty YAML mapping using the same decoder as local configs,
 // rejecting unknown fields so an error page cannot masquerade as configuration.
 func validateDownloadedConfig(data []byte) error {
+	if err := validateSingleConfigMapping(data); err != nil {
+		return err
+	}
+	return decodeConfigExactly(data)
+}
+
+func validateSingleConfigMapping(data []byte) error {
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
@@ -234,6 +234,10 @@ func validateDownloadedConfig(data []byte) error {
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return fmt.Errorf("expected exactly one YAML document")
 	}
+	return nil
+}
+
+func decodeConfigExactly(data []byte) error {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	if err := v.ReadConfig(bytes.NewReader(data)); err != nil {
@@ -243,23 +247,56 @@ func validateDownloadedConfig(data []byte) error {
 	return v.UnmarshalExact(&config)
 }
 
-// Stage on the same filesystem and rename only after the complete file is synced.
-// A file bind mount cannot be renamed; fail without truncating the existing file.
-func writeConfigAtomically(destination string, data []byte) error {
+// Stage both files before touching either destination. Publish the backup only
+// after config replacement succeeds, rolling the config back on backup failure.
+func replaceConfigFiles(configPath, backupPath string, next, previous []byte, backup bool, rename func(string, string) error) (bool, error) {
+	stage, err := stageConfig(configPath, next)
+	if err != nil {
+		return false, fmt.Errorf("stage config: %w", err)
+	}
+	defer os.Remove(stage)
+	var backupStage string
+	if backup {
+		backupStage, err = stageConfig(backupPath, previous)
+		if err != nil {
+			return false, fmt.Errorf("stage backup: %w", err)
+		}
+		defer os.Remove(backupStage)
+	}
+	if err := rename(stage, configPath); err != nil {
+		return false, fmt.Errorf("replace config; previous files preserved: %w", err)
+	}
+	if backup {
+		if err := rename(backupStage, backupPath); err != nil {
+			if rollbackErr := rename(backupStage, configPath); rollbackErr != nil {
+				return true, errors.Join(fmt.Errorf("publish backup: %w", err), fmt.Errorf("rollback failed; new config remains active: %w", rollbackErr))
+			}
+			return false, fmt.Errorf("publish backup; config rolled back: %w", err)
+		}
+	}
+	return true, nil
+}
+
+func stageConfig(destination string, data []byte) (name string, resultErr error) {
 	file, err := os.CreateTemp(filepath.Dir(destination), ".fetchit-config-*")
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer os.Remove(file.Name())
-	defer file.Close()
+	name = file.Name()
+	defer func() {
+		file.Close()
+		if resultErr != nil {
+			os.Remove(name)
+		}
+	}()
 	if _, err := file.Write(data); err != nil {
-		return err
+		return name, err
 	}
 	if err := file.Sync(); err != nil {
-		return err
+		return name, err
 	}
 	if err := file.Close(); err != nil {
-		return err
+		return name, err
 	}
-	return os.Rename(file.Name(), destination)
+	return name, nil
 }

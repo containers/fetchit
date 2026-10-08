@@ -108,11 +108,19 @@ NOTE: The key must be defined within your git provider to be able to be used for
    cp -rp ~/.ssh/id_rsa ~/.fetchit/.ssh/id_rsa
    chmod 0700 ~/.fetchit/.ssh
    chmod 0600 ~/.fetchit/.ssh/id_rsa
-   ssh-keyscan github.com > ~/.fetchit/.ssh/known_hosts
+   ssh-keyscan -t ed25519 github.com > /tmp/github.keys
+   ssh-keygen -lf /tmp/github.keys -E sha256
 
 
-Verify the scanned host key fingerprints against your Git provider's published
-keys before trusting them. Mount the directory at ``/opt/mount/.ssh`` (normally
+Compare the printed SHA256 fingerprint with GitHub's `published SSH fingerprints
+<https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints>`_
+through a trusted channel. Only after they match, install the verified key:
+
+.. code-block:: bash
+
+   install -m 0600 /tmp/github.keys ~/.fetchit/.ssh/known_hosts
+
+Mount the directory at ``/opt/mount/.ssh`` (normally
 as part of the ``~/.fetchit:/opt/mount`` directory mount). An unknown or changed
 host key fails authentication; do not disable host key checking. For a nonstandard
 port, use ``ssh://git@host:2222/path/repo.git`` and a matching ``[host]:2222``
@@ -343,8 +351,9 @@ container back into defaults. Kube passes the method's list to Podman kube play
 for all pods in its manifest. These are Podman networks, not Kubernetes Services
 or NetworkPolicies. Network creation, IPs, aliases, and routing remain managed by
 Podman. A named network list replaces implicit default-network attachment;
-include the default network explicitly if needed. Missing networks cause Podman
-to reject deployment and FetchIt logs the error. Network options are not applied
+include the default network explicitly if needed. Configured networks are inspected before workload teardown. Missing networks
+fail before removing existing containers or pods. A network disappearing after
+this check, or another Podman runtime failure, can still interrupt redeployment. Network options are not applied
 to file-transfer or other helper containers.
 
 Changing a network setting in FetchIt's config alone does not redeploy an

@@ -39,7 +39,7 @@ git -C "$fixture/work" add .
 git -C "$fixture/work" -c commit.gpgsign=false commit -m initial
 git clone --bare "$fixture/work" "$fixture/repo.git"
 sudo chown -R git:git "$fixture/repo.git"
-sudo -u git git config --global --add safe.directory "$fixture/work"
+sudo -u git git -C /tmp config --global --add safe.directory "$fixture/work"
 sudo chown root:root "$fixture"
 sudo mkdir -p /run/sshd
 cat > "$fixture/sshd_config" <<CONFIG
@@ -122,7 +122,7 @@ printf 'updated\n' > "$fixture/work/files/hello.txt"
 printf 'added\n' > "$fixture/work/files/another.txt"
 git -C "$fixture/work" add .
 git -C "$fixture/work" -c commit.gpgsign=false commit -m update
-sudo -u git git --git-dir="$fixture/repo.git" fetch "$fixture/work" main:main
+sudo -u git git -C /tmp --git-dir="$fixture/repo.git" fetch "$fixture/work" main:main
 wait_for_content "$fixture/output/hello.txt" updated
 wait_for_content "$fixture/output/another.txt" added
 # Inspect actual attachments for both Raw and Kube network opt-ins.

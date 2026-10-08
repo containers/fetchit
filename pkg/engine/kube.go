@@ -89,6 +89,9 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 
 func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) error {
 	if path != deleteFile {
+		if err := validateNetworks(conn, k.Networks); err != nil {
+			return err
+		}
 		logger.Infof("Creating podman container from %s using kube method", path)
 	}
 

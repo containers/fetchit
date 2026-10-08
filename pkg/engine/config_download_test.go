@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -131,5 +132,43 @@ func TestConfigDownloadInitialAndWriteFailure(t *testing.T) {
 	info, err := os.Stat(defaultConfigPath)
 	if err != nil || !info.IsDir() {
 		t.Fatal("destination replaced on failure")
+	}
+}
+
+func TestConfigReplacementPreservesBackupOnRenameFailure(t *testing.T) {
+	for _, failure := range []string{"config", "backup"} {
+		t.Run(failure, func(t *testing.T) {
+			directory := t.TempDir()
+			config := filepath.Join(directory, "config.yaml")
+			backup := filepath.Join(directory, "backup.yaml")
+			if err := os.WriteFile(config, []byte("old config"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(backup, []byte("older backup"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			rename := func(from, to string) error {
+				calls++
+				if failure == "config" && calls == 1 || failure == "backup" && calls == 2 {
+					return os.ErrPermission
+				}
+				return os.Rename(from, to)
+			}
+			updated, err := replaceConfigFiles(config, backup, []byte("new config"), []byte("old config"), true, rename)
+			if updated || !errors.Is(err, os.ErrPermission) {
+				t.Fatalf("failure classification: %v %v", updated, err)
+			}
+			for path, want := range map[string]string{config: "old config", backup: "older backup"} {
+				got, err := os.ReadFile(path)
+				if err != nil || string(got) != want {
+					t.Fatalf("%s changed: %q %v", path, got, err)
+				}
+			}
+			stages, _ := filepath.Glob(filepath.Join(directory, ".fetchit-config-*"))
+			if len(stages) != 0 {
+				t.Fatal("staging files leaked")
+			}
+		})
 	}
 }
