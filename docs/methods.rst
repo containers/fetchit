@@ -378,3 +378,11 @@ symlinks are rejected. Legacy entries such as ``../fetchit/file`` remain support
 when their normalized paths resolve inside the destination ``fetchit`` directory.
 Archive extraction is not transactional: a filesystem or
 entry-read error during extraction can leave some extracted files behind.
+
+Encrypted Kube manifests
+------------------------
+
+Kube methods can opt into authenticated SOPS decryption using a read-only age key
+file. All changed manifests are prepared before teardown. See :doc:`sops` for a
+complete encrypted Secret/Pod example, configuration, key rotation, deletion,
+limits, and recovery. Ordinary Kube methods retain their current behavior.

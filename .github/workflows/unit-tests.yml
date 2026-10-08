@@ -24,9 +24,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgpgme-dev libdevmapper-dev libseccomp-dev pkg-config
+      - name: Install SOPS test tools
+        run: |
+          sudo apt-get install -y age
+          sudo bash scripts/install-sops.sh amd64 /usr/local/bin/sops
       - name: Vet
         run: go vet -mod=readonly -tags "$BUILDTAGS" ./cmd/... ./pkg/...
       - name: Test
+        env:
+          SOPS_TEST_BINARY: /usr/local/bin/sops
+          AGE_TEST_BINARY: /usr/bin/age-keygen
         run: go test -mod=readonly -tags "$BUILDTAGS" ./...
       - name: Status and repository concurrency race checks
         run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror'
@@ -39,12 +46,17 @@ jobs:
       BUILDTAGS: containers_image_openpgp gssapi providerless netgo osusergo exclude_graphdriver_btrfs
     steps:
       - name: Install build dependencies
-        run: dnf install -y git tar gzip gcc make pkgconf-pkg-config gpgme-devel device-mapper-devel libseccomp-devel
+        run: dnf install -y git tar gzip gcc make pkgconf-pkg-config gpgme-devel device-mapper-devel libseccomp-devel age curl
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Install SOPS test binary
+        run: bash scripts/install-sops.sh amd64 /usr/local/bin/sops
       - name: Vet
         run: go vet -mod=readonly -tags "$BUILDTAGS" ./cmd/... ./pkg/...
       - name: Test
+        env:
+          SOPS_TEST_BINARY: /usr/local/bin/sops
+          AGE_TEST_BINARY: /usr/bin/age-keygen
         run: go test -mod=readonly -tags "$BUILDTAGS" ./...

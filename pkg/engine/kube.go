@@ -31,6 +31,7 @@ type Kube struct {
 	CommonMethod `mapstructure:",squash"`
 	// Optional existing Podman networks for all pods played by this method.
 	Networks []string `mapstructure:"networks"`
+	SOPS     *SOPS    `mapstructure:"sops"`
 }
 
 func (k *Kube) GetKind() string {
@@ -69,6 +70,9 @@ func (k *Kube) Process(ctx, conn context.Context, skew int) {
 }
 
 func (k *Kube) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
+	if k.SOPS != nil {
+		return k.applyPreparedSOPS(ctx, conn, map[*object.Change]string{change: path})
+	}
 	prev, err := getChangeString(change)
 	if err != nil {
 		return err
@@ -80,6 +84,9 @@ func (k *Kube) Apply(ctx, conn context.Context, currentState, desiredState plumb
 	changeMap, err := applyChanges(ctx, k.GetTarget(), k.GetTargetPath(), k.Glob, currentState, desiredState, tags)
 	if err != nil {
 		return err
+	}
+	if k.SOPS != nil {
+		return k.applyPreparedSOPS(ctx, conn, changeMap)
 	}
 	if err := runChanges(ctx, conn, k, changeMap); err != nil {
 		return err
