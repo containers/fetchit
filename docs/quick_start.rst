@@ -1,12 +1,12 @@
 Quick Start
 ============
-If you want to to try FetchIt out run the following commands. This document will assume that the OS is Fedora, CentOS, or RHEL but FetchIt is also tested on Ubuntu. The only requirement is Podman v4.
+If you want to to try FetchIt out run the following commands. This document will assume that the OS is Fedora, CentOS, or RHEL but FetchIt is also tested on Ubuntu. Use Podman 5.7 or newer within major version 5. For host-managed Quadlet services, see :doc:`quadlet`.
 
 We will assume that FetchIt will be ran as a non-privileged user. The first step will be to install Podman.
 
 .. code-block:: bash
    
-   sudo dnf -y podman
+   sudo dnf install -y podman
    systemctl start podman.socket --user
 
 Now that Podman is available and the Podman socket is running, we can use FetchIt to manage containers. Start by creating the directory that will hold the FetchIt configuration.

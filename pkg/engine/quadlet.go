@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"github.com/go-git/go-git/v5"
 	"path"
 	"regexp"
 	"sort"
@@ -20,6 +19,7 @@ import (
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/containers/podman/v5/pkg/systemd/parser"
 	"github.com/containers/podman/v5/pkg/systemd/quadlet"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -27,6 +27,8 @@ import (
 )
 
 const quadletMethod = "quadlet"
+const quadletMaxBytes int64 = 32 << 20
+const quadletMaxFiles = 4096
 
 //go:embed quadlet-host.sh
 var quadletHostScript string
@@ -43,6 +45,8 @@ type Quadlet struct {
 	HostRuntimeDir string `mapstructure:"hostRuntimeDir"`
 	HelperImage    string `mapstructure:"helperImage"`
 	runHost        func(context.Context, context.Context, quadletPlan) error
+	dirty          bool
+	forceReconcile bool
 }
 
 type quadletBundle struct {
@@ -53,17 +57,61 @@ type quadletBundle struct {
 }
 
 type quadletPlan struct {
-	previous  quadletBundle
-	desired   quadletBundle
-	parent    string
-	runtime   string
-	namespace string
-	home      string
+	previous        quadletBundle
+	desired         quadletBundle
+	parent          string
+	runtime         string
+	namespace       string
+	home            string
+	current         string
+	desiredRevision string
+	configID        string
 }
 
 var quadletSafeName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:@-]*$`)
 
 func (q *Quadlet) GetKind() string { return quadletMethod }
+
+// GetName includes bundle identity and settings so config reloads have distinct
+// applied tags, while host ownership remains stable across activation changes.
+func (q *Quadlet) GetName() string {
+	url, branch := "", ""
+	if q.target != nil {
+		url = q.target.url
+		branch = q.target.branch
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%s\x00%t\x00%s\x00%s\x00%s\x00%t\x00%t\x00%s", url, branch, q.TargetPath, q.Root, q.HostHome, q.HostConfigHome, q.HostRuntimeDir, q.Start, q.Restart, q.HelperImage)))
+	return fmt.Sprintf("%s-%x", q.Name, sum[:6])
+}
+
+func (q *Quadlet) reconcile(ctx, conn context.Context) error {
+	target := q.GetTarget()
+	if target.disconnected {
+		if target.url != "" {
+			extractZip(target.url)
+		} else if target.device != "" {
+			localDevicePull(getDirectory(target), target.device, "", false)
+		}
+	}
+	latest, err := getLatest(target)
+	if err != nil {
+		return err
+	}
+	current, err := getCurrent(target, q.GetKind(), q.GetName())
+	if err != nil {
+		return err
+	}
+	q.forceReconcile = q.initialRun || q.dirty
+	err = q.Apply(ctx, conn, current, latest, nil)
+	q.forceReconcile = false
+	if err != nil {
+		return err
+	}
+	if latest != current {
+		return updateCurrent(ctx, target, latest, q.GetKind(), q.GetName())
+	}
+	return nil
+}
 
 func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
 	select {
@@ -82,7 +130,7 @@ func (q *Quadlet) Process(ctx, conn context.Context, skew int) {
 			return
 		}
 	}
-	if err := currentToLatest(ctx, conn, q, target, nil); err != nil {
+	if err := q.reconcile(ctx, conn); err != nil {
 		logger.Errorf("Quadlet %s: %v", q.Name, err)
 		return
 	}
@@ -95,7 +143,7 @@ func (q *Quadlet) MethodEngine(context.Context, context.Context, *object.Change,
 }
 
 func (q *Quadlet) paths() (string, string, error) {
-	if !quadletSafeName.MatchString(q.Name) || strings.Contains(q.Name, "@") || strings.Contains(q.Name, ":") {
+	if len(q.Name) > 64 || !quadletSafeName.MatchString(q.Name) || strings.Contains(q.Name, "@") || strings.Contains(q.Name, ":") {
 		return "", "", fmt.Errorf("invalid Quadlet method name %q", q.Name)
 	}
 	if q.TargetPath == "" || path.Clean(q.TargetPath) != q.TargetPath || path.IsAbs(q.TargetPath) || strings.HasPrefix(q.TargetPath, "..") {
@@ -143,6 +191,7 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 		return b, err
 	}
 
+	var total int64
 	err = tree.Files().ForEach(func(f *object.File) error {
 		if f.Mode != filemode.Regular && f.Mode != filemode.Executable {
 			return fmt.Errorf("Quadlet bundle requires regular files: %s", f.Name)
@@ -150,6 +199,10 @@ func (q *Quadlet) bundle(hash plumbing.Hash) (quadletBundle, error) {
 		if path.Clean(f.Name) != f.Name || path.IsAbs(f.Name) || strings.HasPrefix(f.Name, "../") || strings.ContainsAny(f.Name, "\n\r") {
 			return fmt.Errorf("invalid bundle path %q", f.Name)
 		}
+		if len(b.files) >= quadletMaxFiles || f.Size > quadletMaxBytes-total {
+			return fmt.Errorf("Quadlet bundle exceeds limit: %d files or %d bytes", quadletMaxFiles, quadletMaxBytes)
+		}
+		total += f.Size
 		content, err := f.Contents()
 		if err != nil {
 			return err
@@ -242,24 +295,27 @@ func (q *Quadlet) Apply(ctx, conn context.Context, current, desired plumbing.Has
 	if err != nil {
 		return err
 	}
-	if len(next.services) == 0 && (current.IsZero() || (len(next.files) > 0 && len(old.services) == 0)) {
+	if len(next.services) == 0 && current.IsZero() {
 		return fmt.Errorf("Quadlet bundle contains no supported source units")
 	}
-	if current == desired {
+	if current == desired && !q.forceReconcile {
 		return nil
 	}
 
-	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.Name))
+	sum := sha256.Sum256([]byte(q.target.url + "\x00" + q.target.branch + "\x00" + q.Name + "\x00" + q.TargetPath))
 	home := q.HostHome
 	if q.Root {
 		home = "/root"
 	}
-	plan := quadletPlan{previous: old, desired: next, parent: parent, runtime: runtime, namespace: fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6]), home: home}
+	plan := quadletPlan{previous: old, desired: next, parent: parent, runtime: runtime, namespace: fmt.Sprintf("fetchit-%s-%x", q.Name, sum[:6]), home: home, current: current.String(), desiredRevision: desired.String(), configID: q.GetName()}
 	run := q.runHost
 	if run == nil {
 		run = q.deploy
 	}
-	return run(ctx, conn, plan)
+	q.dirty = true
+	err = run(ctx, conn, plan)
+	q.dirty = err != nil
+	return err
 }
 
 func quadletArchive(files map[string][]byte, modes map[string]int64) ([]byte, error) {
@@ -288,7 +344,7 @@ func quadletArchive(files map[string][]byte, modes map[string]int64) ([]byte, er
 	return buf.Bytes(), nil
 }
 
-func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
+func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) (resultErr error) {
 	archive, err := quadletArchive(p.desired.files, p.desired.modes)
 	if err != nil {
 		return err
@@ -301,8 +357,9 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
 		return err
 	}
 	s := specgen.NewSpecGenerator(image, false)
-	privileged := true
-	s.Privileged = &privileged
+	s.CapDrop = []string{"ALL"}
+	s.CapAdd = []string{"SYS_CHROOT", "DAC_OVERRIDE", "FOWNER", "CHOWN"}
+	s.SelinuxOpts = []string{"disable"}
 	s.PidNS = specgen.Namespace{NSMode: "host"}
 	// Host binaries/generator and their libraries remain read-only. Only the
 	// containers/config directory is writable; systemd uses its private socket.
@@ -315,7 +372,7 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
 	if q.Restart {
 		restartUnits = strings.Join(p.desired.restartServices, "\n")
 	}
-	s.Command = []string{"-ceu", quadletHostScript, "quadlet", p.parent, p.runtime, p.namespace, strings.Join(p.previous.services, "\n"), strings.Join(p.desired.services, "\n"), fmt.Sprint(q.Start || q.Restart), restartUnits}
+	s.Command = []string{"-ceu", quadletHostScript, "quadlet", p.parent, p.runtime, p.namespace, strings.Join(p.previous.services, "\n"), strings.Join(p.desired.services, "\n"), fmt.Sprint(q.Start || q.Restart), restartUnits, p.current, p.desiredRevision, p.configID}
 	s.Env = map[string]string{"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": p.home}
 	if p.runtime != "" {
 		s.Env["XDG_CONFIG_HOME"] = p.parent
@@ -326,10 +383,15 @@ func (q *Quadlet) deploy(ctx, conn context.Context, p quadletPlan) error {
 		return err
 	}
 	defer func() {
-		if _, err := containers.Remove(conn, created.ID, new(containers.RemoveOptions).WithForce(true)); err != nil {
-			logger.Warnf("Remove Quadlet helper: %v", err)
+		reports, err := containers.Remove(conn, created.ID, new(containers.RemoveOptions).WithForce(true))
+		resultErr = errors.Join(resultErr, err)
+		for _, report := range reports {
+			if report != nil {
+				resultErr = errors.Join(resultErr, report.Err)
+			}
 		}
 	}()
+
 	copyBundle, err := containers.CopyFromArchive(conn, created.ID, "/tmp", bytes.NewReader(archive))
 	if err != nil {
 		return err

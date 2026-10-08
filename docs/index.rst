@@ -13,4 +13,5 @@ FetchIt was designed to allow for the hands off management of containers running
    purpose
    methods
    quadlet
+   release_notes
    running

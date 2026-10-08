@@ -90,6 +90,12 @@ func TestQuadletIntegration(t *testing.T) {
 	if out, err := systemctl("is-active", unit); err != nil || out != "active" {
 		t.Fatalf("unit not active: %s %v", out, err)
 	}
+	sourcePath, err := systemctl("show", unit, "--property=SourcePath", "--value")
+	if err != nil || sourcePath == "" {
+		t.Fatalf("source path: %s %v", sourcePath, err)
+	}
+	liveDir := filepath.Dir(sourcePath)
+
 	marker("first")
 	env, err := exec.Command("podman", "exec", name, "printenv", "DROPIN").CombinedOutput()
 	if err != nil || strings.TrimSpace(string(env)) != "yes" {
@@ -145,4 +151,11 @@ func TestQuadletIntegration(t *testing.T) {
 	if out, err := exec.Command("podman", "container", "exists", name).CombinedOutput(); err == nil {
 		t.Fatalf("deleted container still exists: %s", out)
 	}
+	removedDirectory := quadletCommit(t, r, map[string]string{})
+	apply(deleted, removedDirectory)
+	entries, err := os.ReadDir(liveDir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("removed bundle directory retained files: %v %v", entries, err)
+	}
+
 }

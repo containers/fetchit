@@ -233,8 +233,9 @@ esac
 			if err := os.WriteFile(filepath.Join(bin, "chroot"), []byte(stub), 0755); err != nil {
 				t.Fatal(err)
 			}
+			nextRevision := strings.Repeat("1", 40)
 			run := func(fail string) (string, error) {
-				cmd := exec.Command("sh", "-ceu", quadletHostScript, "quadlet", "/etc/containers", "", "fetchit-test", "old.service", "new.service", "true", map[bool]string{true: "new.service", false: ""}[failure == "restart"])
+				cmd := exec.Command("sh", "-ceu", quadletHostScript, "quadlet", "/etc/containers", "", "fetchit-test", "old.service", "new.service", "true", map[bool]string{true: "new.service", false: ""}[failure == "restart"], strings.Repeat("0", 40), nextRevision, "test-config")
 				cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "FETCHIT_QUADLET_HOST_ROOT="+host, "FETCHIT_QUADLET_BUNDLE="+bundle, "LOG="+log, "FAIL="+fail)
 				out, err := cmd.CombinedOutput()
 				return string(out), err
@@ -263,6 +264,11 @@ esac
 			if !strings.Contains(lines, "start new.service") && !strings.Contains(lines, "restart new.service") {
 				t.Fatalf("new unit not activated: %s", lines)
 			}
+			nextRevision = strings.Repeat("2", 40)
+			if out, err := run(""); err == nil || !strings.Contains(out, "Stale Quadlet plan") {
+				t.Fatalf("stale concurrent plan accepted: %v %s", err, out)
+			}
+
 			if _, err := os.Stat(filepath.Join(host, "etc/containers/systemd/fetchit-test/new.container")); err != nil {
 				t.Fatal(err)
 			}
@@ -284,7 +290,7 @@ func TestQuadletFailureDoesNotAdvanceAppliedCommit(t *testing.T) {
 	if _, err := r.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{abs}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := updateCurrent(context.Background(), q.target, old, q.GetKind(), q.Name); err != nil {
+	if err := updateCurrent(context.Background(), q.target, old, q.GetKind(), q.GetName()); err != nil {
 		t.Fatal(err)
 	}
 	sentinel := errors.New("failed host operation")
@@ -292,7 +298,7 @@ func TestQuadletFailureDoesNotAdvanceAppliedCommit(t *testing.T) {
 	if err := currentToLatest(context.Background(), context.Background(), q, q.target, nil); err == nil {
 		t.Fatal("failed reconciliation accepted")
 	}
-	applied, err := getCurrent(q.target, q.GetKind(), q.Name)
+	applied, err := getCurrent(q.target, q.GetKind(), q.GetName())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +316,7 @@ func TestQuadletFailureDoesNotAdvanceAppliedCommit(t *testing.T) {
 	if err := currentToLatest(context.Background(), context.Background(), q, q.target, nil); err != nil {
 		t.Fatal(err)
 	}
-	applied, err = getCurrent(q.target, q.GetKind(), q.Name)
+	applied, err = getCurrent(q.target, q.GetKind(), q.GetName())
 	if err != nil || applied != next {
 		t.Fatalf("successful retry failed to advance: %s %v", applied, err)
 	}
@@ -325,4 +331,56 @@ func TestQuadletFailureDoesNotAdvanceAppliedCommit(t *testing.T) {
 		t.Fatal("rollback with matching historical contents skipped host repair")
 	}
 
+}
+
+func TestQuadletSettingsAndBundleIdentities(t *testing.T) {
+	_, q := quadletTestRepo(t)
+	original := q.GetName()
+	q.Start = true
+	if q.GetName() == original {
+		t.Fatal("activation settings reused applied tag")
+	}
+	q.Start = false
+	q.TargetPath = "another-bundle"
+	if q.GetName() == original {
+		t.Fatal("different bundle reused applied tag")
+	}
+	q.TargetPath = "bundle"
+	q.target.branch = "other"
+	if q.GetName() == original {
+		t.Fatal("different branch reused applied tag")
+	}
+}
+
+func TestQuadletDeletedDirectoryAndRestartRecovery(t *testing.T) {
+	r, q := quadletTestRepo(t)
+	old := quadletCommit(t, r, map[string]string{"a.container": "[Container]\nImage=example.com/a\n"})
+	// A deleted Git subtree still has a nonzero desired commit.
+	deleted := quadletCommit(t, r, map[string]string{})
+	calls := 0
+	q.runHost = func(_ context.Context, _ context.Context, p quadletPlan) error {
+		calls++
+		if len(p.desired.files) != 0 || len(p.desired.services) != 0 {
+			t.Fatal("deleted subtree was not empty")
+		}
+		return nil
+	}
+	if err := q.Apply(context.Background(), context.Background(), old, deleted, nil); err != nil {
+		t.Fatal(err)
+	}
+	q.forceReconcile = true
+	if err := q.Apply(context.Background(), context.Background(), deleted, deleted, nil); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatal("restart did not check host receipt for pending repairs")
+	}
+}
+
+func TestQuadletOversizedBundle(t *testing.T) {
+	r, q := quadletTestRepo(t)
+	hash := quadletCommit(t, r, map[string]string{"a.container": "[Container]\nImage=example.com/a\n", "context/oversized": strings.Repeat("x", int(quadletMaxBytes)+1)})
+	if _, err := q.bundle(hash); err == nil || !strings.Contains(err.Error(), "exceeds limit") {
+		t.Fatalf("oversized context accepted: %v", err)
+	}
 }

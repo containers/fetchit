@@ -208,7 +208,7 @@ A Raw JSON file can contain the following fields.
 Volume and host mounts can be provided in the JSON file.
 
 PodmanAutoUpdate
--------
+----------------
 If this method is present in the config file, podman-auto-update.service & podman-auto-update.timer
 will be enabled on the host. Podman auto-update will look for image updates with all podman-generated unit files
 that include the auto-update label, according to the timer schedule. Can configure for root, non-root, or both.
