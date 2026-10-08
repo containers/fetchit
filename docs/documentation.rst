@@ -105,3 +105,14 @@ the same rootful store. For a local build, use:
 
    sudo podman build -t quay.io/fetchit/fetchit-sample-app:latest \
      -f examples/sample-app/Containerfile examples/sample-app
+
+Platform index verification
+---------------------------
+
+The publisher stages amd64 and arm64 child manifests in the destination
+repository and publishes one index referencing their immutable digests.
+Verification reads the index using the digest returned by the push. A local
+manifest with the same name as a public ``latest`` tag can shadow registry
+inspection in Podman; it must not be used as evidence of published content.
+The local-registry regression includes this collision and checks that clients
+can pull both architectures from the shared tag.

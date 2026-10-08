@@ -58,11 +58,15 @@ podman manifest add "${options[@]}" "$manifest" "docker://$repository@$arm_diges
 # can recompress layers and replace the exact digests pinned above. Publish only
 # the index with --all=false; Podman 5 defaults --all to true. Keep both pinned
 # child digests unchanged. Child publication and index publication are separate.
-if ! podman manifest push --all=false "${options[@]}" --format=docker "$manifest" "docker://$destination"; then
+if ! podman manifest push --all=false "${options[@]}" --format=docker --digestfile "$scratch/index.digest" "$manifest" "docker://$destination"; then
   echo "Failed to publish platform index: $destination" >&2
   exit 1
 fi
-podman manifest inspect "${options[@]}" "$destination" > "$scratch/index.json"
+index_digest=$(cat "$scratch/index.digest")
+[[ "$index_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid pushed index digest' >&2; exit 1; }
+# A local list named DESTINATION shadows the remote tag in manifest inspect.
+# Inspect the immutable index returned by this push, not a possibly stale local tag.
+podman manifest inspect "${options[@]}" "$repository@$index_digest" > "$scratch/index.json"
 python3 - "$scratch/index.json" "$amd_digest" "$arm_digest" <<'PYTHON'
 import json
 import sys

@@ -1719,9 +1719,6 @@ jobs:
       - name: Load the arm image
         run: podman load -i /tmp/fetchit-arm.tar
 
-      - name: create manifest
-        run: podman manifest create quay.io/fetchit/fetchit:latest
-
       - name: Login to Quay
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
@@ -1730,19 +1727,10 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Assemble and verify the tested platform images
+      - name: Verify the tested platform architectures
         run: |
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-amd:latest)" = amd64
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-arm:latest)" = arm64
-          podman manifest add quay.io/fetchit/fetchit:latest quay.io/fetchit/fetchit-arm:latest
-          podman manifest add quay.io/fetchit/fetchit:latest quay.io/fetchit/fetchit-amd:latest
-          podman manifest inspect quay.io/fetchit/fetchit:latest > /tmp/platform-index.json
-          python3 - <<'PYTHON'
-          import json
-          with open('/tmp/platform-index.json') as source:
-              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
-          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
-          PYTHON
 
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1834,22 +1822,10 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: create manifest
-        run: podman manifest create quay.io/fetchit/fetchit-ansible:latest
-
-      - name: Assemble and verify the tested platform images
+      - name: Verify the tested platform architectures
         run: |
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-ansible-amd:latest)" = amd64
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-ansible-arm:latest)" = arm64
-          podman manifest add quay.io/fetchit/fetchit-ansible:latest quay.io/fetchit/fetchit-ansible-arm:latest
-          podman manifest add quay.io/fetchit/fetchit-ansible:latest quay.io/fetchit/fetchit-ansible-amd:latest
-          podman manifest inspect quay.io/fetchit/fetchit-ansible:latest > /tmp/platform-index.json
-          python3 - <<'PYTHON'
-          import json
-          with open('/tmp/platform-index.json') as source:
-              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
-          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
-          PYTHON
 
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -1891,22 +1867,10 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: create manifest
-        run: podman manifest create quay.io/fetchit/fetchit-systemd:latest
-
-      - name: Assemble and verify the tested platform images
+      - name: Verify the tested platform architectures
         run: |
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-systemd-amd:latest)" = amd64
           test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-systemd-arm:latest)" = arm64
-          podman manifest add quay.io/fetchit/fetchit-systemd:latest quay.io/fetchit/fetchit-systemd-arm:latest
-          podman manifest add quay.io/fetchit/fetchit-systemd:latest quay.io/fetchit/fetchit-systemd-amd:latest
-          podman manifest inspect quay.io/fetchit/fetchit-systemd:latest > /tmp/platform-index.json
-          python3 - <<'PYTHON'
-          import json
-          with open('/tmp/platform-index.json') as source:
-              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
-          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
-          PYTHON
 
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
