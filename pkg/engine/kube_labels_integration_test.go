@@ -21,7 +21,7 @@ func assertKubeRuntimeLabels(t *testing.T, k *Kube) {
 	for _, resource := range []string{"pod", "container"} {
 		args := []string{"ps", "-a", "-q", "--filter", "label=" + filter}
 		if resource == "pod" {
-			args = append([]string{"pod"}, args...)
+			args = []string{"pod", "ps", "-q", "--filter", "label=" + filter}
 		}
 		out, err := exec.Command("podman", args...).Output()
 		if err != nil || len(strings.Fields(string(out))) == 0 {
@@ -73,7 +73,7 @@ func TestKubeLabelsPodmanLifecycle(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() {
-				out, _ := exec.Command("podman", "pod", "ps", "-a", "-q", "--filter", "label="+kubeOwnerLabel+"="+k.kubeLabels()[kubeOwnerLabel]).Output()
+				out, _ := exec.Command("podman", "pod", "ps", "-q", "--filter", "label="+kubeOwnerLabel+"="+k.kubeLabels()[kubeOwnerLabel]).Output()
 				for _, id := range strings.Fields(string(out)) {
 					exec.Command("podman", "pod", "rm", "-f", id).Run()
 				}
@@ -90,11 +90,12 @@ func TestKubeLabelsPodmanLifecycle(t *testing.T) {
 			if err := k.MethodEngine(context.Background(), conn, nil, path); err != nil {
 				t.Fatal(err)
 			}
+			assertKubeRuntimeLabels(t, k)
 			previous := string(input)
 			if err := k.kubePodman(context.Background(), conn, deleteFile, &previous); err != nil {
 				t.Fatal(err)
 			}
-			out, err := exec.Command("podman", "pod", "ps", "-a", "-q", "--filter", "label="+kubeOwnerLabel+"="+k.kubeLabels()[kubeOwnerLabel]).Output()
+			out, err := exec.Command("podman", "pod", "ps", "-q", "--filter", "label="+kubeOwnerLabel+"="+k.kubeLabels()[kubeOwnerLabel]).Output()
 			if err != nil || strings.TrimSpace(string(out)) != "" {
 				t.Fatal("deleted labeled pod remains")
 			}

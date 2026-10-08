@@ -282,7 +282,10 @@ The KubeTarget method will launch a container based upon a Kubernetes pod manife
        schedule: "*/5 * * * *"
      branch: main
 
-FetchIt automatically adds the following labels to newly played Pods and to the
+Workload labels
+~~~~~~~~~~~~~~~
+
+FetchIt automatically adds the following labels to newly created or recreated Pods and to the
 Pod templates of Deployments, DaemonSets, and Jobs. Podman 5 propagates these
 labels to the resulting Pods and workload containers, including init containers:
 
@@ -306,8 +309,9 @@ Use labels to find workloads managed by FetchIt:
 
    podman pod ps --filter label=fetchit.containers.io/managed-by=fetchit
    podman ps -a --filter label=fetchit.containers.io/managed-by=fetchit
-   podman pod inspect POD --format '{{ index .Labels "fetchit.containers.io/owner" }}'
-   podman ps -a --filter label=fetchit.containers.io/owner=OWNER_ID
+   # Replace POD with a Pod name shown by the first command.
+   owner_id=$(podman pod inspect POD --format '{{ index .Labels "fetchit.containers.io/owner" }}')
+   podman ps -a --filter "label=fetchit.containers.io/owner=$owner_id"
 
 This is an Unreleased feature; older images do not add these labels. Existing
 workloads acquire labels on their next successful recreation by FetchIt. A
@@ -318,6 +322,9 @@ FetchIt retains its existing name-based replacement/deletion behavior, including
 for unlabeled workloads. Use unique resource names and avoid sharing workload
 names between methods or with manually created workloads. Enforcing ownership
 checks requires a separate migration policy for pre-existing unlabeled workloads.
+
+Manifest example
+~~~~~~~~~~~~~~~~
 
 An example Kube play YAML file will look similiar to the following. This will launch a container as well as the coresponding ConfigMap.
 

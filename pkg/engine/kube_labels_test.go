@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"reflect"
 	"strings"
@@ -93,5 +94,16 @@ func TestKubeLabelsRejectMalformedStructure(t *testing.T) {
 		if _, err := labelKubeManifest([]byte(input), map[string]string{kubeManagedByLabel: "fetchit"}); err == nil {
 			t.Fatal("accepted malformed structure")
 		}
+	}
+}
+
+func TestKubeManifestErrorPreservesSafeCause(t *testing.T) {
+	_, err := labelKubeManifest([]byte("kind: Pod\nmetadata: secret-sentinel\nmetadata: secret-sentinel\n"), nil)
+	var failure *KubeManifestError
+	if !errors.As(err, &failure) || failure.Operation != "decode" || errors.Unwrap(failure) == nil {
+		t.Fatal("lost decoder error classification or cause")
+	}
+	if strings.Contains(err.Error(), "secret-sentinel") {
+		t.Fatal("unsafe parser details in log message")
 	}
 }
