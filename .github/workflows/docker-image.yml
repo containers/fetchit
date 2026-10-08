@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# Keep main image publication ordered; PR runs have separate groups.
+concurrency:
+  group: fetchit-images-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   CGO_ENABLED: 0
 
