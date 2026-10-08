@@ -263,9 +263,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		tc.mu.Lock()
 		defer tc.mu.Unlock()
 		internalTarget := &Target{
-			url:    tc.Url,
-			device: tc.Device,
-			pat:    fetchit.pat,
+			url:          tc.Url,
+			fallbackURLs: append([]string(nil), tc.FallbackURLs...),
+			device:       tc.Device,
+			pat:          fetchit.pat,
 			// define the environment variable for envSecret
 			envSecret:    fetchit.envSecret,
 			ssh:          fetchit.ssh,
@@ -391,7 +392,7 @@ func (f *Fetchit) RunTargets() {
 
 func getRepo(target *Target) error {
 	if target.url != "" && !target.disconnected {
-		getClone(target)
+		return getClone(target)
 	} else if target.disconnected && len(target.url) > 0 {
 		getDisconnected(target)
 	} else if target.disconnected && len(target.device) > 0 {
@@ -401,6 +402,9 @@ func getRepo(target *Target) error {
 }
 
 func getClone(target *Target) error {
+	if len(target.fallbackURLs) > 0 {
+		return getCloneWithMirrors(target)
+	}
 	directory := getDirectory(target)
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
