@@ -1803,9 +1803,8 @@ jobs:
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: |
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-arm:latest
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-amd:latest
-          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest
+          FETCHIT_PUBLISH_AUTH_FILE="$HOME/.docker/config.json" bash scripts/publish-platform-index.sh \
+            quay.io/fetchit/fetchit:latest quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit-arm:latest
 
   publish-binary-to-github:
     permissions:
@@ -1911,9 +1910,8 @@ jobs:
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: |
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible-arm:latest
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible-amd:latest
-          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest
+          FETCHIT_PUBLISH_AUTH_FILE="$HOME/.docker/config.json" bash scripts/publish-platform-index.sh \
+            quay.io/fetchit/fetchit-ansible:latest quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible-arm:latest
 
   create-systemd-manifest:
     runs-on: ubuntu-26.04
@@ -1969,6 +1967,5 @@ jobs:
       - name: Publish tested architecture tags and platform index
         if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: |
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd-arm:latest
-          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd-amd:latest
-          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd:latest
+          FETCHIT_PUBLISH_AUTH_FILE="$HOME/.docker/config.json" bash scripts/publish-platform-index.sh \
+            quay.io/fetchit/fetchit-systemd:latest quay.io/fetchit/fetchit-systemd-amd:latest quay.io/fetchit/fetchit-systemd-arm:latest

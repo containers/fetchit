@@ -34,7 +34,10 @@ arm64 runners without QEMU. PR checks build all three ARM images and verify
 combined amd64/arm64 indexes from the actual run's downloaded artifacts. Registry
 publishing remains limited to main/release pushes. This fixes Ubuntu 26.04's
 removal of the old ``qemu-user-static`` package and prevents stale registry images
-from entering a new release's platform index.
+from entering a new release's platform index. Publishing pins entries to the exact
+digests produced by pushing the tested architecture images, then verifies the
+remote index. A local-registry PR test exercises archive import, manifest-format
+conversion, complete index publishing, and platform pulls without credentials.
 
 Release cleanup
 ~~~~~~~~~~~~~~~
