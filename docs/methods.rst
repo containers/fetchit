@@ -95,8 +95,10 @@ configuration file or URL instead.
 Methods
 =======
 Methods manage containers, host services, and files. The examples below show the
-configuration keys used inside ``targetConfigs``. Use a FetchIt image containing
-the documented features; see :doc:`release_notes` for unreleased changes.
+configuration keys used inside ``targetConfigs``. For the features documented
+here, build engine and helper images from commit ``4e7964a`` or a descendant,
+until a release containing them is published. See :doc:`documentation` for
+revision-pinned builds and :doc:`release_notes` for unreleased changes.
 
 .. list-table:: Method selection
    :header-rows: 1
@@ -124,16 +126,15 @@ the documented features; see :doc:`release_notes` for unreleased changes.
      - Host configuration through playbooks
      - No automatic undo of playbook changes
 
-``cleanupOnRemoval`` defaults to false. Removing a method from configuration
-retains its resources unless cleanup was enabled beforehand. The method sections
+``cleanupOnRemoval`` defaults to false. Deleting a method entry or its entire
+Git target from configuration retains its resources unless cleanup was enabled
+before that change. The method sections
 and :doc:`lifecycle` explain ownership, migration, and recovery requirements.
 Trailing slashes in ``targetPath`` are optional; the Git target paths section
 above explains normalization and FileTransfer's flat destination layout.
 
-See :doc:`samples` for current runnable applications, amd64/arm64 images, ports,
-and archive-loading instructions. HTTP examples use container port 8080 and the
-FetchIt sample image; ``APP_COLOR`` remains a configuration example and does not
-change the page color.
+See :doc:`samples` for runnable applications, amd64/arm64 images, ports,
+and archive-loading instructions.
 
 
 All methods are defined within specific targetConfiguration sections. These sections are demonstrated below. For private repositories, a PAT token or a username/password combination is required.
@@ -248,6 +249,11 @@ In the examples directory, there is an Ansible playbook that is used to install 
        schedule: "*/5 * * * *"
 
 The field sshDirectory is unique for this method. This directory should contain the private key used to connect to the host and the public key should be copied into the `.ssh/authorized_keys` file to allow for connectivity. The .ssh directory should be owned by root.
+
+Write idempotent playbooks so retrying a revision is safe. Removing the method
+does not reverse its changes, and apply rollback is unsupported for Ansible.
+Recover through a reviewed compensating playbook or restore the host manually;
+reverting Git alone does not undo packages, users, or external state.
 
 Raw
 ---
@@ -449,13 +455,10 @@ An example Kube play YAML file will look similiar to the following. This will la
 Quadlet Method
 --------------
 
-The ``quadlet`` method installs a complete Git bundle into the host's Quadlet
-search path. The host Podman generator validates the bundle and generates systemd
-services. Use host Podman **5.7 or newer within major version 5**, cgroup v2, and a
-running host systemd manager. Podman 6 is not supported by this method.
-
-The checked-in example deploys a container, network, volume, environment file,
-and drop-in:
+The ``quadlet`` method deploys a complete Git bundle into the host's Quadlet
+search path, where the host Podman generator creates systemd services. Use Podman
+5.7 or newer within major version 5, cgroup v2, and a running systemd manager.
+Prefer rootless operation when workloads do not require root-owned host resources:
 
 .. code-block:: yaml
 
@@ -467,56 +470,29 @@ and drop-in:
      - name: web
        targetPath: examples/quadlet/units/
        schedule: "*/1 * * * *"
-       root: true
+       root: false
+       hostHome: /home/operator
+       hostConfigHome: /home/operator/.config
+       hostRuntimeDir: /run/user/1234
        start: true
        restart: true
        cleanupOnRemoval: true
 
-The example writes a message into its named volume; it does not publish an HTTP
-port. Select the complete units directory, not an individual file. Source units
-belong at its root; supporting files and drop-ins may be nested. ``glob`` is
-unsupported because it could omit dependencies. Bundles are limited to 32 MiB
-and 4,096 files.
+Replace the host paths with the actual socket user's paths. For this rootless
+example, change the bundled container's ``[Install]`` target to
+``WantedBy=default.target`` in your repository. It writes a message to a named
+volume and does not publish an HTTP port. Select the complete units directory.
 
-``root`` defaults to false. ``start`` defaults to false and starts services after
-deployment. ``restart`` defaults to false and implies ``start``; changed supporting
-files also trigger workload restarts. Network and volume services are started
-rather than restarted. Boot activation comes from the units' ``[Install]``
-sections, not ``systemctl enable`` on generated services.
+``start`` defaults to false; set it to true to start services after deployment.
+``restart`` defaults to false; setting it to true implies start and restarts
+workload services when the bundle changes. Cleanup defaults to false and must
+be enabled before removing the method entry or its entire Git target.
 
-For rootless operation, use the host user's Podman socket, running user manager,
-and explicit host paths:
-
-.. code-block:: yaml
-
-   quadlet:
-   - name: web
-     targetPath: examples/quadlet/units
-     schedule: "*/1 * * * *"
-     root: false
-     hostHome: /home/operator
-     hostConfigHome: /home/operator/.config
-     hostRuntimeDir: /run/user/1234
-     start: true
-     restart: true
-     cleanupOnRemoval: true
-
-Replace the home and runtime paths with those of the actual host user. These are
-host paths, not paths inferred from FetchIt's container. Create the configured
-host configuration directory and enable lingering if services must survive logout.
-Rootful deployment requires ``/etc/containers`` on the host.
-
-``helperImage`` optionally selects a compatible FetchIt helper; its default is
-``quay.io/fetchit/fetchit:latest``. Engine and helper images must include Quadlet
-support. The helper uses host binaries and administrative filesystem access, so
-use trusted repositories and images.
-
-``cleanupOnRemoval: true`` enables persisted bundle cleanup when the method leaves
-configuration. Cleanup stops journal-owned services and removes its bundle;
-volumes and other resources follow the authored units' stop behavior. Defaults
-retain workloads. See :doc:`quadlet` for the full setup, supported unit types,
-inspection commands, and migration limits, and :doc:`lifecycle` for retry and
-rollback behavior.
+See :doc:`quadlet` for rootful setup, validated host paths, bundle limits, image
+pinning, activation, and precise resource-retention rules. See :doc:`lifecycle`
+for removal receipts, retries, and rollback. Rootful helpers have host-wide
+administrative access; rootless helpers still administer the user's resources.
+Use trusted repositories and reviewed helper images in either scope.
 
 
 .. _method-podman-networks:
@@ -618,37 +594,25 @@ limits, and recovery. Ordinary Kube methods retain their current behavior.
 Cleanup, rollback, and method identity
 --------------------------------------
 
-Raw, Kube, Quadlet, FileTransfer, and Systemd support opt-in method-removal
-cleanup. Enable tracking while a method is still configured, before removing it.
-FileTransfer and Systemd refuse to adopt pre-existing untracked files; follow the
-migration steps in :doc:`lifecycle` before enabling cleanup on existing deployments.
-Preserve the FetchIt volume and host journals across upgrades.
+Raw, Kube, Quadlet, FileTransfer, and Systemd support ``cleanupOnRemoval``.
+Resources are retained when a method entry or its entire Git target leaves
+configuration unless the flag was enabled beforehand. See :doc:`lifecycle` for
+migration, ownership, retries, and retained resources.
 
-Git targets containing only Raw, Kube, or Quadlet may also opt into apply rollback:
+Git targets may set ``rollback: true`` only when all their methods are Raw, Kube,
+or Quadlet. A mixed target containing FileTransfer, Systemd, Ansible, or another
+unsupported method is rejected, rather than partially rolled back. Rollback
+defaults to false; ``trackBadCommits`` requires rollback. Configuration examples
+and recovery limits are in :doc:`lifecycle`.
 
-.. code-block:: yaml
+Preserve the FetchIt volume and host journals across upgrades: they store applied
+Git baselines, pending cleanup receipts, and file/service ownership needed to
+retry safely. Deleting them loses that recovery information; FetchIt does not
+reconstruct ownership by deleting unknown host resources.
 
-   targetConfigs:
-   - url: https://github.com/example/workloads.git
-     branch: main
-     rollback: true
-     trackBadCommits: true
-     raw:
-     - name: web
-       targetPath: containers/
-       schedule: "*/1 * * * *"
-       cleanupOnRemoval: true
-
-``rollback`` defaults to false. ``trackBadCommits`` requires rollback and suppresses
-repeated attempts at a failed revision only after successful rollback. Tracking is
-process-local and resets on reload. Rollback is best effort and does not undo
-persistent-data writes. It is unsupported for FileTransfer, Systemd, or Ansible.
-See :doc:`lifecycle` for failure handling and retained resources.
-
-Raw and Kube workloads carry FetchIt ownership labels. Keep method names and
-paths stable, and avoid resource-name collisions between methods. Changing from
-``containers`` to ``containers/`` retains the same normalized identity. See the
-Kube workload label section above for discovery commands and reserved label keys.
+Raw and Kube workloads carry ownership labels. Changing ``containers`` to
+``containers/`` retains the same normalized identity. The workload-label section
+above documents discovery commands and reserved keys.
 
 Git mirrors and service status
 -------------------------------
@@ -659,5 +623,8 @@ checks, and authentication. SSH setup is documented above; verify host keys
 rather than disabling verification.
 
 Set ``FETCHIT_STATUS_ADDR`` to expose optional ``/healthz`` and ``/status`` HTTP
-endpoints. See :doc:`status` for binding and monitoring examples. Neither endpoint
-is enabled by default.
+endpoints. For a native process, use ``FETCHIT_STATUS_ADDR=127.0.0.1:8080``.
+For containers, publish the port only on host loopback as shown in :doc:`status`.
+The endpoints have no authentication; remote exposure requires an authenticated
+TLS proxy and firewall policy. FetchIt does not enforce those controls or reject
+public binds itself. Neither endpoint is enabled by default.

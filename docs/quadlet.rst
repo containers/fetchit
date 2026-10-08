@@ -39,8 +39,8 @@ large build contexts in a separate build pipeline or reduce the selected bundle.
 Symlinks, uninstantiated templates, and duplicate generated service names are
 rejected. Concrete instance files such as ``web@blue.container`` are allowed.
 
-``root`` defaults to false. ``start`` defaults to false and starts desired services
-after deployment. ``restart`` defaults to false and implies ``start``; it restarts
+``root`` defaults to false. ``start`` defaults to false; set it to true to start
+desired services after deployment. ``restart`` defaults to false and implies ``start``; it restarts
 workload services whenever the selected bundle changes, including supporting-file
 changes. Network and volume units are started, rather than restarted, to preserve
 resources used by running containers. Changing the configuration of an existing
@@ -96,6 +96,19 @@ must survive logout. FetchIt does not infer host paths from its container's UID,
 ``hostConfigHome/containers/systemd``; system files beneath
 ``/etc/containers/systemd``.
 
+Use rootless operation unless the workloads require root-owned host resources.
+The helper administers the selected user's filesystem and systemd manager; a
+rootful helper administers the entire host. The helper uses only the capabilities
+listed above and writable configuration parent, but authored units can invoke
+host commands. Use a dedicated deployment user/host where isolation is needed.
+
+Rootless host paths must be canonical absolute paths, not ``/``, with no traversal
+or embedded newlines. Configure the intended user's home, configuration, and
+runtime directories, and verify their ownership and permissions before deployment.
+Do not select shared or sensitive configuration parents. FetchIt validates path
+syntax and its own managed directory; this is not an arbitrary host-path sandbox
+or a policy allowlist for commands authored in units.
+
 ``helperImage`` optionally selects the helper image. The default is
 ``quay.io/fetchit/fetchit:latest``. Use an image built from a FetchIt release with
 Quadlet support: it must provide ``sh``, ``chroot``, ``flock``, ``cp``, ``find``,
@@ -103,6 +116,21 @@ Quadlet support: it must provide ``sh``, ``chroot``, ``flock``, ``cp``, ``find``
 ``helperImage`` when available. Local development can use the image tag built from
 the same checkout. Helper images and Git contents are trusted host administration
 inputs; reducing container capabilities does not sandbox the Quadlet services.
+
+For production, replace the mutable default with an approved immutable digest:
+
+.. code-block:: yaml
+
+   helperImage: quay.io/fetchit/fetchit@sha256:REPLACE_WITH_APPROVED_DIGEST
+
+This is a placeholder, not a usable image reference. Obtain the actual digest
+from the image built from your reviewed source revision. Verify any available
+signature/provenance against your organization's trusted signer policy before
+allowing the deployment; a digest pins content but does not establish who built
+it. FetchIt does not perform signature verification or enforce an image allowlist.
+Do not assume that this project publishes a signature for every development image.
+Test the new engine/helper pair on a disposable host, then update the pinned digest
+explicitly. Keep the persistent volume and host journals through that upgrade.
 
 New actions are carried in the FetchIt binary,
 so no changes to the legacy Systemd helper image are required.
@@ -130,6 +158,29 @@ on the host after their units are removed; FetchIt does not force-delete data.
 On startup, FetchIt checks the host receipt for an interrupted application, even
 when the saved Git revision already matches the desired revision. After success,
 an unchanged Git commit is a no-op; this method does not continuously repair host drift.
+
+Resource retention during cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+FetchIt stops the bundle's journal-owned generated services, removes its deployed
+source units and supporting files, and reloads systemd. It does not separately
+run ``podman volume rm``, ``podman network rm``, or an image prune.
+
+For the checked-in ``web.container``, ``web.network``, and ``web.volume`` example,
+the generated container is removed on service stop, but the named network and
+named volume remain with their data. Podman's standard ``.volume`` generator does
+not delete the volume when its service is stopped. ``.network`` retains its
+network by default; ``NetworkDeleteOnStop=true`` changes that behavior to delete
+it. Custom ``ExecStop``/``ExecStopPost`` and ``.kube`` teardown settings can also
+remove resources. Review the generated units with ``systemctl cat`` before
+turning on cleanup. See the `Podman Quadlet reference
+<https://docs.podman.io/en/v5.8.0/markdown/podman-systemd.unit.5.html>`_.
+
+To preserve persistent data, keep volume-deletion commands out of stop hooks,
+back up named volumes before removal, and inspect them afterward with
+``podman volume ls`` and ``podman volume inspect NAME`` (add ``sudo`` for rootful).
+Keep the volume until a separate, explicit data-retirement decision. Deleting
+source units does not make a destructive authored stop hook safe.
 
 See the `runnable example <https://github.com/containers/fetchit/tree/main/examples/quadlet>`_
 and the `Podman 5.8 Quadlet manual <https://docs.podman.io/en/v5.8.0/markdown/podman-systemd.unit.5.html>`_.

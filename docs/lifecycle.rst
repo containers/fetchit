@@ -53,7 +53,11 @@ journal, removes its dedicated source bundle's contents, and reloads systemd.
 It checks each stopped service's SourcePath against that bundle. Persistent
 volumes and other resources are subject to the authored Quadlet units' own stop
 behavior; cleanup does not separately prune them. Quadlet supporting files in
-the method's bundle are removed together with its source units.
+the method's bundle are removed together with its source units. For the standard
+container/network/volume example, the stopped container is removed and the named
+volume and network remain. A network authored with ``NetworkDeleteOnStop=true``
+is deleted on stop; custom stop hooks can delete other data. See :doc:`quadlet`
+for the exact generator behavior and persistent-data preservation procedure.
 
 Tracked host files and services
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

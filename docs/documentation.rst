@@ -20,6 +20,32 @@ GitHub Actions runs the same strict Sphinx build for PRs and main pushes. Its
 Python dependencies match the pinned requirements used by Read the Docs. CI
 checks the documentation source; it does not itself publish the hosted site.
 
+Build a compatible engine and helper
+-------------------------------------
+
+The host-file cleanup features require commit ``4e7964a`` or a descendant, which
+also includes the other features documented here. This is a source compatibility
+baseline, not a published release tag. For a reproducible development build:
+
+.. code-block:: bash
+
+   git clone https://github.com/containers/fetchit.git
+   cd fetchit
+   git checkout 4e7964a
+   go mod vendor
+   # Use ordinary podman for rootless or sudo podman for rootful, consistently.
+   podman build --build-arg ARCH=amd64 -t localhost/fetchit:reviewed .
+
+Use ``ARCH=arm64`` on arm64. Launch that engine image and set Quadlet's
+``helperImage: localhost/fetchit:reviewed``. FileTransfer/Systemd tracked cleanup
+currently uses the fixed ``quay.io/fetchit/fetchit:latest`` helper reference:
+tag the same reviewed local image with that name in the matching Podman store
+before testing those features. They do not expose Quadlet's ``helperImage``
+override. Follow :doc:`running` and :doc:`quadlet` for mounts and host setup.
+For production publication, review the source, publish your approved build, and
+pin its digest where the method supports it; do not invent a compatible release
+number or use an older image merely because it has the ``latest`` tag.
+
 Configure Read the Docs
 -----------------------
 
