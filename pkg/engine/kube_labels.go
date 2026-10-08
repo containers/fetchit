@@ -49,7 +49,16 @@ func (e *KubeManifestError) Unwrap() error { return e.cause }
 
 // Label the pod metadata Podman uses for both pods and their containers. Controller
 // selectors and unrelated resources are deliberately left unchanged.
-func labelKubeManifest(input []byte, labels map[string]string) (result []byte, err error) {
+func labelKubeManifest(input []byte, labels map[string]string) ([]byte, error) {
+	expanded, err := addKubeVolumeDeclarations(input)
+	if err != nil {
+		return nil, err
+	}
+	defer clear(expanded)
+	return labelKubeManifestDocuments(expanded, labels)
+}
+
+func labelKubeManifestDocuments(input []byte, labels map[string]string) (result []byte, err error) {
 	decoder := yaml.NewDecoder(bytes.NewReader(input))
 	var output bytes.Buffer
 	encoder := yaml.NewEncoder(&output)

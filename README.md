@@ -21,6 +21,9 @@ engine and compatible helper built from current main to try them. A cached
 - **Use Podman kube play:** Deploy ordinary or SOPS-encrypted YAML, attach Pods
   to existing Podman networks, and discover workloads through ownership labels.
   [Methods and networks](docs/methods.rst) · [SOPS guide](docs/sops.rst)
+- **Provision named storage per workload:** Opt into missing-volume creation
+  for raw mounts or kube PVC references; retain existing data across redeployments.
+  [Volume guide](docs/volumes.rst)
 - **Keep Git sources available:** Authenticate with verified SSH host keys and
   configure trusted fallback repositories.
   [SSH configuration](docs/methods.rst) · [Mirrors guide](docs/mirrors.rst)

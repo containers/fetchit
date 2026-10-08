@@ -290,7 +290,9 @@ A Raw JSON file can contain the following fields.
         "protocol":      ""}]
    }
 
-Volume and host mounts can be provided in the JSON file.
+Volume and host mounts can be provided in the JSON file. Named mounts can opt
+into missing-volume creation with ``create: true``. See :doc:`volumes` for raw
+and kube examples, creation flags, mount paths, and persistence behavior.
 
 The sample HTTP image supports amd64 and arm64 and runs as user 1001 and listens on container port 8080 without capability overrides.
 ``APP_COLOR`` and ``tree`` illustrate environment propagation; Apache does not
@@ -398,7 +400,8 @@ literal repository URL or credentials; it is an identifier, not a security token
 Existing application labels and controller selectors are preserved. FetchIt
 replaces values for its two reserved label keys. Labels are added in memory,
 including after authenticated SOPS decryption; repository manifests are unchanged.
-Secrets, ConfigMaps, and volumes do not receive these labels.
+Secrets, ConfigMaps, and volumes do not receive these labels. For named PVC
+creation and mounting, including opt-in generated declarations, see :doc:`volumes`.
 
 Use labels to find workloads managed by FetchIt:
 
