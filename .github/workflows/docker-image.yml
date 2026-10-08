@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-26.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install required packages
         run: sudo apt install curl
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -32,7 +32,7 @@ jobs:
         run: docker save -o /tmp/fetchit.tar quay.io/fetchit/fetchit-amd:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fetchit-image
           path: /tmp/fetchit.tar
@@ -40,11 +40,11 @@ jobs:
   build-ansible-amd:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -58,40 +58,39 @@ jobs:
         run: podman save -o /tmp/ansible-amd.tar quay.io/fetchit/fetchit-ansible-amd:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ansible-image-amd
           path: /tmp/ansible-amd.tar
 
   build-ansible-arm:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
-      - name: update system
-        run: sudo apt-get update
-
       - name: Install required packages
-        run: sudo apt install podman build-essential qemu-user qemu-user-static
+        run: sudo apt-get install -y build-essential
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
       - name: Build the image
         run: go mod download && go mod vendor && CTR_CMD=podman make build-ansible-cross-build-linux-arm64
 
+      - name: Verify native ARM image
+        run: test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-ansible-arm:latest)" = arm64
+
       - name: Export image
         run: podman save -o /tmp/ansible-arm.tar quay.io/fetchit/fetchit-ansible-arm:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ansible-image-arm
           path: /tmp/ansible-arm.tar
@@ -99,7 +98,7 @@ jobs:
   pull-and-archive:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: Build the UBI sample from this revision
@@ -113,7 +112,7 @@ jobs:
         run: podman save --multi-image-archive -o /tmp/colors.tar quay.io/fetchit/fetchit-sample-app:latest docker.io/mmumshad/simple-webapp-color:latest
 
       - name: save the container as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: colors
           path: /tmp/colors.tar
@@ -121,11 +120,11 @@ jobs:
   build-systemd-amd:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -139,40 +138,39 @@ jobs:
         run: podman save -o /tmp/systemd-amd.tar quay.io/fetchit/fetchit-systemd-amd:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: systemd-image-amd
           path: /tmp/systemd-amd.tar
 
   build-systemd-arm:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     needs: [ build, raw-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
-      - name: update system
-        run: sudo apt-get update
-
       - name: Install required packages
-        run: sudo apt install podman build-essential qemu-user qemu-user-static
+        run: sudo apt-get install -y build-essential
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
       - name: Build the image
         run: go mod download && go mod vendor && CTR_CMD=podman make build-systemd-cross-build-linux-arm64
 
+      - name: Verify native ARM image
+        run: test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-systemd-arm:latest)" = arm64
+
       - name: Export image
         run: podman save -o /tmp/systemd-arm.tar quay.io/fetchit/fetchit-systemd-arm:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: systemd-image-arm
           path: /tmp/systemd-arm.tar
@@ -181,7 +179,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -189,7 +187,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -198,7 +196,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -232,7 +230,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -240,7 +238,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -249,7 +247,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -283,7 +281,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -291,7 +289,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -300,7 +298,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -337,7 +335,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -345,7 +343,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -354,7 +352,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -388,7 +386,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -396,7 +394,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -405,7 +403,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -460,7 +458,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -468,7 +466,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -477,7 +475,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -537,7 +535,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -545,7 +543,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -554,7 +552,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -631,7 +629,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -639,7 +637,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -648,7 +646,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -686,13 +684,13 @@ jobs:
     needs: [build]
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
       - name: Install local SSH server
         run: sudo apt-get install -y openssh-server git
       - name: Enable the Podman socket
         run: sudo systemctl enable --now podman.socket
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -707,7 +705,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -715,7 +713,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -749,7 +747,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -757,7 +755,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -788,7 +786,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-systemd-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -796,7 +794,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -824,7 +822,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-systemd-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -832,7 +830,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -853,7 +851,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-amd
           path: /tmp
@@ -909,7 +907,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-systemd-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -917,7 +915,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -929,7 +927,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-amd
           path: /tmp
@@ -960,7 +958,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-systemd-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -973,7 +971,7 @@ jobs:
           XDG_RUNTIME_DIR=/run/user/$UID systemctl --user enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -985,7 +983,7 @@ jobs:
         run: podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-amd
           path: /tmp
@@ -1018,7 +1016,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-systemd-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1026,7 +1024,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1038,7 +1036,7 @@ jobs:
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
       - name: pull systemd amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-amd
           path: /tmp
@@ -1072,7 +1070,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, build-ansible-amd ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1086,7 +1084,7 @@ jobs:
         run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1095,7 +1093,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: Pull ansible artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ansible-image-amd
           path: /tmp
@@ -1129,7 +1127,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1137,7 +1135,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1168,7 +1166,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1176,7 +1174,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1207,7 +1205,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1215,7 +1213,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1261,7 +1259,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1269,7 +1267,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1278,7 +1276,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1312,7 +1310,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1320,7 +1318,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1329,7 +1327,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1344,7 +1342,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1381,7 +1379,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1389,7 +1387,7 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1398,7 +1396,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1413,7 +1411,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1456,12 +1454,12 @@ jobs:
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: main
 
       - name: checkout with token
-        uses: actions/checkout@v3
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: ci
           ref: ci
@@ -1483,7 +1481,7 @@ jobs:
           fi
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1492,7 +1490,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1548,7 +1546,7 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: ./.github/actions/setup-podman
 
@@ -1556,13 +1554,13 @@ jobs:
         run: sudo systemctl enable --now podman.socket
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1606,7 +1604,7 @@ jobs:
     needs: [ build, build-ansible-amd, pull-and-archive ]
     steps:
       - name: checkout with token
-        uses: actions/checkout@v3
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: ci
 
@@ -1622,7 +1620,7 @@ jobs:
         run: sudo cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1631,7 +1629,7 @@ jobs:
         run: sudo podman load -i /tmp/fetchit.tar
 
       - name: Pull ansible artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ansible-image-amd
           path: /tmp
@@ -1642,7 +1640,7 @@ jobs:
          sudo podman tag quay.io/fetchit/fetchit-ansible-amd:latest quay.io/fetchit/fetchit-ansible:latest
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: colors
           path: /tmp
@@ -1697,7 +1695,7 @@ jobs:
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: Login to Quay
@@ -1708,7 +1706,7 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1721,36 +1719,32 @@ jobs:
 
 
   build-arm-and-manifest-list:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     needs: [ build, raw-validate, podman-secret-validate, podman-config-secret-validate, fetchit-config-target-no-config-validate, fetchit-config-reload-validate, clean-validate, kube-validate, systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, systemd-restart-validate, systemd-validate-exact-file, multi-engine-validate, make-change-to-repo, filetransfer-validate, filetransfer-validate-exact-file, ssh-validate, ansible-validate, loader-validate, disconnected-validate ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    # PRs skip make-change-to-repo; failed or cancelled validation still blocks builds.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: update system
-        run: sudo apt-get update
-
       - name: Install required packages
-        run: sudo apt install podman build-essential qemu-user qemu-user-static
+        run: sudo apt-get install -y build-essential
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
       - name: Build the arm image
         run: go mod download && go mod vendor && CTR_CMD=podman make build-containerized-cross-build-linux-arm64
 
+      - name: Verify native ARM image
+        run: test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-arm:latest)" = arm64
+
       - name: Export image
         run: podman save -o /tmp/fetchit-arm.tar quay.io/fetchit/fetchit-arm:latest
 
       - name: Save container as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fetchit-arm-image
           path: /tmp/fetchit-arm.tar
@@ -1758,15 +1752,13 @@ jobs:
   push-manifest-list-to-registry:
     runs-on: ubuntu-26.04
     needs: [ build-arm-and-manifest-list ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1775,7 +1767,7 @@ jobs:
         run: podman load -i /tmp/fetchit.tar
 
       - name: pull arm artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-arm-image
           path: /tmp
@@ -1787,33 +1779,48 @@ jobs:
         run: podman manifest create quay.io/fetchit/fetchit:latest
 
       - name: Login to Quay
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: podman login to quay.io
-        run: podman login --authfile ~/.docker/config.json quay.io
-
-      - name: add images and push manifest list
+      - name: Assemble and verify the tested platform images
         run: |
-          podman manifest add --arch arm64 quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit-arm:latest
-          podman manifest add quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest --format=docker
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-amd:latest)" = amd64
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-arm:latest)" = arm64
+          podman manifest add quay.io/fetchit/fetchit:latest quay.io/fetchit/fetchit-arm:latest
+          podman manifest add quay.io/fetchit/fetchit:latest quay.io/fetchit/fetchit-amd:latest
+          podman manifest inspect quay.io/fetchit/fetchit:latest > /tmp/platform-index.json
+          python3 - <<'PYTHON'
+          import json
+          with open('/tmp/platform-index.json') as source:
+              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          PYTHON
+
+      - name: Publish tested architecture tags and platform index
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-arm:latest
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-amd:latest
+          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit:latest docker://quay.io/fetchit/fetchit:latest
 
   publish-binary-to-github:
+    permissions:
+      contents: write
     runs-on: ubuntu-26.04
     needs: [ build-arm-and-manifest-list ]
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: pull arm image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-arm-image
           path: /tmp
@@ -1822,7 +1829,7 @@ jobs:
         run: podman load -i /tmp/fetchit-arm.tar
 
       - name: Pull amd image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: fetchit-image
           path: /tmp
@@ -1830,36 +1837,36 @@ jobs:
       - name: Load the amd image
         run: podman load -i /tmp/fetchit.tar
 
-      - name: move binary
+      - name: Extract binaries from the tested images
         run: |
-          arm=$(podman images | grep arm | awk '{print $3}')
-          amd=$(podman images | grep amd | awk '{print $3}')
-          podman cp $(podman create --rm $arm):/usr/local/bin/fetchit ./fetchit-arm
-          podman cp $(podman create --rm $amd):/usr/local/bin/fetchit ./fetchit-amd
+          arm=$(podman create quay.io/fetchit/fetchit-arm:latest)
+          amd=$(podman create quay.io/fetchit/fetchit-amd:latest)
+          trap 'podman rm -f "$arm" "$amd"' EXIT
+          podman cp "$arm:/usr/local/bin/fetchit" ./fetchit-arm
+          podman cp "$amd:/usr/local/bin/fetchit" ./fetchit-amd
 
-      - name: push binary
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
-          prerelease: true
-          title: "Latest Build"
-          files: |
-            fetchit-arm
-            fetchit-amd
+      - name: Publish the latest prerelease binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" -f sha="$GITHUB_SHA" -F force=true
+            gh release edit latest --prerelease --title "Latest Build" --notes "Automated builds from $GITHUB_SHA"
+          else
+            gh release create latest --target "$GITHUB_SHA" --prerelease --title "Latest Build" --notes "Automated builds from $GITHUB_SHA"
+          fi
+          gh release upload latest ./fetchit-arm ./fetchit-amd --clobber
 
   create-ansible-manifest:
     runs-on: ubuntu-26.04
     needs: [ ansible-validate, build-ansible-arm ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ansible-image-arm
           path: /tmp
@@ -1868,7 +1875,7 @@ jobs:
         run: podman load -i /tmp/ansible-arm.tar
 
       - name: pull amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: ansible-image-amd
           path: /tmp
@@ -1877,36 +1884,47 @@ jobs:
         run: podman load -i /tmp/ansible-amd.tar
 
       - name: Login to Quay
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: podman login to quay.io
-        run: podman login --authfile ~/.docker/config.json quay.io
-
       - name: create manifest
         run: podman manifest create quay.io/fetchit/fetchit-ansible:latest
 
-      - name: add images to manifest list
+      - name: Assemble and verify the tested platform images
         run: |
-          podman manifest add --arch arm64 quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible-arm:latest
-          podman manifest add quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest --format=docker
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-ansible-amd:latest)" = amd64
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-ansible-arm:latest)" = arm64
+          podman manifest add quay.io/fetchit/fetchit-ansible:latest quay.io/fetchit/fetchit-ansible-arm:latest
+          podman manifest add quay.io/fetchit/fetchit-ansible:latest quay.io/fetchit/fetchit-ansible-amd:latest
+          podman manifest inspect quay.io/fetchit/fetchit-ansible:latest > /tmp/platform-index.json
+          python3 - <<'PYTHON'
+          import json
+          with open('/tmp/platform-index.json') as source:
+              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          PYTHON
+
+      - name: Publish tested architecture tags and platform index
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible-arm:latest
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-ansible-amd:latest
+          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit-ansible:latest docker://quay.io/fetchit/fetchit-ansible:latest
 
   create-systemd-manifest:
     runs-on: ubuntu-26.04
     needs: [ systemd-validate, systemd-enable-validate, systemd-user-enable-validate, systemd-autoupdate-validate, build-systemd-arm ]
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup-podman
 
       - name: pull artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-arm
           path: /tmp
@@ -1915,7 +1933,7 @@ jobs:
         run: podman load -i /tmp/systemd-arm.tar
 
       - name: pull amd artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: systemd-image-amd
           path: /tmp
@@ -1924,20 +1942,33 @@ jobs:
         run: podman load -i /tmp/systemd-amd.tar
 
       - name: Login to Quay
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: podman login to quay.io
-        run: podman login --authfile ~/.docker/config.json quay.io
-
       - name: create manifest
         run: podman manifest create quay.io/fetchit/fetchit-systemd:latest
 
-      - name: add images to manifest list
+      - name: Assemble and verify the tested platform images
         run: |
-          podman manifest add --arch arm64 quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd-arm:latest
-          podman manifest add quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd-amd:latest
-          podman manifest push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd:latest --format=docker
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-systemd-amd:latest)" = amd64
+          test "$(podman image inspect --format '{{.Architecture}}' quay.io/fetchit/fetchit-systemd-arm:latest)" = arm64
+          podman manifest add quay.io/fetchit/fetchit-systemd:latest quay.io/fetchit/fetchit-systemd-arm:latest
+          podman manifest add quay.io/fetchit/fetchit-systemd:latest quay.io/fetchit/fetchit-systemd-amd:latest
+          podman manifest inspect quay.io/fetchit/fetchit-systemd:latest > /tmp/platform-index.json
+          python3 - <<'PYTHON'
+          import json
+          with open('/tmp/platform-index.json') as source:
+              platforms = {(m['platform']['os'], m['platform']['architecture']) for m in json.load(source)['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          PYTHON
+
+      - name: Publish tested architecture tags and platform index
+        if: (github.event_name == 'push' || github.event_name == 'schedule') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd-arm:latest
+          podman push --authfile ~/.docker/config.json quay.io/fetchit/fetchit-systemd-amd:latest
+          podman manifest push --all --authfile ~/.docker/config.json --format=docker quay.io/fetchit/fetchit-systemd:latest docker://quay.io/fetchit/fetchit-systemd:latest
