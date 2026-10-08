@@ -49,7 +49,7 @@ pod is required to reload targetConfigs. The following fields are required with 
 
    configReload:
      schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+     configURL: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
 
 Changes pushed to the ConfigURL will trigger a reloading of FetchIt target configs. It's recommended to include the ConfigReload
 in the FetchIt config to enable updates to target configs without requiring a restart.
@@ -61,51 +61,36 @@ that is stored in git will be used.
 For opt-in cleanup when a method leaves configuration, and recovery after a failed
 Git apply, see :doc:`lifecycle`.
 
-Dynamic Configuration Reload Using a Private Registry
------------------------------------------------------
+Private configuration downloads
+-------------------------------
 
-The ConfigReload method can be used to reload target configs from a private registry but this comes with the warning to ensure that
-the repository is not public. The config.yaml will need to include the credentials to access the private registry.
-
-When using a GitHub PAT token, the config.yaml will need to include the following fields:
+Keep credentials out of public repositories. Scheduled remote configuration
+updates use the top-level ``gitAuth`` credentials, which also apply to Git targets:
 
 .. code-block:: yaml
 
+   gitAuth:
+     envSecret: GH_PAT
    configReload:
      schedule: "*/5 * * * *"
-     pat: github-alphanumeric-token
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
+     configURL: https://raw.githubusercontent.com/example/private/main/config.yaml
 
-When using basic authentication the config.yaml will need to include the following fields:
+Provide ``GH_PAT`` to the engine as an environment secret using the launch example
+below. Alternatively, top-level ``gitAuth.pat`` or ``gitAuth.username`` and
+``gitAuth.password`` supply credentials; protect the local configuration file.
+Do not put credentials only inside ``configReload``. Bootstrap with a local
+config containing the authentication settings: the initial URL download before
+configuration is loaded does not have those credentials available.
 
-.. code-block:: yaml
-
-  gitAuth:
-    username: bob
-    password: bobpassword
-   configReload:
-     schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
-
-NOTE: This is not recommended for public repositories. As your credentials will need to be in clear text in the config.yaml.
-
-PAT is the preferred method of authentication when available as the credentials can be reissued or locked. The PAT will be used both for the configuration file and the repo
-
-.. code-block:: yaml
-
-    gitAuth:
-      pat: github-alphanumeric-token
-   configReload:
-     schedule: "*/5 * * * *"
-     configUrl: https://raw.githubusercontent.com/containers/fetchit/main/examples/config-reload.yaml
-
-
-Configuring FetchIt Using Environment Variables
+Remote configuration and environment variables
 -----------------------------------------------
 
-FetchIt can also be configured by providing the FetchIt config through the `FETCHIT_CONFIG` environment variable. 
-This approach will use the contents of `FETCHIT_CONFIG` to configure the FetchIt application.
-This variable takes precedence over the FetchIt config file and will overwrite its contents if both are provided. 
+Set ``FETCHIT_CONFIG_URL`` to supply a remote configuration URL. An existing local
+``/opt/mount/config.yaml`` takes priority on initial startup. Use ``configReload``
+for scheduled updates, and mount a writable configuration directory for atomic
+replacement. See :doc:`running` for validation, backups, and failure behavior.
+The current engine does not load YAML directly from ``FETCHIT_CONFIG``; use the
+configuration file or URL instead.
 
 Methods
 =======
@@ -217,9 +202,9 @@ An example of using username/password is shown below.
 
 .. code-block:: yaml
 
-    gitAuth:
-      username: bob
-      password: bobpassword
+   gitAuth:
+     username: bob
+     password: bobpassword
    targetConfigs:
    - url: https://github.com/containers/fetchit
      branch: main
@@ -236,7 +221,15 @@ This variable is defined as `--secret GH_PAT,type=env` in the `podman run` comma
 
    export GH_PAT_TOKEN=CHANGEME
    podman secret create --env GH_PAT GH_PAT_TOKEN 
-   podman run -d --name fetchit     -v fetchit-volume:/opt     -v $HOME/.fetchit:/opt/mount     -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock --secret GH_PAT,type=env --security-opt label=disable --secret GH_PAT,type=env quay.io/fetchit/fetchit:latest
+   podman run -d --name fetchit \
+     -v fetchit-volume:/opt \
+     -v "$HOME/.fetchit:/opt/mount" \
+     -v "/run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock" \
+     --secret GH_PAT,type=env --security-opt label=disable \
+     quay.io/fetchit/fetchit:latest
+
+Set ``gitAuth.envSecret: GH_PAT`` in the configuration so the engine reads this
+secret. Create it in the same rootful/rootless Podman store used to launch FetchIt.
 
 Ansible
 -------

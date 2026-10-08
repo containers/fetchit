@@ -159,8 +159,10 @@ interrupt deployment or leave some changes applied; the applied commit is not
 advanced and subsequent scheduled attempts retry. Do not share resource or
 secret names across methods. SOPS methods use body-based remote kube play and
 support self-contained YAML; automatic Containerfile builds and local auxiliary
-files are outside this feature's supported scope. Existing plaintext methods
-continue to use their existing path-based behavior.
+files are outside this feature's supported scope. Ordinary plaintext Kube methods also submit manifests through the Podman API
+from memory; host-side auxiliary files and automatic builds are not made available
+by a Git path alone. See :ref:`method-podman-networks` for network attachment and
+rootful/rootless scope.
 
 If decryption fails, check the key mount, permissions, supported age metadata,
 integrity, file sizes, and executable installation without printing secrets to

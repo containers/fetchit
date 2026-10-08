@@ -1,76 +1,108 @@
-
-
 Running
 ============
-For running the engine the podman socket must be enabled. This can be enabled for the user account that will be running fetchit or for root.
 
-User
-----
-For regular user accounts run the following to enable the socket.
+FetchIt connects to the Podman API socket on the host. Use Podman 5.7 or newer
+within major version 5 for the documented host-managed features. Rootful and
+rootless Podman stores are separate: build/pull helper images and create networks
+in the same store used by FetchIt. See :doc:`samples` for amd64/arm64 applications
+and :doc:`release_notes` for features requiring a newer engine/helper image.
+
+Rootless socket
+---------------
+
+Run as the host user that will own the containers:
 
 .. code-block:: bash
 
    systemctl --user enable --now podman.socket
+   export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
-Within */run* a process will be started for the user to interact with the podman socket. Using your UID you can idenitfy the socket.
-
-.. code-block:: bash
-   
-   export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
-
-Root
-----
-For the root user enable the socket by running the following.
+The socket is at ``$XDG_RUNTIME_DIR/podman/podman.sock``. For workloads that must
+survive logout, enable lingering for that user:
 
 .. code-block:: bash
 
-   systemctl enable --now podman.socket
+   sudo loginctl enable-linger "$(id -un)"
 
-Launching
----------
-The podman engine can be launched by running the following command or by using the systemd files from the repository. Most methods except for systemd can be ran without sudo. 
-
-Running with systemd
---------------------
-The two systemd files are differentiated by .root and .user.
-
-Ensure that the location of the `config.yaml` is correctly defined in the systemd service file before attempting to start the service.
-
-For root
+Rootful socket
+--------------
 
 .. code-block:: bash
-   
-   cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
-   systemctl enable fetchit --now
 
+   sudo systemctl enable --now podman.socket
 
-For user ensure that the path for the configuration file `/home/fetchiter/config.yaml:/opt/config.yaml` and the path for the podman socket are correct.
+The rootful socket is ``/run/podman/podman.sock``. Access to either socket allows
+administration of that Podman instance; only expose it to trusted engine images.
 
-.. code-block:: bash
-   
-   mkdir -p ~/.config/systemd/user/
-   cp systemd/fetchit-user.service ~/.config/systemd/user/
-   systemctl --user enable fetchit --now
+Launch manually
+---------------
 
-Manually
---------
+Create ``$HOME/.fetchit/config.yaml`` using :doc:`quick_start` or :doc:`methods`,
+then launch a rootless engine:
 
 .. code-block:: bash
-   
+
+   mkdir -p "$HOME/.fetchit"
    podman run -d --name fetchit \
      -v fetchit-volume:/opt \
-     -v ./config.yaml:/opt/config.yaml \
-     -v /run/user/1000/podman/podman.sock:/run/podman/podman.sock \
+     -v "$HOME/.fetchit:/opt/mount" \
+     -v "/run/user/$(id -u)/podman/podman.sock:/run/podman/podman.sock" \
      --security-opt label=disable \
      quay.io/fetchit/fetchit:latest
 
-FetchIt will clone the repository and attempt to remediate those items defined in the config.yaml file. To follow the status.
+FetchIt reads ``/opt/mount/config.yaml``. Keep the named volume to preserve Git
+baselines and removal receipts across container recreation. Mounting a single
+config file is possible for static configuration, but remote atomic reloads need
+the writable directory mount above. For rootful operation, use ``sudo podman``
+and substitute the rootful socket path.
+
+Rootless tracked Systemd methods additionally need the actual host user's
+``HOME`` and ``XDG_RUNTIME_DIR`` passed into the engine:
+
+.. code-block:: bash
+
+   -e HOME="$HOME" -e XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+These are additional ``podman run`` options. Quadlet instead takes explicit
+``hostHome``, ``hostConfigHome``, and ``hostRuntimeDir`` method fields; see
+:doc:`quadlet`. Both require a running host systemd manager. See :doc:`lifecycle`
+before enabling cleanup for existing files or services.
 
 .. code-block:: bash
 
    podman logs -f fetchit
-   
 
+See :doc:`status` for optional HTTP liveness and schedule monitoring.
+
+Launch with systemd
+-------------------
+
+From a repository checkout, install the service for the intended scope. Review
+its image, configuration mount, and socket before starting it.
+
+For root, the checked-in service uses root's ``~/.fetchit/config.yaml``:
+
+.. code-block:: bash
+
+   sudo mkdir -p /root/.fetchit
+   sudo install -m 0600 /path/to/config.yaml /root/.fetchit/config.yaml
+   sudo cp systemd/fetchit-root.service /etc/systemd/system/fetchit.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now fetchit.service
+
+For the host user, it uses ``$HOME/.fetchit/config.yaml``:
+
+.. code-block:: bash
+
+   mkdir -p "$HOME/.fetchit" "$HOME/.config/systemd/user"
+   install -m 0600 /path/to/config.yaml "$HOME/.fetchit/config.yaml"
+   cp systemd/fetchit-user.service "$HOME/.config/systemd/user/fetchit.service"
+   systemctl --user daemon-reload
+   systemctl --user enable --now fetchit.service
+
+The user service already passes host ``HOME`` and ``XDG_RUNTIME_DIR``. These
+services launch the engine; workload service configuration remains in its Git
+methods. Restarting the engine does not automatically stop retained workloads.
 
 Safe remote configuration updates
 ---------------------------------

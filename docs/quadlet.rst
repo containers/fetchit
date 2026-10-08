@@ -114,14 +114,18 @@ FetchIt stops removed services before deleting their source files. Renaming a
 file or changing ``ServiceName=`` retires the old service. It refuses to overwrite
 a service owned outside the method's bundle. Removing the complete selected
 Git directory removes its deployed files and stops its managed services.
-Removing a method from FetchIt's configuration does not perform this cleanup;
-remove its source units first while the method is still scheduled.
+By default, removing a method from FetchIt's configuration retains its services.
+Set ``cleanupOnRemoval: true`` while the method is still configured to register
+persistent cleanup intent; removing it then cleans its journal-owned bundle on
+reload/startup. See :doc:`lifecycle` for receipts, retries, and retained resources.
+Without opt-in, remove its source units first while the method is still scheduled.
 
 Generator, copy, reload, and service failures are reported and leave the applied
 Git commit unchanged. Persistent helper state tracks services from interrupted
 applications so the next run can retry safely, including when the desired commit
-changes. Application is not an atomic transaction and does not automatically
-roll back a partially applied batch. Network and volume resources may remain
+changes. Application is not an atomic transaction. Git targets may opt into best-effort
+``rollback`` when they contain only Raw, Kube, or Quadlet methods; it is disabled
+by default. See :doc:`lifecycle` for limits. Network and volume resources may remain
 on the host after their units are removed; FetchIt does not force-delete data.
 On startup, FetchIt checks the host receipt for an interrupted application, even
 when the saved Git revision already matches the desired revision. After success,
@@ -276,9 +280,11 @@ Applied-commit tags include the bundle path, branch, host paths, and activation
 settings. Changing ``start``, ``restart``, or ``helperImage`` therefore triggers
 application on configuration reload, even if the Git commit is unchanged. The
 host directory identity stays stable for activation changes, preserving ownership.
-Changing the root/user scope, host paths, branch, or bundle path requires first
-removing the old sources while their old method is still configured. FetchIt does
-not automatically migrate an existing deployment to a different manager or path.
+Changing the root/user scope, host paths, branch, or bundle path changes ownership.
+With cleanup enabled, the old identity is retired and cleaned up. Without it,
+remove the old sources while their previous method is still configured. FetchIt
+does not migrate resource contents to a different manager or path. Trailing
+slashes in ``targetPath`` do not change ownership.
 The existing :doc:`methods` configuration-reload mechanism also applies to Quadlet.
 
 Use one active configuration owner for each bundle. The host lock serializes helper

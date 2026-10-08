@@ -103,7 +103,8 @@ and manual dispatch. It uses FetchIt's actual Raw/Kube routines and the
 checked-in manifests, checks the loaded image architecture, and checks successful
 HTTP responses and the non-root HTTP sample user. It also assembles and verifies the combined platform index, tests local image-archive import and runs the Systemd
 and Quadlet sample images. Full service/receipt lifecycle coverage remains in
-the existing Systemd and Quadlet workflows.
+the host-artifact rootful/rootless/arm64 and Quadlet workflows.
+See :doc:`lifecycle` for what they verify and how cleanup is enabled.
 
 To run the native sample tests on a disposable Linux host with Podman 5:
 
