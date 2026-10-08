@@ -35,8 +35,8 @@ jobs:
           SOPS_TEST_BINARY: /usr/local/bin/sops
           AGE_TEST_BINARY: /usr/bin/age-keygen
         run: go test -mod=readonly -tags "$BUILDTAGS" ./...
-      - name: Status and repository concurrency race checks
-        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror'
+      - name: Engine concurrency race checks
+        run: go test -race -mod=readonly -tags "$BUILDTAGS" ./pkg/engine -run 'TestStatus|TestMirror|TestCommonGit|TestHelperContainer|TestRetirement|TestConfigReloadCan|TestRollback|TestDisconnected|TestFileTransfer'
 
   fedora:
     runs-on: ubuntu-26.04

@@ -43,24 +43,22 @@ type Fetchit struct {
 	runCancel context.CancelFunc
 	removals  *removalStore
 	// conn holds podman client
-	conn               context.Context
-	volume             string
-	ssh                bool
-	sshKey             string
-	username           string
-	password           string
-	pat                string
-	envSecret          string
-	restartFetchit     bool
+	conn context.Context
+
+	ssh       bool
+	sshKey    string
+	username  string
+	password  string
+	pat       string
+	envSecret string
+
 	scheduler          *gocron.Scheduler
 	methodTargetScheds map[Method]SchedInfo
-	allMethodTypes     map[string]struct{}
 }
 
 func newFetchit() *Fetchit {
 	return &Fetchit{
 		methodTargetScheds: make(map[Method]SchedInfo),
-		allMethodTypes:     make(map[string]struct{}),
 	}
 }
 
@@ -309,8 +307,6 @@ func (fc *FetchitConfig) InitConfig(initial bool) *Fetchit {
 // Takes target from user and converts it for internal use
 func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fetchit {
 	for _, tc := range targetConfigs {
-		tc.mu.Lock()
-		defer tc.mu.Unlock()
 		internalTarget := &Target{
 			rollback:        tc.Rollback,
 			trackBadCommits: tc.TrackBadCommits,
@@ -337,13 +333,11 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			tc.configReload.target = internalTarget
 			tc.configReload.initialRun = true
 			fetchit.methodTargetScheds[tc.configReload] = tc.configReload.SchedInfo()
-			fetchit.allMethodTypes[configFileMethod] = struct{}{}
 		}
 
 		if tc.prune != nil {
 			tc.prune.target = internalTarget
 			fetchit.methodTargetScheds[tc.prune] = tc.prune.SchedInfo()
-			fetchit.allMethodTypes[pruneMethod] = struct{}{}
 
 		}
 
@@ -351,12 +345,10 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			tc.image.target = internalTarget
 			tc.image.initialRun = true
 			fetchit.methodTargetScheds[tc.image] = tc.image.SchedInfo()
-			fetchit.allMethodTypes[imageMethod] = struct{}{}
 
 		}
 
 		if len(tc.Ansible) > 0 {
-			fetchit.allMethodTypes[ansibleMethod] = struct{}{}
 			for _, a := range tc.Ansible {
 				a.initialRun = true
 				a.target = internalTarget
@@ -364,7 +356,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		if len(tc.FileTransfer) > 0 {
-			fetchit.allMethodTypes[filetransferMethod] = struct{}{}
 			for _, ft := range tc.FileTransfer {
 				ft.initialRun = true
 				ft.target = internalTarget
@@ -372,7 +363,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		if len(tc.Kube) > 0 {
-			fetchit.allMethodTypes[kubeMethod] = struct{}{}
 			for _, k := range tc.Kube {
 				k.initialRun = true
 				k.target = internalTarget
@@ -380,7 +370,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		if len(tc.Raw) > 0 {
-			fetchit.allMethodTypes[rawMethod] = struct{}{}
 			for _, r := range tc.Raw {
 				r.initialRun = true
 				r.target = internalTarget
@@ -388,7 +377,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 			}
 		}
 		if len(tc.Quadlet) > 0 {
-			fetchit.allMethodTypes[quadletMethod] = struct{}{}
 			for _, q := range tc.Quadlet {
 				q.initialRun = true
 				q.target = internalTarget
@@ -397,7 +385,6 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 		}
 
 		if len(tc.Systemd) > 0 {
-			fetchit.allMethodTypes[systemdMethod] = struct{}{}
 			for _, sd := range tc.Systemd {
 				sd.initialRun = true
 				sd.target = internalTarget
@@ -571,7 +558,8 @@ func getDeviceDisconnected(target *Target) error {
 		return err
 	}
 	if !exists {
-		localDevicePull(directory, target.device, "", false)
+		_, err := localDevicePull(directory, target.device, "", false)
+		return err
 	}
 	return nil
 }

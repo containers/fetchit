@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"time"
 
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/specgen"
@@ -25,33 +24,8 @@ func (ans *Ansible) GetKind() string {
 }
 
 func (ans *Ansible) Process(ctx, conn context.Context, skew int) {
-	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target := ans.GetTarget()
-	target.mu.Lock()
-	defer target.mu.Unlock()
-
-	tag := []string{"yaml", "yml"}
-	if ans.initialRun {
-		err := getRepo(target)
-		if err != nil {
-			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
-			return
-		}
-
-		err = zeroToCurrent(ctx, conn, ans, target, &tag)
-		if err != nil {
-			logger.Errorf("Error moving to current: %v", err)
-			return
-		}
-	}
-
-	err := currentToLatest(ctx, conn, ans, target, &tag)
-	if err != nil {
-		logger.Errorf("Error moving current to latest: %v", err)
-		return
-	}
-
-	ans.initialRun = false
+	tags := []string{"yaml", "yml"}
+	ans.processGit(ctx, conn, ans, skew, &tags)
 }
 
 func (ans *Ansible) MethodEngine(ctx context.Context, conn context.Context, change *object.Change, path string) error {
@@ -59,14 +33,7 @@ func (ans *Ansible) MethodEngine(ctx context.Context, conn context.Context, chan
 }
 
 func (ans *Ansible) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ans.GetTarget(), ans.GetTargetPath(), ans.Glob, currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChanges(ctx, conn, ans, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return ans.applyGitChanges(ctx, conn, ans, currentState, desiredState, tags)
 }
 
 func (ans *Ansible) ansiblePodman(ctx, conn context.Context, path string) error {

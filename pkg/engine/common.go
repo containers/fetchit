@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -82,7 +83,9 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 				return fmt.Errorf("refreshing disconnected archive: %w", err)
 			}
 		} else if len(target.device) > 0 {
-			localDevicePull(directory, target.device, "", false)
+			if _, err := localDevicePull(directory, target.device, "", false); err != nil {
+				return fmt.Errorf("refreshing disconnected device: %w", err)
+			}
 		}
 	}
 	latest, err := getLatest(target)
@@ -152,4 +155,48 @@ func readChangeInput(change *object.Change, path string) ([]byte, error) {
 		}
 	}
 	return os.ReadFile(path)
+}
+
+// processGit serializes methods sharing a target. Later scheduled invocations
+// retry failed startup replay; initialRun clears only after both phases succeed.
+func (m *CommonMethod) processGit(ctx, conn context.Context, method Method, skew int, tags *[]string) {
+	timer := time.NewTimer(time.Duration(skew) * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	target := m.GetTarget()
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if ctx.Err() != nil {
+		return
+	}
+	if m.initialRun {
+		if err := getRepo(target); err != nil {
+			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
+			return
+		}
+		if err := zeroToCurrent(ctx, conn, method, target, tags); err != nil {
+			logger.Errorf("Error moving to current: %v", err)
+			return
+		}
+	}
+	if err := currentToLatest(ctx, conn, method, target, tags); err != nil {
+		logger.Errorf("Error moving current to latest: %v", err)
+		return
+	}
+	m.initialRun = false
+}
+
+func (m *CommonMethod) applyGitChanges(ctx, conn context.Context, method Method, current, desired plumbing.Hash, tags *[]string) error {
+	changes, err := applyChanges(ctx, m.GetTarget(), m.TargetPath, m.Glob, current, desired, tags)
+	if err != nil {
+		return err
+	}
+	return runChanges(ctx, conn, method, changes)
 }

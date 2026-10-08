@@ -5,12 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/containers/podman/v5/pkg/errorhandling"
 	"net/http"
-	"time"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/errorhandling"
 	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -85,35 +84,9 @@ type RawPod struct {
 	Networks []string          `json:"Networks" yaml:"Networks"`
 }
 
-func (r *Raw) Process(ctx context.Context, conn context.Context, skew int) {
-	time.Sleep(time.Duration(skew) * time.Millisecond)
-	target := r.GetTarget()
-	target.mu.Lock()
-	defer target.mu.Unlock()
-
-	tag := []string{".json", ".yaml", ".yml"}
-
-	if r.initialRun {
-		err := getRepo(target)
-		if err != nil {
-			logger.Errorf("Failed to clone repository %s: %v", target.url, err)
-			return
-		}
-
-		err = zeroToCurrent(ctx, conn, r, target, &tag)
-		if err != nil {
-			logger.Errorf("Error moving to current: %v", err)
-			return
-		}
-	}
-
-	err := currentToLatest(ctx, conn, r, target, &tag)
-	if err != nil {
-		logger.Errorf("Error moving current to latest: %v", err)
-		return
-	}
-
-	r.initialRun = false
+func (r *Raw) Process(ctx, conn context.Context, skew int) {
+	tags := []string{".json", ".yaml", ".yml"}
+	r.processGit(ctx, conn, r, skew, &tags)
 }
 
 func (r *Raw) rawPodman(ctx, conn context.Context, path string, prev *string) error {
@@ -173,10 +146,6 @@ func (r *Raw) applyRawInput(ctx, conn context.Context, path string, prev *string
 		logger.Infof("Deleted podman container %s", raw.Name)
 	}
 
-	if path == deleteFile {
-		return nil
-	}
-
 	err = removeExisting(conn, raw.Name)
 	if err != nil {
 		return err
@@ -215,18 +184,11 @@ func (r *Raw) MethodEngine(ctx context.Context, conn context.Context, change *ob
 }
 
 func (r *Raw) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, r.GetTarget(), r.GetTargetPath(), r.Glob, currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChanges(ctx, conn, r, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return r.applyGitChanges(ctx, conn, r, currentState, desiredState, tags)
 }
 
 func convertMounts(mounts []mount) []specs.Mount {
-	result := []specs.Mount{}
+	result := make([]specs.Mount, 0, len(mounts))
 	for _, m := range mounts {
 		toAppend := specs.Mount{
 			Destination: m.Destination,
@@ -240,7 +202,7 @@ func convertMounts(mounts []mount) []specs.Mount {
 }
 
 func convertPorts(ports []port) []types.PortMapping {
-	result := []types.PortMapping{}
+	result := make([]types.PortMapping, 0, len(ports))
 	for _, p := range ports {
 		toAppend := types.PortMapping{
 			HostIP:        p.HostIP,
@@ -255,7 +217,7 @@ func convertPorts(ports []port) []types.PortMapping {
 }
 
 func convertVolumes(namedVolumes []namedVolume) []*specgen.NamedVolume {
-	result := []*specgen.NamedVolume{}
+	result := make([]*specgen.NamedVolume, 0, len(namedVolumes))
 	for _, n := range namedVolumes {
 		toAppend := specgen.NamedVolume{
 			Name:    n.Name,
@@ -328,7 +290,7 @@ func rawPodFromBytes(b []byte) (*RawPod, error) {
 
 // Using this might not be necessary
 func removeExisting(conn context.Context, podName string) error {
-	inspectData, err := containers.Inspect(conn, podName, new(containers.InspectOptions).WithSize(true))
+	inspectData, err := containers.Inspect(conn, podName, nil)
 	if err != nil {
 		// Container doesn't exist or inspect failed
 		var apiError *errorhandling.ErrorModel

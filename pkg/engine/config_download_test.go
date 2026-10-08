@@ -172,3 +172,42 @@ func TestConfigReplacementPreservesBackupOnRenameFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestDisconnectedConfigValidationAndBackup(t *testing.T) {
+	configDownloadPaths(t)
+	original := "targetConfigs: []\n"
+	source := filepath.Join(t.TempDir(), "device.yaml")
+	if err := os.WriteFile(defaultConfigPath, []byte(original), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []string{"500: error", "targetConfigs: [", strings.Repeat("x", (1<<20)+1)} {
+		if err := os.WriteFile(source, []byte(invalid), 0600); err != nil {
+			t.Fatal(err)
+		}
+		updated, err := updateDisconnectedConfig(source, true, false)
+		if err == nil || updated {
+			t.Fatal("invalid device config accepted")
+		}
+		data, err := os.ReadFile(defaultConfigPath)
+		if err != nil || string(data) != original {
+			t.Fatal("invalid device config replaced active config")
+		}
+	}
+	desired := "images: []\n"
+	if err := os.WriteFile(source, []byte(desired), 0600); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := updateDisconnectedConfig(source, true, false)
+	if err != nil || !updated {
+		t.Fatalf("device config update failed: %v", err)
+	}
+	for path, want := range map[string]string{defaultConfigPath: desired, defaultConfigBackup: original} {
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != want {
+			t.Fatalf("wrong configuration at %s: %q %v", path, data, err)
+		}
+	}
+	if updated, err := updateDisconnectedConfig(source, true, false); updated || err != nil {
+		t.Fatalf("unchanged device config updated: %v", err)
+	}
+}

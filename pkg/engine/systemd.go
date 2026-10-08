@@ -170,14 +170,7 @@ func (sd *Systemd) MethodEngine(ctx context.Context, conn context.Context, chang
 }
 
 func (sd *Systemd) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, sd.GetTarget(), sd.GetTargetPath(), sd.Glob, currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChanges(ctx, conn, sd, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return sd.applyGitChanges(ctx, conn, sd, currentState, desiredState, tags)
 }
 
 func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path, dest string, prev *string, curr *string, changeType *string) error {
@@ -238,12 +231,6 @@ func (sd *Systemd) enableRestartSystemdService(conn context.Context, action, des
 		return err
 	}
 
-	// TODO: remove
-	if sd.Root {
-		os.Setenv("ROOT", "true")
-	} else {
-		os.Setenv("ROOT", "false")
-	}
 	s := specgen.NewSpecGenerator(systemdImage, false)
 	runMounttmp := "/run"
 	runMountsd := "/run/systemd"

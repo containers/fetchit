@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,11 +145,7 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	}
 	// Extract signature from commit
 	pgpsig := commit.PGPSignature + "\n"
-	r := strings.NewReader(pgpsig)
-	sig := make([]byte, len(pgpsig))
-	if _, err := r.Read(sig); err != nil {
-		return utils.WrapErr(err, "Error reading signature from commit %s", hash)
-	}
+	sig := []byte(pgpsig)
 	// Extract everything else from commit
 	d := &plumbing.MemoryObject{}
 	if err := commit.EncodeWithoutSignature(d); err != nil {
@@ -158,8 +155,9 @@ func VerifyGitsign(ctx context.Context, commit *object.Commit, hash, repo, url s
 	if err != nil {
 		return utils.WrapErr(err, "Error configuring data reader from commit %s", hash)
 	}
-	data := make([]byte, d.Size())
-	if _, err = er.Read(data); err != nil {
+	defer er.Close()
+	data, err := io.ReadAll(er)
+	if err != nil {
 		return utils.WrapErr(err, "Error reading data from commit %s", hash)
 	}
 

@@ -59,8 +59,8 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, skew int) {
 func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
 	var prev *string = nil
 	if change != nil {
-		if change.To.Name != "" {
-			prev = &change.To.Name
+		if change.From.Name != "" {
+			prev = &change.From.Name
 		}
 	}
 	dest := ft.DestinationDirectory
@@ -68,14 +68,7 @@ func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.C
 }
 
 func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
-	changeMap, err := applyChanges(ctx, ft.GetTarget(), ft.GetTargetPath(), ft.Glob, currentState, desiredState, tags)
-	if err != nil {
-		return err
-	}
-	if err := runChanges(ctx, conn, ft, changeMap); err != nil {
-		return err
-	}
-	return nil
+	return ft.applyGitChanges(ctx, conn, ft, currentState, desiredState, tags)
 }
 
 func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest string, prev *string) error {
@@ -102,9 +95,8 @@ func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest
 	file := filepath.Base(path)
 
 	source := filepath.Join("/opt", path)
-	copyFile := (source + " " + dest)
 
-	s := generateSpec(filetransferMethod, file, copyFile, dest, ft.Name)
+	s := generateSpec(filetransferMethod, file, source, dest, ft.Name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
 		return err
