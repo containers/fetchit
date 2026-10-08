@@ -52,7 +52,7 @@ jobs:
         if: matrix.environment == 'fedora-rootful'
         run: |
           sudo podman build -t localhost/fetchit-sops-fedora -f tests/integration/sops/Dockerfile .
-          sudo podman run --rm --privileged --env SOPS_TEST_IMAGE --env SOPS_TEST_INFRA_IMAGE \
+          sudo podman run --rm --privileged --env "SOPS_TEST_IMAGE=$SOPS_TEST_IMAGE" --env "SOPS_TEST_INFRA_IMAGE=$SOPS_TEST_INFRA_IMAGE" \
             -v "$PWD/_output:/work:ro" \
             localhost/fetchit-sops-fedora bash -euo pipefail -c '
               install -m 0755 /work/sops /usr/local/bin/sops
