@@ -123,6 +123,7 @@ func TestSOPSPodmanLifecycle(t *testing.T) {
 	})
 	first := commit("application.enc.yaml", encrypt("fetchit-secret-sentinel-first"))
 	apply(first)
+	assertKubeRuntimeLabels(t, k)
 	readSecret("fetchit-secret-sentinel-first")
 	secondCipher := encrypt("fetchit-secret-sentinel-second")
 	second := commit("application.enc.yaml", secondCipher)

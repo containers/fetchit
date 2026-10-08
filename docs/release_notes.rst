@@ -4,6 +4,15 @@ Release notes
 Unreleased
 ----------
 
+Kube workload labels
+~~~~~~~~~~~~~~~~~~~~
+
+FetchIt adds managed-by and stable owner labels to Pods and controller Pod
+templates in ordinary and SOPS kube methods. Podman propagates them to workload
+containers. See :doc:`methods` for filtering commands, reserved keys, identity
+behavior, and migration limits. Existing name-based teardown is unchanged; labels
+are not an ownership enforcement boundary.
+
 SOPS-encrypted Kube manifests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

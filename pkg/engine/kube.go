@@ -102,6 +102,18 @@ func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) 
 		logger.Infof("Creating podman container from %s using kube method", path)
 	}
 
+	var kubeYaml []byte
+	if path != deleteFile {
+		input, err := ioutil.ReadFile(path)
+		if err != nil {
+			return utils.WrapErr(err, "Error reading file")
+		}
+		kubeYaml, err = labelKubeManifest(input, k.kubeLabels())
+		if err != nil {
+			return err
+		}
+	}
+
 	if prev != nil {
 		err := stopPods(conn, []byte(*prev))
 		if err != nil {
@@ -110,13 +122,8 @@ func (k *Kube) kubePodman(ctx, conn context.Context, path string, prev *string) 
 	}
 
 	if path != deleteFile {
-		kubeYaml, err := ioutil.ReadFile(path)
-		if err != nil {
-			return utils.WrapErr(err, "Error reading file")
-		}
-
 		// Try stopping the pods, don't care if they don't exist
-		err = stopPods(conn, kubeYaml)
+		err := stopPods(conn, kubeYaml)
 		if err != nil {
 			if !strings.Contains(err.Error(), "no such pod") {
 				return utils.WrapErr(err, "Error stopping pods")
@@ -164,7 +171,7 @@ func createPods(ctx context.Context, path string, specs []byte, networks []strin
 		}
 	}
 
-	_, err = play.Kube(ctx, path, kubeNetworkOptions(networks))
+	_, err = play.KubeWithBody(ctx, bytes.NewReader(specs), kubeNetworkOptions(networks))
 	if err != nil {
 		return utils.WrapErr(err, "Error playing kube spec")
 	}

@@ -88,8 +88,17 @@ func (k *Kube) prepareSOPSChanges(ctx context.Context, changeMap map[*object.Cha
 			clear(plain)
 			return nil, err
 		}
-		total += len(plain)
-		return plain, nil
+		labeled, err := labelKubeManifest(plain, k.kubeLabels())
+		clear(plain)
+		if err != nil {
+			return nil, err
+		}
+		if len(labeled) > sopsFileLimit || total+len(labeled) > sopsBatchLimit {
+			clear(labeled)
+			return nil, ErrSOPSSize
+		}
+		total += len(labeled)
+		return labeled, nil
 	}
 	for _, change := range keys {
 		item := preparedKubeChange{path: changeMap[change]}
