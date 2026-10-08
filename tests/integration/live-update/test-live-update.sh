@@ -43,7 +43,7 @@ git -C "$scratch/seed" commit -m 'Initial workload definitions'
 git -C "$scratch/seed" push origin main
 python3 "$fixture_dir/git-server.py" "$scratch/server" "$scratch/port" > "$scratch/server.log" 2>&1 &
 server_pid=$!
-for attempt in {1..50}; do
+for ((attempt = 0; attempt < 50; attempt++)); do
   if [[ -s "$scratch/port" ]]; then break; fi
   kill -0 "$server_pid"
   sleep 0.1
