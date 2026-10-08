@@ -42,3 +42,11 @@ CI reliability
 The existing secret-config integration now polls running workload names while a
 configuration reload recreates containers, rather than failing on a transient
 single snapshot during reconciliation.
+
+Optional health and status HTTP endpoint
+----------------------------------------
+
+Set ``FETCHIT_STATUS_ADDR`` to enable ``/healthz`` and ``/status``. The status
+response includes current method schedules and invocation statistics, including
+Quadlet methods. Snapshots are safe during concurrent reconciliations and config
+reloads. See :doc:`status` for deployment and monitoring details.

@@ -50,3 +50,27 @@ Several automated findings do not describe the actual behavior:
 Workflow duplication and further extraction of small orchestration functions were
 considered readability suggestions, not merge blockers. Explicit mode-specific
 commands keep privilege boundaries visible in CI.
+
+
+## Status endpoint carried forward from PR #382
+
+The two Go changes from #382 add useful opt-in monitoring and are included here,
+with the following resolutions to its Sourcery review:
+
+- Copy method values under the registry mutex before sorting/encoding; run time
+  pointers refer to immutable timestamps. Concurrent snapshot tests cover this
+  with the race detector.
+- Omit an uninitialized start time and report zero uptime with `initializing`.
+  Registering even an empty configuration establishes the process start time.
+- Log JSON and health response write errors. Do not attempt a second HTTP error
+  response after a write has begun; it cannot reliably change the status code.
+- Configure explicit header/read/write/idle timeouts and document interface
+  binding, authentication limits, and loopback container publishing.
+- Keep the scheduler callback's two `context.Context` parameters. Sourcery's
+  proposed `*grpc.ClientConn` does not match this repository: `Fetchit.conn` and
+  `Method.Process` both use Podman binding contexts, not gRPC client connections.
+- Start one listener per process and replace the registry on config reload so
+  removed methods disappear while retained identities preserve counters.
+
+Only the requested Go functionality and its tests/docs are carried forward;
+#382's separate dependency automation workflows are outside this change.
