@@ -4,6 +4,11 @@ Release notes
 Unreleased
 ----------
 
+* Graceful engine shutdown (issue #287): SIGTERM and SIGINT stop scheduling
+  work and cancel running operations, with a five-second grace period before
+  exit. The entry script forwards signals by replacing itself with FetchIt.
+  Deployed workloads remain running. See :doc:`running`.
+
 * Per-declaration named-volume creation: raw mounts support ``create: true``;
   kube workloads can generate missing PVC declarations with the
   ``fetchit.containers.io/create-volumes`` annotation. Existing volumes and data

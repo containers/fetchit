@@ -27,7 +27,9 @@ type FetchitConfig struct {
 	PodmanAutoUpdate *PodmanAutoUpdate `mapstructure:"podmanAutoUpdate"`
 	Images           []*Image          `mapstructure:"images"`
 	conn             context.Context
-	scheduler        *gocron.Scheduler
+	// lifetime survives configuration reloads and is canceled on engine shutdown.
+	lifetime  context.Context
+	scheduler *gocron.Scheduler
 }
 
 type TargetConfig struct {

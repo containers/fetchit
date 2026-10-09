@@ -20,7 +20,7 @@ main() {
 	fi
 
 	echo 'starting fetchit'
- 	/usr/local/bin/fetchit start
+	exec /usr/local/bin/fetchit start
 }
 
 main
