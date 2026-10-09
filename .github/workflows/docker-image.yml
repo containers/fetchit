@@ -212,6 +212,9 @@ jobs:
       - name: tag the image
         run: sudo podman tag quay.io/fetchit/fetchit-amd:latest quay.io/fetchit/fetchit:latest
 
+      - name: Verify graceful engine shutdown
+        run: sudo bash scripts/test-shutdown.sh quay.io/fetchit/fetchit-amd:latest
+
       - name: create fetchit config directory
         run: sudo mkdir /root/.fetchit
 

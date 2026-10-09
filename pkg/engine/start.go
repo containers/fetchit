@@ -1,11 +1,14 @@
 package engine
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/natefinch/lumberjack"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
 )
 
 // This file will be created within the fetchit pod
@@ -15,9 +18,10 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start fetchit engine",
 	Long:  `Start fetchit engine`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fetchit = fetchitConfig.InitConfig(true)
-		fetchit.RunTargets()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, os.Interrupt)
+		defer stop()
+		return fetchitConfig.run(ctx)
 	},
 }
 

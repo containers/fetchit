@@ -41,6 +41,7 @@ type Fetchit struct {
 	runMu     sync.RWMutex
 	retired   bool
 	runCancel context.CancelFunc
+	lifetime  context.Context
 	removals  *removalStore
 	// conn holds podman client
 	conn context.Context
@@ -91,11 +92,20 @@ func Execute() {
 func (fc *FetchitConfig) Restart() {
 	configRestartMu.Lock()
 	defer configRestartMu.Unlock()
+	if fc.runtimeContext().Err() != nil {
+		return
+	}
 	old := fetchit
 	old.retire()
 	old.scheduler.Clear()
+	if fc.runtimeContext().Err() != nil {
+		return
+	}
 	next := fc.InitConfig(false)
-	cobra.CheckErr(next.startTargets())
+	err := next.startTargets()
+	if fc.runtimeContext().Err() == nil {
+		cobra.CheckErr(err)
+	}
 }
 
 // Config reload runs outside this gate so it can wait for deployment jobs to
@@ -110,7 +120,7 @@ func (f *Fetchit) retire() {
 }
 func (f *Fetchit) runMethod(m Method, ctx, conn context.Context, skew int) {
 	f.runMu.RLock()
-	if f.retired {
+	if f.retired || ctx.Err() != nil {
 		f.runMu.RUnlock()
 		return
 	}
@@ -123,7 +133,7 @@ func (f *Fetchit) runMethod(m Method, ctx, conn context.Context, skew int) {
 		f.runMu.RLock()
 		retired := f.retired
 		f.runMu.RUnlock()
-		if retired {
+		if retired || ctx.Err() != nil {
 			return
 		}
 		status.recordRun(m)
@@ -157,20 +167,28 @@ func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
 
 func (fc *FetchitConfig) populateFetchit(config *FetchitConfig) *Fetchit {
 	fetchit = newFetchit()
-	ctx := context.Background()
+	ctx := fc.runtimeContext()
 	if fc.conn == nil {
 		// TODO: socket directory same for all platforms?
 		// sock_dir := os.Getenv("XDG_RUNTIME_DIR")
 		// socket := "unix:" + sock_dir + "/podman/podman.sock"
 		conn, err := bindings.NewConnection(ctx, "unix://run/podman/podman.sock")
+		if ctx.Err() != nil {
+			fetchit.lifetime = ctx
+			return fetchit
+		}
 		if err != nil || conn == nil {
 			cobra.CheckErr(fmt.Errorf("error establishing connection to podman.sock: %v", err))
 		}
 		fc.conn = conn
 	}
 	fetchit.conn = fc.conn
+	fetchit.lifetime = ctx
 
 	if err := detectOrFetchImage(fc.conn, fetchitImage, false); err != nil {
+		if ctx.Err() != nil {
+			return fetchit
+		}
 		cobra.CheckErr(err)
 	}
 
@@ -400,12 +418,14 @@ func getMethodTargetScheds(targetConfigs []*TargetConfig, fetchit *Fetchit) *Fet
 	return fetchit
 }
 
-func (f *Fetchit) RunTargets() {
-	cobra.CheckErr(f.startTargets())
-	select {}
-}
-
 func (f *Fetchit) startTargets() error {
+	parent := f.lifetime
+	if parent == nil {
+		parent = context.Background()
+	}
+	if err := parent.Err(); err != nil {
+		return err
+	}
 	store, err := loadRemovalStore(defaultRemovalsPath)
 	if err != nil {
 		return err
@@ -417,17 +437,23 @@ func (f *Fetchit) startTargets() error {
 	if err := store.reconcile(f.conn); err != nil {
 		logger.Errorf("Method removal cleanup: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(parent)
 	f.runCancel = cancel
 	status.replace(f.methodTargetScheds)
 	startStatusServer()
 	for method := range f.methodTargetScheds {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		// ConfigReload, PodmanAutoUpdateAll, Image, Prune methods do not include git URL
 		if method.GetTarget().url != "" {
 			if err := getRepo(method.GetTarget()); err != nil {
 				logger.Debugf("Target: %s, clone error: %v, will retry next scheduled run", method.GetTarget(), err)
 			}
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	s := f.scheduler
@@ -447,7 +473,7 @@ func (f *Fetchit) startTargets() error {
 	if _, err := s.Every(1).Minute().Tag("removal-cleanup").Do(func() {
 		f.runMu.RLock()
 		defer f.runMu.RUnlock()
-		if f.retired {
+		if f.retired || ctx.Err() != nil {
 			return
 		}
 		if err := store.reconcile(f.conn); err != nil {

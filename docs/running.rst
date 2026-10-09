@@ -7,6 +7,18 @@ rootless Podman stores are separate: build/pull helper images and create network
 in the same store used by FetchIt. See :doc:`samples` for amd64/arm64 applications
 and :doc:`release_notes` for features requiring a newer engine/helper image.
 
+Stopping the engine
+-------------------
+
+On current main, ``podman stop fetchit`` sends SIGTERM directly to the engine.
+SIGINT is also supported. FetchIt stops scheduling work, cancels running
+operations, and waits up to five seconds for jobs to finish before exiting.
+Operations that do not honor cancellation may still be in flight when that
+grace period expires; check the logs and workload state before restarting.
+Stopping FetchIt leaves its deployed workloads running and preserves engine
+state for the next start. Published releases require this shutdown fix to be
+included in their engine image.
+
 Rootless socket
 ---------------
 
