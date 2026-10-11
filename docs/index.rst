@@ -26,6 +26,7 @@ images containing those changes; an older published image may lack new options.
    mirrors
    quadlet
    status
+   metrics
    release_notes
    running
    documentation

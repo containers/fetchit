@@ -17,6 +17,9 @@ class GitHandler(BaseHTTPRequestHandler):
         self.serve_git()
 
     def serve_git(self):
+        if Path(self.server.repository_root, "offline").exists():
+            self.send_error(503, "Git fixture offline")
+            return
         request = urlsplit(self.path)
         if self.command == "GET" and request.path == "/config.yaml":
             result = subprocess.run(

@@ -100,10 +100,12 @@ func (q *Quadlet) reconcile(ctx, conn context.Context) error {
 	if err != nil {
 		return err
 	}
+	observeGit(ctx, "unknown", true)
 	current, err := getCurrent(target, q.GetKind(), q.GetName())
 	if err != nil {
 		return err
 	}
+	observeGit(ctx, "out_of_sync", false)
 	q.forceReconcile = q.initialRun || q.dirty
 	err = applyWithRecovery(ctx, conn, q, current, latest, nil)
 	q.forceReconcile = false
@@ -111,8 +113,14 @@ func (q *Quadlet) reconcile(ctx, conn context.Context) error {
 		return err
 	}
 	if latest != current {
-		return updateCurrent(ctx, target, latest, q.GetKind(), q.GetName())
+		if err := updateCurrent(ctx, target, latest, q.GetKind(), q.GetName()); err != nil {
+			return err
+		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	observeGit(ctx, "synced", false)
 	return nil
 }
 

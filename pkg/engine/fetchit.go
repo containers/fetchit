@@ -137,12 +137,12 @@ func (f *Fetchit) runMethod(m Method, ctx, conn context.Context, skew int) {
 			return
 		}
 		status.recordRun(m)
-		m.Process(ctx, conn, skew)
+		m.Process(metrics.begin(ctx, m), conn, skew)
 		return
 	}
 	defer f.runMu.RUnlock()
 	status.recordRun(m)
-	m.Process(ctx, conn, skew)
+	m.Process(metrics.begin(ctx, m), conn, skew)
 }
 
 func readConfig(v *viper.Viper) (*FetchitConfig, bool, error) {
@@ -426,6 +426,10 @@ func (f *Fetchit) startTargets() error {
 	if err := parent.Err(); err != nil {
 		return err
 	}
+	hostname, err := configuredHostname()
+	if err != nil {
+		return err
+	}
 	store, err := loadRemovalStore(defaultRemovalsPath)
 	if err != nil {
 		return err
@@ -439,7 +443,12 @@ func (f *Fetchit) startTargets() error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	f.runCancel = cancel
+	metrics.replace(f.methodTargetScheds, hostname)
 	status.replace(f.methodTargetScheds)
+	status.setHostname(hostname)
+	if err := startMetricsServer(); err != nil {
+		return err
+	}
 	startStatusServer()
 	for method := range f.methodTargetScheds {
 		if err := ctx.Err(); err != nil {
