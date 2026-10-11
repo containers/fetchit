@@ -1489,6 +1489,9 @@ jobs:
       - name: Reconcile a commit from an isolated Git repository
         run: sudo bash tests/integration/live-update/test-live-update.sh
 
+      - name: Validate metrics through Git failure and recovery
+        run: sudo bash tests/integration/metrics/test-metrics.sh
+
   loader-validate:
     runs-on: ubuntu-26.04
     needs: [ build, pull-and-archive ]

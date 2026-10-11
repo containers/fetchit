@@ -26,9 +26,10 @@ type methodStatus struct {
 }
 
 type statusRegistry struct {
-	mu      sync.Mutex
-	started time.Time
-	methods map[string]*methodStatus
+	mu       sync.Mutex
+	started  time.Time
+	hostname string
+	methods  map[string]*methodStatus
 }
 
 var status = &statusRegistry{methods: make(map[string]*methodStatus)}
@@ -72,6 +73,17 @@ func (r *statusRegistry) recordRun(m Method) {
 	s.LastRun = &now
 }
 
+func (r *statusRegistry) setHostname(hostname string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hostname = hostname
+}
+func (r *statusRegistry) hostName() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hostname
+}
+
 func (r *statusRegistry) writeJSON(w http.ResponseWriter) {
 	r.mu.Lock()
 	// Copy by value under the lock so concurrent recordRun/register calls
@@ -81,6 +93,7 @@ func (r *statusRegistry) writeJSON(w http.ResponseWriter) {
 		ms = append(ms, *s)
 	}
 	started := r.started
+	hostname := r.hostname
 	r.mu.Unlock()
 
 	sort.Slice(ms, func(i, j int) bool {
@@ -109,17 +122,20 @@ func (r *statusRegistry) writeJSON(w http.ResponseWriter) {
 	}
 	resp := struct {
 		Status        string         `json:"status"`
+		Hostname      string         `json:"hostname"`
 		StartedAt     *time.Time     `json:"startedAt,omitempty"`
 		UptimeSeconds int64          `json:"uptimeSeconds"`
 		Methods       []methodStatus `json:"methods"`
 	}{
 		Status:        state,
+		Hostname:      hostname,
 		StartedAt:     startedAt,
 		UptimeSeconds: uptime,
 		Methods:       ms,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Fetchit-Hostname", hostname)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(resp); err != nil {
@@ -154,6 +170,7 @@ func newStatusServer(addr string, registry *statusRegistry) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Fetchit-Hostname", registry.hostName())
 		if _, err := w.Write([]byte("ok\n")); err != nil {
 			logger.Debugf("status: failed to write health response: %v", err)
 		}
