@@ -40,6 +40,9 @@ directories or change its destination layout.
 Dynamic Configuration Reload
 ----------------------------
 
+For a complete Git-hosted root that configures several methods and updates
+itself, see :doc:`root_configuration`.
+
 There are a few ways currently to trigger FetchIt to reload its targets without requiring a restart. The first is to
 pass the environment variable `$FETCHIT_CONFIG_URL` to the `podman run` command running the FetchIt image.
 The second is to include a ConfigReload. If neither of these exist, a restart of the FetchIt
