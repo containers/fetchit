@@ -1,6 +1,11 @@
 Health and status endpoint
 ==========================
 
+For Prometheus configuration synchronization metrics, see :doc:`metrics`.
+The separate metrics listener exposes no repository metadata. ``/healthz`` and
+``/status`` describe liveness and invocation activity, not successful
+configuration application, Git synchronization, or workload health.
+
 FetchIt can expose an optional HTTP endpoint for process liveness and scheduled
 method activity, including Quadlet methods. Set ``FETCHIT_STATUS_ADDR`` to enable
 it; leaving the variable unset opens no listener. For a host installation, use
@@ -18,12 +23,25 @@ and exposes method names and repository URLs; use trusted access or an
 authenticated reverse proxy for remote monitoring. Repository URLs should not
 contain credentials.
 
+The loopback publication above restricts the published host port; it does not
+authenticate local clients or prevent access from peers that can reach the
+container's network. Keep the engine off networks shared with untrusted
+containers. With host networking, bind the listener itself to
+``127.0.0.1:8080``. Host-local processes that can connect to the listener can
+read its output. Do not expose ``/status`` remotely merely to collect metrics:
+the current response includes configured names and URLs without redaction.
+
 .. code-block:: shell
 
    curl --fail http://127.0.0.1:8080/healthz
    curl --fail http://127.0.0.1:8080/status
 
 ``GET /healthz`` returns ``200 OK`` with ``ok`` while the HTTP server can respond.
+Responses include an ``X-Fetchit-Hostname`` header; ``/status`` also reports
+``hostname`` in JSON. Set ``FETCHIT_HOSTNAME`` explicitly to the underlying
+hostname when running in a container; otherwise it defaults to the operating
+system hostname. See :doc:`metrics` for validation rules.
+
 It is a liveness check: it does not assert Podman connectivity, successful
 reconciliation, or workload readiness.
 
@@ -33,6 +51,7 @@ reconciliation, or workload readiness.
 
    {
      "status": "running",
+     "hostname": "edge-01.example.invalid",
      "startedAt": "2026-10-08T12:00:00Z",
      "uptimeSeconds": 312,
      "methods": [

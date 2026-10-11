@@ -17,6 +17,9 @@ class GitHandler(BaseHTTPRequestHandler):
         self.serve_git()
 
     def serve_git(self):
+        if Path(self.server.repository_root, "offline").exists():
+            self.send_error(503, "Git fixture offline")
+            return
         request = urlsplit(self.path)
         if request.path not in ("/live.git/info/refs", "/live.git/git-upload-pack"):
             self.send_error(404)

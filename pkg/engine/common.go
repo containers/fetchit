@@ -103,11 +103,13 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		return fmt.Errorf("Failed to get latest commit: %v", err)
 	}
 
+	observeGit(ctx, "unknown", true)
 	current, err := getCurrent(target, m.GetKind(), m.GetName())
 	if err != nil {
 		return fmt.Errorf("Failed to get current commit: %v", err)
 	}
 
+	observeGit(ctx, "out_of_sync", false)
 	if latest != current {
 		if err := applyWithRecovery(ctx, conn, m, current, latest, tag); err != nil {
 			return fmt.Errorf("Failed to apply changes: %w", err)
@@ -120,6 +122,10 @@ func currentToLatest(ctx, conn context.Context, m Method, target *Target, tag *[
 		logger.Infof("No changes applied to git target %s this run, %s currently at %s", directory, m.GetKind(), current.String()[:hashReportLen])
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	observeGit(ctx, "synced", false)
 	return nil
 }
 
