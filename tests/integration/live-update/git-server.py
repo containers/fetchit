@@ -21,6 +21,21 @@ class GitHandler(BaseHTTPRequestHandler):
             self.send_error(503, "Git fixture offline")
             return
         request = urlsplit(self.path)
+        if self.command == "GET" and request.path == "/config.yaml":
+            result = subprocess.run(
+                ["git", "--git-dir", str(Path(self.server.repository_root, "live.git")),
+                 "show", "refs/heads/main:config.yaml"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10,
+            )
+            if result.returncode != 0:
+                self.send_error(404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/yaml")
+            self.send_header("Content-Length", str(len(result.stdout)))
+            self.end_headers()
+            self.wfile.write(result.stdout)
+            return
         if request.path not in ("/live.git/info/refs", "/live.git/git-upload-pack"):
             self.send_error(404)
             return

@@ -19,6 +19,7 @@ images containing those changes; an older published image may lack new options.
    samples
    purpose
    methods
+   root_configuration
    lifecycle
    volumes
    sops

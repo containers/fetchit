@@ -1486,6 +1486,9 @@ jobs:
           sudo podman load -i /tmp/fetchit.tar
           sudo podman load -i /tmp/colors.tar
 
+      - name: Verify Git-hosted root bootstrap and self-reconfiguration
+        run: sudo bash tests/integration/root-config/test-root-config.sh
+
       - name: Reconcile a commit from an isolated Git repository
         run: sudo bash tests/integration/live-update/test-live-update.sh
 
