@@ -4,11 +4,16 @@ export SHELL := $(shell which bash)
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Include openshift build-machinery-go libraries
+# The source SBOM does not need the vendored build machinery.
+ifneq ($(MAKECMDGOALS),sbom)
 include ./vendor/github.com/openshift/build-machinery-go/make/golang.mk
+endif
 
 SRC_ROOT :=$(shell pwd)
 
 OUTPUT_DIR :=_output
+SYFT ?= syft
+SBOM_FILE ?= $(OUTPUT_DIR)/sbom/fetchit.spdx.json
 CROSS_BUILD_BINDIR :=$(OUTPUT_DIR)/bin
 CTR_CMD :=$(or $(shell which podman 2>/dev/null), $(shell which docker 2>/dev/null))
 ARCH := $(shell uname -m |sed -e "s/x86_64/amd64/" |sed -e "s/aarch64/arm64/")
@@ -164,6 +169,12 @@ build-systemd-cross-build:
 ###############################
 # dev targets                 #
 ###############################
+
+# Inventory source dependencies without scanning generated output or vendored manifests.
+sbom:
+	@mkdir -p "$(dir $(SBOM_FILE))"
+	$(SYFT) scan dir:. --source-name fetchit --exclude './.git/**' --exclude './vendor/**' --exclude './$(OUTPUT_DIR)/**' --output "spdx-json=$(SBOM_FILE)"
+.PHONY: sbom
 
 clean-cross-build:
 	$(RM) -r '$(CROSS_BUILD_BINDIR)'

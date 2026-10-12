@@ -159,6 +159,20 @@ See [image compatibility and build guidance](docs/documentation.rst) and
 
 ## Develop and validate
 
+Generate a source dependency Software Bill of Materials (SBOM) with
+[Syft](https://github.com/anchore/syft) v1.54.1 installed:
+
+```sh
+make sbom
+```
+
+The SPDX JSON is written to `_output/sbom/fetchit.spdx.json`. Override `SYFT`
+to use a different executable or `SBOM_FILE` to choose another output path.
+The SBOM workflow runs on pull requests, pushes to `main`, and manual dispatch,
+and publishes the file as the `fetchit-sbom` workflow artifact. It scans the
+source tree, excluding vendored manifests and generated output; it does not
+inventory operating system packages in the built container images.
+
 On Linux, install the GPGME, device-mapper, and libseccomp development packages
 before running unit tests:
 
