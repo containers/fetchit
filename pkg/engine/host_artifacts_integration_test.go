@@ -52,11 +52,22 @@ func TestHostArtifactsPodmanLifecycle(t *testing.T) {
 		wantedBy = "multi-user.target"
 	}
 	unitText := "[Unit]\nDescription=FetchIt artifact lifecycle fixture\n[Service]\nExecStart=/usr/bin/sleep infinity\n[Install]\nWantedBy=" + wantedBy + "\n"
-	files := map[string]string{"owned file.txt": "original", unit: unitText, "legacy.txt": "legacy"}
+	fileSource := filepath.Join(source, "artifact-fixture", "files", "nested")
+	serviceSource := filepath.Join(source, "artifact-fixture", "services")
+	if err := os.MkdirAll(fileSource, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(serviceSource, 0755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{"owned file.txt": "original", "legacy.txt": "legacy"}
 	for file, contents := range files {
-		if err := os.WriteFile(filepath.Join(source, file), []byte(contents), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(fileSource, file), []byte(contents), 0644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.WriteFile(filepath.Join(serviceSource, unit), []byte(unitText), 0644); err != nil {
+		t.Fatal(err)
 	}
 	uploader := command("create", "--network=none", "--entrypoint", "/bin/sleep", "-v", fetchitVolume+":/opt", fetchitImage, "infinity")
 	t.Cleanup(func() { exec.Command("podman", "rm", "-f", uploader).Run() })
@@ -76,10 +87,12 @@ func TestHostArtifactsPodmanLifecycle(t *testing.T) {
 	if err := store.configure(methods); err != nil {
 		t.Fatal(err)
 	}
-	if err := ft.MethodEngine(context.Background(), conn, nil, "owned file.txt"); err != nil {
+	ownedPathInRepo := filepath.Join("artifact-fixture", "files", "nested", "owned file.txt")
+	if err := ft.MethodEngine(context.Background(), conn, nil, ownedPathInRepo); err != nil {
 		t.Fatal(err)
 	}
-	if err := legacy.MethodEngine(context.Background(), conn, nil, "legacy.txt"); err != nil {
+	legacyPathInRepo := filepath.Join("artifact-fixture", "files", "nested", "legacy.txt")
+	if err := legacy.MethodEngine(context.Background(), conn, nil, legacyPathInRepo); err != nil {
 		t.Fatal(err)
 	}
 	unrelated := filepath.Join(dest, "unrelated.txt")
@@ -104,7 +117,8 @@ func TestHostArtifactsPodmanLifecycle(t *testing.T) {
 			systemctl("daemon-reload")
 		}
 	})
-	if err := sd.MethodEngine(context.Background(), conn, nil, unit); err != nil {
+	unitPathInRepo := filepath.Join("artifact-fixture", "services", unit)
+	if err := sd.MethodEngine(context.Background(), conn, nil, unitPathInRepo); err != nil {
 		t.Fatal(err)
 	}
 	installed = true
@@ -113,7 +127,7 @@ func TestHostArtifactsPodmanLifecycle(t *testing.T) {
 	}
 	// Stop relying on Git/source files before reconstructing removal receipts.
 	command("volume", "rm", fetchitVolume)
-	ownedPath := filepath.Join(dest, "owned file.txt")
+	ownedPath := filepath.Join(dest, "nested", "owned file.txt")
 	if err := os.WriteFile(ownedPath, []byte("external edit"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +169,7 @@ func TestHostArtifactsPodmanLifecycle(t *testing.T) {
 	if _, err := os.Stat(ownedPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("owned file remains after retry", err)
 	}
-	for _, path := range []string{unrelated, filepath.Join(legacyDest, "legacy.txt")} {
+	for _, path := range []string{unrelated, filepath.Join(legacyDest, "nested", "legacy.txt")} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatal("retained file removed", path, err)
 		}

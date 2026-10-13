@@ -7,6 +7,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"go.uber.org/zap"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,14 +18,15 @@ func TestFileTransferCreateRenameDeleteAndRetry(t *testing.T) {
 	logger = zap.NewNop().Sugar()
 	t.Cleanup(func() { logger = old })
 	for _, tc := range []struct {
-		name, from, to string
-		fail           bool
-		want           [][]string
+		name, targetPath, from, to string
+		fail                       bool
+		want                       [][]string
 	}{
-		{name: "create", to: "new file.txt", want: [][]string{{"rsync", "-avz", "--", "/opt/repo/new file.txt", "/host/dest"}}},
-		{name: "rename", from: "old file.txt", to: "new file.txt", want: [][]string{{"rm", "-f", "--", "/host/dest/old file.txt"}, {"rsync", "-avz", "--", "/opt/repo/new file.txt", "/host/dest"}}},
-		{name: "delete", from: "old file.txt", want: [][]string{{"rm", "-f", "--", "/host/dest/old file.txt"}}},
-		{name: "failed removal", from: "old file.txt", to: "new file.txt", fail: true, want: [][]string{{"rm", "-f", "--", "/host/dest/old file.txt"}}},
+		{name: "create single file", to: "new file.txt", want: [][]string{{"rsync", "-avz", "--mkpath", "--", "/opt/repo/new file.txt", "/host/dest/new file.txt"}}},
+		{name: "create nested file", targetPath: "source", to: "nested/deep/new file.txt", want: [][]string{{"rsync", "-avz", "--mkpath", "--", "/opt/repo/source/nested/deep/new file.txt", "/host/dest/nested/deep/new file.txt"}}},
+		{name: "rename nested file", targetPath: "source", from: "nested/old file.txt", to: "nested/deep/new file.txt", want: [][]string{{"rm", "-f", "--", "/host/dest/nested/old file.txt"}, {"rsync", "-avz", "--mkpath", "--", "/opt/repo/source/nested/deep/new file.txt", "/host/dest/nested/deep/new file.txt"}}},
+		{name: "delete nested file", targetPath: "source", from: "nested/old file.txt", want: [][]string{{"rm", "-f", "--", "/host/dest/nested/old file.txt"}}},
+		{name: "failed nested removal", targetPath: "source", from: "nested/old file.txt", to: "nested/deep/new file.txt", fail: true, want: [][]string{{"rm", "-f", "--", "/host/dest/nested/old file.txt"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var commands [][]string
@@ -54,11 +56,14 @@ func TestFileTransferCreateRenameDeleteAndRetry(t *testing.T) {
 				}
 			})
 			change := &object.Change{From: object.ChangeEntry{Name: tc.from}, To: object.ChangeEntry{Name: tc.to}}
-			path := "repo/" + tc.to
+			path := filepath.Join("repo", tc.targetPath, tc.to)
 			if tc.to == "" {
 				path = deleteFile
 			}
-			method := &FileTransfer{DestinationDirectory: "/host/dest", CommonMethod: CommonMethod{Name: "copy"}}
+			method := &FileTransfer{
+				DestinationDirectory: "/host/dest",
+				CommonMethod:         CommonMethod{Name: "copy", TargetPath: tc.targetPath, target: &Target{url: "https://example.com/repo.git"}},
+			}
 			err := method.MethodEngine(context.Background(), conn, change, path)
 			if (err != nil) != tc.fail || !reflect.DeepEqual(commands, tc.want) {
 				t.Fatalf("commands=%v err=%v", commands, err)

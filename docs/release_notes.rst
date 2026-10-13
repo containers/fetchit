@@ -4,6 +4,12 @@ Release notes
 Unreleased
 ----------
 
+* Recursive FileTransfer (issue #236): files below ``targetPath`` retain their
+  relative directory structure in ``destinationDirectory``. Single-file ``glob``
+  selections continue to copy directly into the destination. Tracked cleanup
+  supports nested destination paths and creates missing parent directories for
+  owned files. See :doc:`methods`.
+
 * Graceful engine shutdown (issue #287): SIGTERM and SIGINT stop scheduling
   work and cancel running operations, with a five-second grace period before
   exit. The entry script forwards signals by replacing itself with FetchIt.
@@ -21,8 +27,8 @@ Trailing slashes in Git target paths
 ``targetPath: examples/filetransfer`` (issue #201). Trailing slashes are removed
 before Git change filtering and ownership calculations for Git methods. This
 also makes configuration reloads between these spellings retain the same
-identity. FileTransfer's existing basename-based destination layout is unchanged;
-this does not add recursive directory preservation. See :doc:`methods`.
+identity. FileTransfer preserves paths relative to ``targetPath``; trailing
+slashes do not add another directory level. See :doc:`methods`.
 
 Tracked host file and service cleanup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

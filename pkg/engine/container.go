@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/containers/fetchit/pkg/engine/utils"
@@ -35,14 +36,14 @@ func validateShellParam(param string, paramName string) error {
 
 func generateSpec(method, file, copyFile, dest string, name string) *specgen.SpecGenerator {
 	s := specgen.NewSpecGenerator(fetchitImage, false)
-	s.Name = method + "-" + name + "-" + file
+	s.Name = method + "-" + name + "-" + strings.ReplaceAll(file, "/", "-")
 	privileged := true
 	s.Privileged = &privileged
 	s.PidNS = specgen.Namespace{
 		NSMode: "host",
 		Value:  "",
 	}
-	s.Command = []string{"rsync", "-avz", "--", copyFile, dest}
+	s.Command = []string{"rsync", "-avz", "--mkpath", "--", copyFile, filepath.Join(dest, file)}
 	s.Mounts = []specs.Mount{{Source: dest, Destination: dest, Type: "bind", Options: []string{"rw"}}}
 	s.Volumes = []*specgen.NamedVolume{{Name: fetchitVolume, Dest: "/opt", Options: []string{"rw"}}}
 	return s

@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -57,11 +59,20 @@ func (ft *FileTransfer) Process(ctx, conn context.Context, skew int) {
 }
 
 func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.Change, path string) error {
+	targetRoot := filepath.Join(getDirectory(ft.GetTarget()), ft.GetTargetPath())
 	var prev *string = nil
+	var previousPath string
 	if change != nil {
 		if change.From.Name != "" {
 			prev = &change.From.Name
 		}
+	}
+	if prev != nil {
+		relativePath, err := fileTransferRelativePath(filepath.Join(targetRoot, *prev), targetRoot)
+		if err != nil {
+			return err
+		}
+		previousPath = relativePath
 	}
 	if ft.CleanupOnRemoval {
 		receipt, _, err := hostMethodReceipt(ft)
@@ -70,27 +81,42 @@ func (ft *FileTransfer) MethodEngine(ctx, conn context.Context, change *object.C
 		}
 		plan := hostArtifactPlan{Receipt: receipt, Action: "apply"}
 		if prev != nil {
-			plan.Previous = filepath.Base(*prev)
+			plan.Previous = previousPath
 		}
 		if path == deleteFile {
 			plan.Action = "delete"
 		} else {
+			relativePath, err := fileTransferRelativePath(path, targetRoot)
+			if err != nil {
+				return err
+			}
 			plan.Source = filepath.Join("/opt", path)
+			plan.DestinationPath = relativePath
 		}
 		return deployHostArtifact(conn, plan)
 	}
+
+	relativePath := ""
+	if path != deleteFile {
+		var err error
+		relativePath, err = fileTransferRelativePath(path, targetRoot)
+		if err != nil {
+			return err
+		}
+	}
+
 	dest := ft.DestinationDirectory
-	return ft.fileTransferPodman(ctx, conn, path, dest, prev)
+	return ft.fileTransferPodman(ctx, conn, path, relativePath, dest, previousPath)
 }
 
 func (ft *FileTransfer) Apply(ctx, conn context.Context, currentState, desiredState plumbing.Hash, tags *[]string) error {
 	return ft.applyGitChanges(ctx, conn, ft, currentState, desiredState, tags)
 }
 
-func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest string, prev *string) error {
-	if prev != nil {
-		pathToRemove := filepath.Join(dest, filepath.Base(*prev))
-		s := generateSpecRemove(filetransferMethod, filepath.Base(pathToRemove), pathToRemove, dest, ft.Name)
+func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, relativePath, dest, previousPath string) error {
+	if previousPath != "" {
+		pathToRemove := filepath.Join(dest, previousPath)
+		s := generateSpecRemove(filetransferMethod, previousPath, pathToRemove, dest, ft.Name)
 		createResponse, err := createAndStartContainer(conn, s)
 		if err != nil {
 			return err
@@ -108,11 +134,9 @@ func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest
 
 	logger.Infof("Deploying file(s) %s", path)
 
-	file := filepath.Base(path)
+	source := "/opt/" + filepath.ToSlash(path)
 
-	source := filepath.Join("/opt", path)
-
-	s := generateSpec(filetransferMethod, file, source, dest, ft.Name)
+	s := generateSpec(filetransferMethod, relativePath, source, dest, ft.Name)
 	createResponse, err := createAndStartContainer(conn, s)
 	if err != nil {
 		return err
@@ -120,4 +144,13 @@ func (ft *FileTransfer) fileTransferPodman(ctx, conn context.Context, path, dest
 
 	// Wait for the container to exit
 	return waitAndRemoveContainer(conn, createResponse.ID)
+}
+
+func fileTransferRelativePath(path, repository string) (string, error) {
+	relativePath, err := filepath.Rel(repository, path)
+	if err != nil || relativePath == "" || relativePath == "." || relativePath == ".." ||
+		strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("file transfer path %q is outside repository %q", path, repository)
+	}
+	return relativePath, nil
 }

@@ -206,7 +206,15 @@ func (sd *Systemd) systemdPodman(ctx context.Context, conn context.Context, path
 				Name: sd.Name,
 			},
 		}
-		if err := ft.fileTransferPodman(ctx, conn, path, dest, prev); err != nil {
+		relativePath := ""
+		if path != deleteFile {
+			relativePath = filepath.Base(path)
+		}
+		previousPath := ""
+		if prev != nil {
+			previousPath = filepath.Base(*prev)
+		}
+		if err := ft.fileTransferPodman(ctx, conn, path, relativePath, dest, previousPath); err != nil {
 			return utils.WrapErr(err, "Error deploying systemd %s file(s), Path: %s", sd.Name, sd.TargetPath)
 		}
 	}
