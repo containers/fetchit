@@ -58,13 +58,26 @@ func hostSystemctl(host string, h *hostRemoval, args ...string) (string, error) 
 }
 
 func validArtifactName(name, kind string) bool {
-	if name == "" || name == "." || name == ".." || name == artifactJournalDirectory || filepath.Base(name) != name || strings.ContainsAny(name, "\x00\n\r") {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "\x00\n\r") {
 		return false
 	}
-	if kind == systemdMethod {
-		return quadletSafeName.MatchString(name) && strings.HasSuffix(name, ".service") && !strings.HasPrefix(name, "-") && name != ".service"
+	if kind == filetransferMethod {
+		return validFileTransferArtifactPath(name)
 	}
-	return kind == filetransferMethod
+	return kind == systemdMethod && filepath.Base(name) == name && name != artifactJournalDirectory &&
+		quadletSafeName.MatchString(name) && strings.HasSuffix(name, ".service") && !strings.HasPrefix(name, "-") && name != ".service"
+}
+
+func validFileTransferArtifactPath(name string) bool {
+	if filepath.IsAbs(name) || filepath.Clean(name) != name {
+		return false
+	}
+	for _, part := range strings.Split(name, string(filepath.Separator)) {
+		if part == "" || part == "." || part == ".." || part == artifactJournalDirectory {
+			return false
+		}
+	}
+	return true
 }
 
 // Validate every destination component, rather than following a host symlink.
@@ -113,6 +126,31 @@ func fingerprintArtifact(path string) (*artifactFingerprint, error) {
 	}
 	stat := opened.Sys().(*syscall.Stat_t)
 	return &artifactFingerprint{Digest: hex.EncodeToString(digest.Sum(nil)), Mode: uint32(opened.Mode().Perm()), Device: uint64(stat.Dev), Inode: uint64(stat.Ino), UID: stat.Uid, GID: stat.Gid}, nil
+}
+
+func artifactTargetPath(dest, name string, createParents bool) (string, error) {
+	current := dest
+	components := strings.Split(name, string(filepath.Separator))
+	for _, component := range components[:len(components)-1] {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) && createParents {
+			if err := os.Mkdir(current, 0755); err != nil {
+				return "", err
+			}
+			info, err = os.Lstat(current)
+		}
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return filepath.Join(dest, name), nil
+			}
+			return "", err
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("artifact destination is not a real directory: %s", current)
+		}
+	}
+	return filepath.Join(dest, name), nil
 }
 func sameFingerprint(a, b *artifactFingerprint) bool { return a != nil && b != nil && *a == *b }
 
@@ -213,11 +251,19 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 	if plan.Action != "apply" && plan.Action != "delete" && plan.Action != "cleanup" {
 		return errors.New("invalid host artifact action")
 	}
+	if plan.DestinationPath != "" && !validArtifactName(plan.DestinationPath, r.Kind) {
+		return errors.New("invalid artifact destination path")
+	}
 	if plan.Previous != "" && !validArtifactName(plan.Previous, r.Kind) {
 		return errors.New("invalid previous artifact name")
 	}
-	if plan.Action == "apply" && (!cleanHostPath(plan.Source) || !strings.HasPrefix(plan.Source, "/opt/") || !validArtifactName(filepath.Base(plan.Source), r.Kind)) {
-		return errors.New("invalid artifact source")
+	if plan.Action == "apply" {
+		if plan.DestinationPath == "" {
+			plan.DestinationPath = filepath.Base(plan.Source)
+		}
+		if !cleanHostPath(plan.Source) || !strings.HasPrefix(plan.Source, "/opt/") || !validArtifactName(plan.DestinationPath, r.Kind) {
+			return errors.New("invalid artifact source")
+		}
 	}
 	dest, err := artifactDestination(host, r.Host.Destination)
 	if errors.Is(err, os.ErrNotExist) && plan.Action == "cleanup" {
@@ -265,7 +311,11 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 		return err
 	}
 	check := func(name string) (artifactRecord, *artifactFingerprint, error) {
-		existing, err := fingerprintArtifact(filepath.Join(dest, name))
+		target, err := artifactTargetPath(dest, name, false)
+		if err != nil {
+			return artifactRecord{}, nil, err
+		}
+		existing, err := fingerprintArtifact(target)
 		if err != nil {
 			return artifactRecord{}, nil, err
 		}
@@ -320,7 +370,11 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 			}
 		}
 		if existing != nil {
-			if err := os.Remove(filepath.Join(dest, name)); err != nil {
+			target, err := artifactTargetPath(dest, name, false)
+			if err != nil {
+				return err
+			}
+			if err := os.Remove(target); err != nil {
 				return err
 			}
 		}
@@ -375,7 +429,7 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 		}
 		return nil
 	}
-	name := filepath.Base(plan.Source)
+	name := plan.DestinationPath
 	record, _, err := check(name)
 	if err != nil {
 		return err
@@ -406,7 +460,11 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 	}
 	// An interrupted copy can own either the original inode or the staged inode.
 	if record.Pending != nil {
-		installed, err := fingerprintArtifact(filepath.Join(dest, name))
+		target, err := artifactTargetPath(dest, name, true)
+		if err != nil {
+			return err
+		}
+		installed, err := fingerprintArtifact(target)
 		if err != nil {
 			return err
 		}
@@ -465,7 +523,11 @@ func executeHostArtifactPlan(plan hostArtifactPlan, host, sourceRoot string, con
 			return err
 		}
 	}
-	if err := os.Rename(stagePath, filepath.Join(dest, name)); err != nil {
+	target, err := artifactTargetPath(dest, name, true)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(stagePath, target); err != nil {
 		return err
 	}
 	if err := syncArtifactDirectory(dest); err != nil {

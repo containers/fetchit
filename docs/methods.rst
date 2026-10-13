@@ -33,9 +33,8 @@ absolute-path validation or normalize interior path components.
 normalization applies to ``targetPath``; tracked host destinations must still
 be canonical absolute paths without symlink components.
 
-FileTransfer continues to copy each file by its basename into
-``destinationDirectory``; adding a trailing slash does not preserve nested source
-directories or change its destination layout.
+FileTransfer preserves directories below ``targetPath``. Adding a trailing slash
+does not change the destination layout. Use ``glob`` to select a single file.
 
 Dynamic Configuration Reload
 ----------------------------
@@ -123,7 +122,7 @@ revision-pinned builds and :doc:`release_notes` for unreleased changes.
      - Authored host ``.service`` files
      - Optional tracked-service cleanup
    * - ``filetransfer``
-     - Copy files into an existing host directory
+     - Copy files and nested directories into an existing host directory
      - Optional tracked-file cleanup
    * - ``ansible``
      - Host configuration through playbooks
@@ -350,11 +349,14 @@ The File Transfer method will copy files from the container to the host. This me
        schedule: "*/5 * * * *"
      branch: main
 
-The ``destinationDirectory`` field is the directory on the host where files
-will be copied. Set ``cleanupOnRemoval: true`` to track individual copied files
-and remove them when the method leaves configuration. The default is false.
-Tracked deployments require an existing, absolute destination directory and
-refuse to overwrite untracked files. See :doc:`lifecycle` for setup and recovery.
+The ``destinationDirectory`` field is the directory on the host where files and
+nested directories below ``targetPath`` will be copied. Source directory
+structure is preserved, while ``glob`` can still select a single file. Set
+``cleanupOnRemoval: true`` to track individual copied files and remove them when
+the method leaves configuration. The default is false. Tracked deployments
+require an existing, absolute destination directory, create missing parent
+directories for tracked files, and refuse to overwrite untracked files. See
+:doc:`lifecycle` for setup and recovery.
 
 During Git reconciliation, deletion removes the old destination filename, and
 rename removes the old filename before installing the new one. Filenames with

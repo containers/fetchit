@@ -25,12 +25,13 @@ type hostRemoval struct {
 }
 
 type hostArtifactPlan struct {
-	Receipt  removalReceipt `json:"receipt"`
-	Action   string         `json:"action"`
-	Source   string         `json:"source,omitempty"`
-	Previous string         `json:"previous,omitempty"`
-	Enable   bool           `json:"enable,omitempty"`
-	Restart  bool           `json:"restart,omitempty"`
+	Receipt         removalReceipt `json:"receipt"`
+	Action          string         `json:"action"`
+	Source          string         `json:"source,omitempty"`
+	DestinationPath string         `json:"destinationPath,omitempty"`
+	Previous        string         `json:"previous,omitempty"`
+	Enable          bool           `json:"enable,omitempty"`
+	Restart         bool           `json:"restart,omitempty"`
 }
 
 func init() {

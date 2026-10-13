@@ -30,7 +30,11 @@ func artifactFixture(t *testing.T, systemd bool) (hostArtifactPlan, string, stri
 	plan := hostArtifactPlan{Receipt: removalReceipt{Kind: kind, Owner: kubeOwner("fixture", kind, "", ""), Host: h}, Action: "apply"}
 	write := func(name, text string) {
 		t.Helper()
-		if err := os.WriteFile(filepath.Join(sourceRoot, "opt", "repo", name), []byte(text), 0644); err != nil {
+		path := filepath.Join(sourceRoot, "opt", "repo", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -92,6 +96,40 @@ func TestHostArtifactsChangedFilesRetained(t *testing.T) {
 				t.Fatal("lost retry record", err)
 			}
 		})
+	}
+}
+
+func TestHostArtifactsPreserveNestedDestinationPaths(t *testing.T) {
+	plan, host, sourceRoot, write := artifactFixture(t, false)
+	write("nested/old.txt", "old")
+	plan.Source = "/opt/repo/nested/old.txt"
+	plan.DestinationPath = "nested/old.txt"
+	if err := executeHostArtifactPlan(plan, host, sourceRoot, noArtifactControl); err != nil {
+		t.Fatal(err)
+	}
+
+	write("nested/deep/new.txt", "new")
+	plan.Source = "/opt/repo/nested/deep/new.txt"
+	plan.DestinationPath = "nested/deep/new.txt"
+	plan.Previous = "nested/old.txt"
+	if err := executeHostArtifactPlan(plan, host, sourceRoot, noArtifactControl); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(host, plan.Receipt.Host.Destination)
+	if _, err := os.Stat(filepath.Join(dest, "nested", "old.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("rename left old nested file", err)
+	}
+	if data, err := os.ReadFile(filepath.Join(dest, "nested", "deep", "new.txt")); err != nil || string(data) != "new" {
+		t.Fatalf("new nested file missing or wrong: %q %v", data, err)
+	}
+
+	plan.Action, plan.Source, plan.DestinationPath, plan.Previous = "delete", "", "", "nested/deep/new.txt"
+	if err := executeHostArtifactPlan(plan, host, sourceRoot, noArtifactControl); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "nested", "deep", "new.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("nested file remains", err)
 	}
 }
 func TestHostArtifactsRefuseUnmanagedAndConflictingOwners(t *testing.T) {
