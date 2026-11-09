@@ -214,7 +214,7 @@ func mirrorCloneOptions(target *Target) (*git.CloneOptions, error) {
 	if target.pat != "" {
 		username, password = "fetchit", target.pat
 	}
-	options := &git.CloneOptions{ReferenceName: plumbing.NewBranchReferenceName(target.branch), SingleBranch: true, Auth: httpBasicAuth(username, password)}
+	options := &git.CloneOptions{ReferenceName: plumbing.NewBranchReferenceName(target.branch), SingleBranch: true}
 	if target.ssh {
 		key, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 		if err != nil {
@@ -227,6 +227,12 @@ func mirrorCloneOptions(target *Target) (*git.CloneOptions, error) {
 		}
 		key.HostKeyCallback = callback
 		options.Auth = key
+	} else {
+		auth, err := httpBasicAuth(username, password)
+		if err != nil {
+			return nil, err
+		}
+		options.Auth = auth
 	}
 	return options, nil
 }

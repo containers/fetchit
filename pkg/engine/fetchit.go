@@ -539,7 +539,6 @@ func getClone(target *Target) error {
 		}
 		// default to using existing http method
 		cOptions := &git.CloneOptions{
-			Auth:          httpBasicAuth(target.username, target.password),
 			URL:           target.url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)),
 			SingleBranch:  true,
@@ -550,6 +549,12 @@ func getClone(target *Target) error {
 			authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 			if err != nil {
 				logger.Infof("generate publickeys failed: %s", err.Error())
+				return err
+			}
+			cOptions.Auth = authValue
+		} else {
+			authValue, err := httpBasicAuth(target.username, target.password)
+			if err != nil {
 				return err
 			}
 			cOptions.Auth = authValue

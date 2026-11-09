@@ -80,7 +80,6 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		RemoteName:      "",
 		RefSpecs:        []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
 		Depth:           0,
-		Auth:            httpBasicAuth(target.username, target.password),
 		Progress:        nil,
 		Tags:            0,
 		Force:           true,
@@ -93,6 +92,12 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 		if err != nil {
 			logger.Infof("generate publickeys failed: %s", err.Error())
+			return plumbing.Hash{}, err
+		}
+		fOptions.Auth = authValue
+	} else {
+		authValue, err := httpBasicAuth(target.username, target.password)
+		if err != nil {
 			return plumbing.Hash{}, err
 		}
 		fOptions.Auth = authValue

@@ -12,16 +12,29 @@ func TestHTTPBasicAuth(t *testing.T) {
 		username  string
 		password  string
 		anonymous bool
+		wantErr   bool
 	}{
 		{name: "anonymous", anonymous: true},
 		{name: "username and password", username: "bob", password: "test-password"},
-		{name: "username only", username: "test-token"},
-		{name: "password only", password: "test-token"},
+		{name: "username only", username: "test-token", wantErr: true},
+		{name: "password only", password: "test-token", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth := httpBasicAuth(tt.username, tt.password)
+			auth, err := httpBasicAuth(tt.username, tt.password)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("incomplete credentials accepted")
+				}
+				if auth != nil {
+					t.Fatalf("authentication with incomplete credentials = %T, want nil", auth)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
 			if tt.anonymous {
 				if auth != nil {
 					t.Fatalf("anonymous authentication = %T, want nil", auth)
@@ -46,8 +59,10 @@ func TestMirrorCloneOptionsHTTPAuth(t *testing.T) {
 		username  string
 		password  string
 		anonymous bool
+		wantErr   bool
 	}{
 		{name: "anonymous", target: &Target{branch: "main"}, anonymous: true},
+		{name: "incomplete credentials", target: &Target{branch: "main", username: "bob"}, wantErr: true},
 		{
 			name:     "basic auth",
 			target:   &Target{branch: "main", username: "bob", password: "test-password"},
@@ -65,6 +80,12 @@ func TestMirrorCloneOptionsHTTPAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			options, err := mirrorCloneOptions(tt.target)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("mirror accepted incomplete credentials")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}

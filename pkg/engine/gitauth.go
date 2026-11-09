@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -20,12 +21,16 @@ type GitAuth struct {
 	EnvSecret  string `mapstructure:"envSecret"`
 }
 
-// httpBasicAuth leaves anonymous requests without an Authorization header.
-func httpBasicAuth(username, password string) transport.AuthMethod {
+// Use httpBasicAuth to omit HTTP Basic authentication for anonymous requests
+// and reject incomplete credentials before sending them to a Git server.
+func httpBasicAuth(username, password string) (transport.AuthMethod, error) {
 	if username == "" && password == "" {
-		return nil
+		return nil, nil
 	}
-	return &githttp.BasicAuth{Username: username, Password: password}
+	if username == "" || password == "" {
+		return nil, errors.New("git username and password must both be provided")
+	}
+	return &githttp.BasicAuth{Username: username, Password: password}, nil
 }
 
 // Checks to see if private key exists on given path
