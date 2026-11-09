@@ -15,7 +15,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
@@ -211,11 +210,11 @@ func (e *mirrorSourceError) Error() string {
 func (e *mirrorSourceError) Unwrap() error { return e.Err }
 
 func mirrorCloneOptions(target *Target) (*git.CloneOptions, error) {
-	auth := &githttp.BasicAuth{Username: target.username, Password: target.password}
+	username, password := target.username, target.password
 	if target.pat != "" {
-		auth.Username, auth.Password = "fetchit", target.pat
+		username, password = "fetchit", target.pat
 	}
-	options := &git.CloneOptions{ReferenceName: plumbing.NewBranchReferenceName(target.branch), SingleBranch: true, Auth: auth}
+	options := &git.CloneOptions{ReferenceName: plumbing.NewBranchReferenceName(target.branch), SingleBranch: true, Auth: httpBasicAuth(username, password)}
 	if target.ssh {
 		key, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 		if err != nil {
