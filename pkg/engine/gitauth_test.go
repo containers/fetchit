@@ -22,7 +22,7 @@ func TestHTTPBasicAuth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			auth, err := httpBasicAuth(tt.username, tt.password)
+			auth, err := httpBasicAuth(&Target{username: tt.username, password: tt.password})
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("incomplete credentials accepted")
@@ -49,6 +49,20 @@ func TestHTTPBasicAuth(t *testing.T) {
 				t.Fatalf("credentials = %q/%q, want %q/%q", basic.Username, basic.Password, tt.username, tt.password)
 			}
 		})
+	}
+}
+
+func TestHTTPBasicAuthPATPrecedence(t *testing.T) {
+	auth, err := httpBasicAuth(&Target{username: "ignored", pat: "test-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	basic, ok := auth.(*githttp.BasicAuth)
+	if !ok {
+		t.Fatalf("PAT authentication = %T, want *http.BasicAuth", auth)
+	}
+	if basic.Username != "fetchit" || basic.Password != "test-token" {
+		t.Fatalf("PAT credentials = %q/%q, want fetchit/test-token", basic.Username, basic.Password)
 	}
 }
 

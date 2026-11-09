@@ -553,7 +553,7 @@ func getClone(target *Target) error {
 			}
 			cOptions.Auth = authValue
 		} else {
-			authValue, err := httpBasicAuth(target.username, target.password)
+			authValue, err := httpBasicAuth(target)
 			if err != nil {
 				return err
 			}

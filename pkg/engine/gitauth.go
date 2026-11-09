@@ -21,9 +21,13 @@ type GitAuth struct {
 	EnvSecret  string `mapstructure:"envSecret"`
 }
 
-// Use httpBasicAuth to omit HTTP Basic authentication for anonymous requests
-// and reject incomplete credentials before sending them to a Git server.
-func httpBasicAuth(username, password string) (transport.AuthMethod, error) {
+// Use httpBasicAuth to apply PAT precedence, omit HTTP Basic authentication for
+// anonymous requests, and reject incomplete credentials before contacting a Git server.
+func httpBasicAuth(target *Target) (transport.AuthMethod, error) {
+	username, password := target.username, target.password
+	if target.pat != "" {
+		username, password = "fetchit", target.pat
+	}
 	if username == "" && password == "" {
 		return nil, nil
 	}

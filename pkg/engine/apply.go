@@ -96,7 +96,7 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		}
 		fOptions.Auth = authValue
 	} else {
-		authValue, err := httpBasicAuth(target.username, target.password)
+		authValue, err := httpBasicAuth(target)
 		if err != nil {
 			return plumbing.Hash{}, err
 		}
