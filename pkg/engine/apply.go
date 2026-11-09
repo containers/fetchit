@@ -17,7 +17,6 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/gobwas/glob"
 	gitsign "github.com/sigstore/gitsign/pkg/git"
@@ -78,13 +77,9 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 
 	// default to using existing http method
 	fOptions := &git.FetchOptions{
-		RemoteName: "",
-		RefSpecs:   []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
-		Depth:      0,
-		Auth: &githttp.BasicAuth{
-			Username: target.username,
-			Password: target.password,
-		},
+		RemoteName:      "",
+		RefSpecs:        []config.RefSpec{refSpec, "HEAD:refs/heads/HEAD"},
+		Depth:           0,
 		Progress:        nil,
 		Tags:            0,
 		Force:           true,
@@ -97,6 +92,12 @@ func getLatest(target *Target) (plumbing.Hash, error) {
 		authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 		if err != nil {
 			logger.Infof("generate publickeys failed: %s", err.Error())
+			return plumbing.Hash{}, err
+		}
+		fOptions.Auth = authValue
+	} else {
+		authValue, err := httpBasicAuth(target)
+		if err != nil {
 			return plumbing.Hash{}, err
 		}
 		fOptions.Auth = authValue

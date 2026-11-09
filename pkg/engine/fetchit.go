@@ -13,7 +13,6 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -540,10 +539,6 @@ func getClone(target *Target) error {
 		}
 		// default to using existing http method
 		cOptions := &git.CloneOptions{
-			Auth: &githttp.BasicAuth{
-				Username: target.username, // the value of this field should not matter when using a PAT
-				Password: target.password,
-			},
 			URL:           target.url,
 			ReferenceName: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", target.branch)),
 			SingleBranch:  true,
@@ -554,6 +549,12 @@ func getClone(target *Target) error {
 			authValue, err := ssh.NewPublicKeysFromFile("git", target.sshKey, target.password)
 			if err != nil {
 				logger.Infof("generate publickeys failed: %s", err.Error())
+				return err
+			}
+			cOptions.Auth = authValue
+		} else {
+			authValue, err := httpBasicAuth(target)
+			if err != nil {
 				return err
 			}
 			cOptions.Auth = authValue
